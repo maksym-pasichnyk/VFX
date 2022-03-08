@@ -60,7 +60,6 @@ add_library(VFX STATIC
     src/buffer.hpp
     src/display.hpp
     src/graph.hpp
-    src/shader.hpp
     src/material.hpp
     src/ui.hpp
     src/assets.hpp

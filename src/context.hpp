@@ -3,7 +3,6 @@
 #include <list>
 #include <types.hpp>
 #include <buffer.hpp>
-#include <shader.hpp>
 #include <display.hpp>
 #include <texture.hpp>
 #include <material.hpp>
@@ -750,47 +749,6 @@ struct Context {
 
     void set_index_buffer_data(Geometry* geometry, const void* src, u64 size, u64 offset) {
         update_buffer(geometry->idx, src, size * geometry->idx_stride, offset * geometry->idx_stride);
-    }
-
-    auto create_shader_effect() -> ShaderEffect* {
-        return new ShaderEffect();
-    }
-
-    auto destroy_shader_effect(ShaderEffect* effect) {
-        for (auto& stage : effect->stages) {
-            logical_device.destroyShaderModule(stage.module);
-        }
-        logical_device.destroyPipeline(effect->pipeline);
-        logical_device.destroyPipelineLayout(effect->layout);
-
-        if (effect->resources.pool) {
-            logical_device.destroyDescriptorPool(effect->resources.pool);
-        }
-        if (effect->resources.layout) {
-            logical_device.destroyDescriptorSetLayout(effect->resources.layout);
-        }
-        delete effect;
-    }
-
-    void create_shader_effect_layout(ShaderEffect* effect) {
-        auto create_info = vk::PipelineLayoutCreateInfo{};
-        if (effect->resources.layout) {
-            create_info.setSetLayouts(effect->resources.layout);
-            create_info.setPushConstantRanges(effect->resources.constants);
-        }
-        effect->layout = logical_device.createPipelineLayout(create_info);
-    }
-
-    void create_shader_effect_descriptors(ShaderEffect* effect) {
-        auto layouts = std::array{
-            effect->resources.layout,
-            effect->resources.layout,
-            effect->resources.layout
-        };
-        auto allocate_info = vk::DescriptorSetAllocateInfo{};
-        allocate_info.setDescriptorPool(effect->resources.pool);
-        allocate_info.setSetLayouts(layouts);
-        effect->resources.descriptors = logical_device.allocateDescriptorSets(allocate_info);
     }
 
     auto create_material(const MaterialDescription& description, vk::RenderPass pass, u32 subpass) -> Material* {
