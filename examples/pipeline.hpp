@@ -10,6 +10,23 @@ struct CameraProperties {
     glm::mat4 view;
 };
 
+struct Camera {
+    static constexpr auto clip = glm::mat4{
+        1.0f,  0.0f, 0.0f, 0.0f,
+        0.0f, -1.0f, 0.0f, 0.0f,
+        0.0f,  0.0f, 1.0f, 0.0f,
+        0.0f,  0.0f, 0.0f, 1.0f
+    };
+
+    glm::mat4 view{};
+    glm::mat4 projection{};
+
+    Camera(f32 fov, f32 aspect) {
+        view = glm::mat4(1.0f); // glm::inverse(camera.local_to_world_matrix());
+        projection = clip * glm::infinitePerspective(glm::radians(fov), aspect, 0.1f);
+    }
+};
+
 struct RenderPipelineSettings {};
 
 struct RenderPipeline {
@@ -159,8 +176,9 @@ struct RenderPipeline {
         return context.create_material(description, graph.pass, 0);
     }
 
-    void set_camera_properties(const CameraProperties& properties) {
-        camera_properties = properties;
+    void set_camera_properties(const Camera& camera) {
+        camera_properties.projection = camera.projection;
+        camera_properties.view = camera.view;
     }
 
     void begin_render_pass(vk::CommandBuffer cmd) {

@@ -1,18 +1,12 @@
 #include <map>
 #include <ui.hpp>
-#include <shader.hpp>
 #include <display.hpp>
 #include <context.hpp>
 #include <glm/ext.hpp>
 
 #include "pipeline.hpp"
 
-struct DefaultVertexFormat {
-    glm::vec3 position;
-    glm::u8vec4 color;
-};
-
-auto main() -> i32 {
+struct Demo {
     Display display{800, 600, "Demo", true};
     Context context{display};
 
@@ -21,75 +15,98 @@ auto main() -> i32 {
 
     UI ui{context, pipeline.graph};
 
-    std::vector<u32> indices{
-        0, 1, 2, 0, 2, 3
-    };
-    std::vector<DefaultVertexFormat> vertices{
-        DefaultVertexFormat{.position = glm::vec3(-1.0, -0.5, -1), .color = glm::u8vec4(0, 0, 255, 255)},
-        DefaultVertexFormat{.position = glm::vec3(-1.0,  0.5, -1), .color = glm::u8vec4(0, 0, 255, 255)},
-        DefaultVertexFormat{.position = glm::vec3( 0.0,  0.5, -1), .color = glm::u8vec4(0, 0, 255, 255)},
-        DefaultVertexFormat{.position = glm::vec3( 0.0, -0.5, -1), .color = glm::u8vec4(0, 0, 255, 255)},
-    };
+    std::vector<Geometry> geometries;
 
-    static constexpr auto clip = glm::mat4{
-        1.0f,  0.0f, 0.0f, 0.0f,
-        0.0f, -1.0f, 0.0f, 0.0f,
-        0.0f,  0.0f, 1.0f, 0.0f,
-        0.0f,  0.0f, 0.0f, 1.0f
-    };
+    Demo() {
+        geometries.resize(2);
 
-    const auto aspect = f32(context.surface_extent.width) / f32(context.surface_extent.height);
-    const auto projection = clip * glm::infinitePerspective(glm::radians(60.0f), aspect, 0.1f);
+        std::vector<u32> indices{
+            0, 1, 2, 0, 2, 3
+        };
+        {
+            std::vector<DefaultVertexFormat> vertices{
+                DefaultVertexFormat{.position = glm::vec3(-1.0, -0.5, -1), .color = glm::u8vec4(0, 0, 255, 255)},
+                DefaultVertexFormat{.position = glm::vec3(-1.0,  0.5, -1), .color = glm::u8vec4(0, 0, 255, 255)},
+                DefaultVertexFormat{.position = glm::vec3( 0.0,  0.5, -1), .color = glm::u8vec4(0, 0, 255, 255)},
+                DefaultVertexFormat{.position = glm::vec3( 0.0, -0.5, -1), .color = glm::u8vec4(0, 0, 255, 255)},
+            };
 
-    auto vtx = context.create_buffer(GraphicsBuffer::Target::Vertex, std::span(vertices).size_bytes());
-    auto idx = context.create_buffer(GraphicsBuffer::Target::Index, std::span(indices).size_bytes());
+            context.set_vertices(&geometries[0], vertices);
+            context.set_indices(&geometries[0], indices);
+        }
+        {
+            std::vector<DefaultVertexFormat> vertices{
+                DefaultVertexFormat{.position = glm::vec3(0.0, -0.5, -1), .color = glm::u8vec4(255, 0, 0, 255)},
+                DefaultVertexFormat{.position = glm::vec3(0.0,  0.5, -1), .color = glm::u8vec4(255, 0, 0, 255)},
+                DefaultVertexFormat{.position = glm::vec3(1.0,  0.5, -1), .color = glm::u8vec4(255, 0, 0, 255)},
+                DefaultVertexFormat{.position = glm::vec3(1.0, -0.5, -1), .color = glm::u8vec4(255, 0, 0, 255)},
+            };
 
-    context.update_buffer(vtx, vertices.data(), std::span(vertices).size_bytes(), 0);
-    context.update_buffer(idx, indices.data(), std::span(indices).size_bytes(), 0);
-
-    auto last_time = std::chrono::high_resolution_clock::now();
-    while (!display.should_close()) {
-        const auto current_time = std::chrono::high_resolution_clock::now();
-        const auto delta_time = std::chrono::duration<f32, std::chrono::seconds::period>(current_time - last_time).count();
-        last_time = current_time;
-
-        display.poll_events();
-
-        ui.set_delta_time(delta_time);
-        ui.update(display);
-
-        if (context.begin_frame()) {
-            auto cmd = context.command_buffers[context.current_frame];
-
-            auto properties = CameraProperties{};
-            properties.projection = projection;
-            properties.view = glm::mat4(1.0);// glm::inverse(camera.local_to_world_matrix());
-
-            pipeline.set_camera_properties(properties);
-            pipeline.begin_render_pass(cmd);
-
-            cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.material->pipeline);
-            cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.material->pipeline_layout, 0, pipeline.material->descriptor_sets[context.current_frame], {});
-            cmd.bindVertexBuffers(0, vtx->buffer, vk::DeviceSize{0});
-            cmd.bindIndexBuffer(idx->buffer, 0, vk::IndexType::eUint32);
-            cmd.drawIndexed(indices.size(), 1, 0, 0, 0);
-
-            ImGui::NewFrame();
-            ImGui::Begin("Demo");
-
-            ImGui::End();
-            ImGui::Render();
-
-            ui.draw(cmd);
-
-            cmd.endRenderPass();
-            context.end_frame();
+            context.set_vertices(&geometries[1], vertices);
+            context.set_indices(&geometries[1], indices);
         }
     }
 
-    context.destroy_buffer(vtx);
-    context.destroy_buffer(idx);
-    context.logical_device.waitIdle();
+    ~Demo() {
+        for (auto& geometry : geometries) {
+            context.destroy_buffer(geometry.vtx);
+            context.destroy_buffer(geometry.idx);
+        }
+    }
 
+    void run() {
+        Camera camera{60.0f, display.get_aspect()};
+
+        auto last_time = std::chrono::high_resolution_clock::now();
+        while (!display.should_close()) {
+            const auto current_time = std::chrono::high_resolution_clock::now();
+            const auto delta_time = std::chrono::duration<f32, std::chrono::seconds::period>(current_time - last_time).count();
+            last_time = current_time;
+
+            display.poll_events();
+
+            ui.set_delta_time(delta_time);
+            ui.update(display);
+
+            if (context.begin_frame()) {
+                auto cmd = context.command_buffers[context.current_frame];
+
+                pipeline.set_camera_properties(camera);
+                pipeline.begin_render_pass(cmd);
+
+                cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.material->pipeline);
+                cmd.bindDescriptorSets(
+                    vk::PipelineBindPoint::eGraphics,
+                    pipeline.material->pipeline_layout,
+                    0,
+                    pipeline.material->descriptor_sets[context.current_frame],
+                    {}
+                );
+
+                for (auto& geometry : geometries) {
+                    cmd.bindVertexBuffers(0, geometry.vtx->buffer, vk::DeviceSize{0});
+                    cmd.bindIndexBuffer(geometry.idx->buffer, 0, vk::IndexType::eUint32);
+                    cmd.drawIndexed(geometry.idx_count, 1, 0, 0, 0);
+                }
+
+                ImGui::NewFrame();
+                ImGui::Begin("Demo");
+
+                ImGui::End();
+                ImGui::Render();
+
+                ui.draw(cmd);
+
+                cmd.endRenderPass();
+                context.end_frame();
+            }
+        }
+        context.logical_device.waitIdle();
+    }
+};
+
+auto main() -> i32 {
+    Demo demo{};
+    demo.run();
     return 0;
 }
