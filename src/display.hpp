@@ -315,6 +315,7 @@ struct Display {
         glfwGetFramebufferSize(window, &size.x, &size.y);
         return glm::vec2(size) / glm::vec2(get_size());
     }
+
     auto get_aspect() const -> f32 {
         const auto size = get_size();
         return f32(size.x) / f32(size.y);

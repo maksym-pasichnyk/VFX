@@ -9,7 +9,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
-struct UI {
+struct Widgets {
     static constexpr auto buttons = std::array{
         MouseButton::Left,
         MouseButton::Right,
@@ -41,7 +41,7 @@ struct UI {
         KeyCode::eZ
     };
 
-    UI(Context& context, RenderGraph& graph) : context(context) {
+    Widgets(Context& context, vk::RenderPass pass) : context(context) {
         IMGUI_CHECKVERSION();
         ctx = ImGui::CreateContext();
 
@@ -156,7 +156,7 @@ struct UI {
             .module = context.create_shader_module(frag_data),
             .pName = "main"
         });
-        material = context.create_material(description, graph.pass, 0);
+        material = context.create_material(description, pass, 0);
 
         for (u64 i = 0; i < 3; ++i) {
             const auto image_info = vk::DescriptorImageInfo{
@@ -176,7 +176,7 @@ struct UI {
         }
     }
 
-    ~UI() {
+    ~Widgets() {
         ImGui::DestroyContext(ctx);
 
         context.destroy_texture(font_texture);

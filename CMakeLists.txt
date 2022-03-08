@@ -61,7 +61,6 @@ add_library(VFX STATIC
     src/display.hpp
     src/graph.hpp
     src/material.hpp
-    src/ui.hpp
     src/assets.hpp
     src/vulkan.cpp
 )
@@ -91,6 +90,7 @@ target_compile_definitions(VFX PUBLIC
 
 add_executable(VFX-example
     examples/main.cpp
+    examples/widgets.hpp
     examples/pipeline.hpp
 )
 target_link_libraries(VFX-example PRIVATE VFX)

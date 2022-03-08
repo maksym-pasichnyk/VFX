@@ -1,9 +1,9 @@
 #include <map>
-#include <ui.hpp>
 #include <display.hpp>
 #include <context.hpp>
 #include <glm/ext.hpp>
 
+#include "widgets.hpp"
 #include "pipeline.hpp"
 
 struct Demo {
@@ -13,7 +13,7 @@ struct Demo {
     RenderPipelineSettings settings{};
     RenderPipeline pipeline{context, settings};
 
-    UI ui{context, pipeline.graph};
+    Widgets widgets{context, pipeline.graph.pass};
 
     std::vector<Geometry> geometries;
 
@@ -65,8 +65,8 @@ struct Demo {
 
             display.poll_events();
 
-            ui.set_delta_time(delta_time);
-            ui.update(display);
+            widgets.set_delta_time(delta_time);
+            widgets.update(display);
 
             if (context.begin_frame()) {
                 auto cmd = context.command_buffers[context.current_frame];
@@ -95,7 +95,7 @@ struct Demo {
                 ImGui::End();
                 ImGui::Render();
 
-                ui.draw(cmd);
+                widgets.draw(cmd);
 
                 cmd.endRenderPass();
                 context.end_frame();
