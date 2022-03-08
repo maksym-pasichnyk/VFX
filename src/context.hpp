@@ -13,6 +13,11 @@
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_beta.h>
 
+struct DefaultVertexFormat {
+    glm::vec3 position;
+    glm::u8vec4 color;
+};
+
 struct Geometry {
     GraphicsBuffer* vtx = nullptr;
     GraphicsBuffer* idx = nullptr;
@@ -713,6 +718,16 @@ struct Context {
         auto dst = static_cast<std::byte*>(ptr) + offset;
         memcpy(dst, src, size);
         vmaUnmapMemory(allocator, gb->allocation);
+    }
+
+    void set_vertices(Geometry* geometry, std::span<const DefaultVertexFormat> vertices) {
+        set_vertex_buffer_params(geometry, i32(vertices.size()), sizeof(DefaultVertexFormat));
+        set_vertex_buffer_data(geometry, vertices.data(), vertices.size(), 0);
+    }
+
+    void set_indices(Geometry* geometry, std::span<const u32> indices) {
+        set_index_buffer_params(geometry, i32(indices.size()), sizeof(u32));
+        set_index_buffer_data(geometry, indices.data(), indices.size(), 0);
     }
 
     void set_vertex_buffer_params(Geometry* geometry, i32 count, u64 stride) {
