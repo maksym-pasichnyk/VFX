@@ -169,8 +169,8 @@ struct RenderPipeline {
         }
 
         auto fb_attachments = std::vector{
-                context.views[context.current_frame],
-                depth[context.current_frame]->view,
+            context.views[context.current_frame],
+            depth[context.current_frame]->view,
         };
 
         vk::FramebufferCreateInfo fb_create_info{};

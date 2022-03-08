@@ -272,8 +272,6 @@ struct UI {
             }
         }
 
-    //    context.bind_material(_material);
-
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, material->pipeline);
         cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, material->pipeline_layout, 0, material->descriptor_sets[context.current_frame], {});
 
@@ -312,46 +310,8 @@ struct UI {
                         }
                     };
 
-    //                auto texture = (VulkanTexture*) pcmd->GetTexID();
-    //                auto it = _material->tmp_descriptor_sets.find(texture);
-    //                if (it == _material->tmp_descriptor_sets.end()) {
-    //                    auto descriptor_set_allocate_info = vk::DescriptorSetAllocateInfo{};
-    //                    descriptor_set_allocate_info.setDescriptorPool(_material->descriptor_pool);
-    //                    descriptor_set_allocate_info.setSetLayouts(_material->descriptor_set_layout);
-    //                    auto descriptor_set = context.logical_device.allocateDescriptorSets(descriptor_set_allocate_info).at(0);
-    //
-    //                    it = _material->tmp_descriptor_sets.emplace(texture, descriptor_set).first;
-    //
-    //                    const auto image_info = vk::DescriptorImageInfo{
-    //                        .sampler = texture->sampler,
-    //                        .imageView = texture->image_view,
-    //                        .imageLayout = texture->layout
-    //                    };
-    //                    const auto write_descriptor_set = vk::WriteDescriptorSet{
-    //                        .dstSet = descriptor_set,
-    //                        .dstBinding = 0,
-    //                        .dstArrayElement = 0,
-    //                        .descriptorCount = 1,
-    //                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-    //                        .pImageInfo = &image_info
-    //                    };
-    //                    context.logical_device.updateDescriptorSets(write_descriptor_set, {});
-    //                }
-
-    //                cmd.bindDescriptorSets(
-    //                    vk::PipelineBindPoint::eGraphics,
-    //                    _material->layout,
-    //                    1,
-    //                    1,
-    //                    &it->second,
-    //                    0,
-    //                    nullptr
-    //                );
-
-    //                context.bind_material(_material);
-
                     cmd.setScissor(0, 1, &scissor);
-                    cmd.drawIndexed(pcmd->ElemCount, 1, pcmd->IdxOffset + global_idx_offset, u32(pcmd->VtxOffset) + global_vtx_offset, 0);
+                    cmd.drawIndexed(pcmd->ElemCount, 1, pcmd->IdxOffset + global_idx_offset, i32(pcmd->VtxOffset + global_vtx_offset), 0);
                 }
             }
             global_idx_offset += cmd_list->IdxBuffer.Size;

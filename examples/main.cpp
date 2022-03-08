@@ -3,9 +3,9 @@
 #include <shader.hpp>
 #include <display.hpp>
 #include <context.hpp>
-#include <pipeline.hpp>
-
 #include <glm/ext.hpp>
+
+#include "pipeline.hpp"
 
 struct DefaultVertexFormat {
     glm::vec3 position;

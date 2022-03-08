@@ -64,7 +64,6 @@ add_library(VFX STATIC
     src/material.hpp
     src/ui.hpp
     src/assets.hpp
-    src/pipeline.hpp
     src/vulkan.cpp
 )
 target_include_directories(VFX PUBLIC src)
@@ -91,7 +90,10 @@ target_compile_definitions(VFX PUBLIC
     -DGLFW_INCLUDE_VULKAN
 )
 
-add_executable(VFX-example examples/main.cpp)
+add_executable(VFX-example
+    examples/main.cpp
+    examples/pipeline.hpp
+)
 target_link_libraries(VFX-example PRIVATE VFX)
 target_compile_shaders(VFX-example
     assets/shaders/default.frag
