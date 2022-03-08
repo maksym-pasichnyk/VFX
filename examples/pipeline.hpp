@@ -19,7 +19,7 @@ struct RenderPipeline {
 
     std::array<Texture*, 3> color;
     std::array<Texture*, 3> depth;
-    std::array<GraphicsBuffer*, 3> camera_uniforms;
+    std::array<GraphicsBuffer*, 3> uniforms;
     std::array<vk::Framebuffer, 3> framebuffers;
 
     Material* material;
@@ -28,20 +28,20 @@ struct RenderPipeline {
     explicit RenderPipeline(Context& context, const RenderPipelineSettings& settings) : context(context), settings(settings) {
         for (u64 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; ++i) {
             color[i] = context.create_texture_2d(
-                    context.surface_extent.width,
-                    context.surface_extent.height,
-                    context.surface_format.format,
-                    vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment,
-                    vk::ImageAspectFlagBits::eColor
+                context.surface_extent.width,
+                context.surface_extent.height,
+                context.surface_format.format,
+                vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment,
+                vk::ImageAspectFlagBits::eColor
             );
             depth[i] = context.create_texture_2d(
-                    context.surface_extent.width,
-                    context.surface_extent.height,
-                    context.depth_format,
-                    vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment,
-                    vk::ImageAspectFlagBits::eDepth
+                context.surface_extent.width,
+                context.surface_extent.height,
+                context.depth_format,
+                vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment,
+                vk::ImageAspectFlagBits::eDepth
             );
-            camera_uniforms[i] = context.create_buffer(GraphicsBuffer::Target::Constant, sizeof(CameraProperties));
+            uniforms[i] = context.create_buffer(GraphicsBuffer::Target::Constant, sizeof(CameraProperties));
         }
 
         auto pass = graph.add_pass("gbuffer");
@@ -56,7 +56,7 @@ struct RenderPipeline {
 
         for (u64 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; ++i) {
             auto buffer_info = vk::DescriptorBufferInfo {
-                .buffer = camera_uniforms[i]->buffer,
+                .buffer = uniforms[i]->buffer,
                 .offset = 0,
                 .range = vk::DeviceSize(sizeof(CameraProperties))
             };
@@ -76,7 +76,7 @@ struct RenderPipeline {
         for (u64 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; ++i) {
             context.destroy_texture(depth[i]);
             context.destroy_texture(color[i]);
-            context.destroy_buffer(camera_uniforms[i]);
+            context.destroy_buffer(uniforms[i]);
         }
         context.destroy_material(material);
 
@@ -196,7 +196,7 @@ struct RenderPipeline {
         viewport.setHeight(static_cast<f32>(area.extent.height));
         viewport.setMaxDepth(1.f);
 
-        context.update_buffer(camera_uniforms[context.current_frame], &camera_properties, sizeof(CameraProperties), 0);
+        context.update_buffer(uniforms[context.current_frame], &camera_properties, sizeof(CameraProperties), 0);
 
         cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
         cmd.setViewport(0, viewport);
