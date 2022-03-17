@@ -6,18 +6,49 @@
 #include "widgets.hpp"
 #include "pipeline.hpp"
 
+#include <entt/entt.hpp>
+
+struct MeshRenderer {
+    bool enable = true;
+    Geometry* geometry{};
+    vfx::Material* material{};
+};
+
+struct Scene {
+    entt::registry registry{};
+
+    auto create_entity() -> entt::entity {
+        return registry.create();
+    }
+};
+
+struct Entity {
+    entt::entity id;
+    Scene* scene;
+
+    template<typename T>
+    void get() {
+        scene->registry.get<T>(id);
+    }
+
+    template<typename T, typename... Args>
+    auto emplace(Args&&... args) -> T& {
+        return scene->registry.emplace<T>(id, std::forward<Args>(args)...);
+    }
+};
+
 struct Demo {
     Display display{800, 600, "Demo", true};
-    Context context{display};
+    vfx::Context context{display};
+    vfx::Swapchain swapchain{context, display};
 
-    RenderPipelineSettings settings{};
-    RenderPipeline pipeline{context, settings};
+    DefaultRenderPipeline pipeline{context, swapchain};
 
-    Widgets widgets{context, pipeline.graph.pass};
+    Widgets widgets{context, pipeline.pass.handle};
 
-    std::vector<Geometry> geometries;
+    void run() {
+        static std::vector<Geometry> geometries;
 
-    Demo() {
         geometries.resize(2);
 
         std::vector<u32> indices{
@@ -45,17 +76,16 @@ struct Demo {
             context.set_vertices(&geometries[1], vertices);
             context.set_indices(&geometries[1], indices);
         }
-    }
 
-    ~Demo() {
-        for (auto& geometry : geometries) {
-            context.destroy_buffer(geometry.vtx);
-            context.destroy_buffer(geometry.idx);
-        }
-    }
+        Scene* scene = new Scene();
 
-    void run() {
-        Camera camera{60.0f, display.get_aspect()};
+        Camera camera{context, 60.0f, display.get_aspect()};
+
+        auto g0 = Entity{scene->create_entity(), scene};
+        auto g1 = Entity{scene->create_entity(), scene};
+
+        g0.emplace<MeshRenderer>(true, &geometries[0], nullptr);
+        g1.emplace<MeshRenderer>(true, &geometries[1], nullptr);
 
         auto last_time = std::chrono::high_resolution_clock::now();
         while (!display.should_close()) {
@@ -68,40 +98,43 @@ struct Demo {
             widgets.set_delta_time(delta_time);
             widgets.update(display);
 
-            if (context.begin_frame()) {
-                auto cmd = context.command_buffers[context.current_frame];
+            if (swapchain.acquire_next_image()) {
+                auto cmd = context.command_buffers[swapchain.current_frame];
+                cmd.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
-                pipeline.set_camera_properties(camera);
-                pipeline.begin_render_pass(cmd);
+                pipeline.begin_frame(cmd);
+                pipeline.setup(cmd, &camera);
 
-                cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.material->pipeline);
-                cmd.bindDescriptorSets(
-                    vk::PipelineBindPoint::eGraphics,
-                    pipeline.material->pipeline_layout,
-                    0,
-                    pipeline.material->descriptor_sets[context.current_frame],
-                    {}
-                );
-
-                for (auto& geometry : geometries) {
-                    cmd.bindVertexBuffers(0, geometry.vtx->buffer, vk::DeviceSize{0});
-                    cmd.bindIndexBuffer(geometry.idx->buffer, 0, vk::IndexType::eUint32);
-                    cmd.drawIndexed(geometry.idx_count, 1, 0, 0, 0);
+                for (auto&& [_, renderer] : scene->registry.view<MeshRenderer>().each()) {
+                    if (!renderer.enable || !renderer.geometry) {
+                        continue;
+                    }
+                    cmd.bindVertexBuffers(0, renderer.geometry->vtx->buffer, vk::DeviceSize{0});
+                    cmd.bindIndexBuffer(renderer.geometry->idx->buffer, 0, vk::IndexType::eUint32);
+                    cmd.drawIndexed(renderer.geometry->idx_count, 1, 0, 0, 0);
                 }
 
-                ImGui::NewFrame();
+                widgets.begin_frame();
                 ImGui::Begin("Demo");
 
                 ImGui::End();
-                ImGui::Render();
+                widgets.end_frame();
 
                 widgets.draw(cmd);
 
                 cmd.endRenderPass();
-                context.end_frame();
+                cmd.end();
+
+                swapchain.submit();
+                swapchain.present();
             }
         }
         context.logical_device.waitIdle();
+
+        for (auto& geometry : geometries) {
+            context.destroy_buffer(geometry.vtx);
+            context.destroy_buffer(geometry.idx);
+        }
     }
 };
 
