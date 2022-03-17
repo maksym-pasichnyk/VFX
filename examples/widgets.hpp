@@ -1,7 +1,7 @@
 #pragma once
 
 #include <assets.hpp>
-#include <graph.hpp>
+#include <pass.hpp>
 #include <display.hpp>
 #include <context.hpp>
 #include <material.hpp>
@@ -41,7 +41,7 @@ struct Widgets {
         KeyCode::eZ
     };
 
-    Widgets(Context& context, vk::RenderPass pass) : context(context) {
+    Widgets(vfx::Context& context, vk::RenderPass pass) : context(context) {
         IMGUI_CHECKVERSION();
         ctx = ImGui::CreateContext();
 
@@ -87,7 +87,7 @@ struct Widgets {
 
         create_font_texture();
 
-        MaterialDescription description{};
+        vfx::Material::Description description{};
 
         description.dynamic_states = {
             vk::DynamicState::eViewport,
@@ -102,19 +102,19 @@ struct Widgets {
         description.create_attribute(0, vk::Format::eR32G32Sfloat,  8);
         description.create_attribute(0, vk::Format::eR8G8B8A8Unorm, 4);
 
-        description.create_attachment(
-            true,
-            vk::BlendFactor::eSrcAlpha,
-            vk::BlendFactor::eOneMinusSrcAlpha,
-            vk::BlendOp::eAdd,
-            vk::BlendFactor::eOneMinusSrcAlpha,
-            vk::BlendFactor::eZero,
-            vk::BlendOp::eAdd,
-            vk::ColorComponentFlagBits::eR |
-            vk::ColorComponentFlagBits::eG |
-            vk::ColorComponentFlagBits::eB |
-            vk::ColorComponentFlagBits::eA
-        );
+        description.create_attachment(vk::PipelineColorBlendAttachmentState{
+            .blendEnable = true,
+            .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+            .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+            .colorBlendOp = vk::BlendOp::eAdd,
+            .srcAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+            .dstAlphaBlendFactor = vk::BlendFactor::eZero,
+            .alphaBlendOp = vk::BlendOp::eAdd,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR |
+                              vk::ColorComponentFlagBits::eG |
+                              vk::ColorComponentFlagBits::eB |
+                              vk::ColorComponentFlagBits::eA
+        });
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
         description.inputAssemblyState.primitiveRestartEnable = false;
 
@@ -169,7 +169,7 @@ struct Widgets {
                 .dstBinding = 0,
                 .dstArrayElement = 0,
                 .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .descriptorType = material->descriptor_set_layout_bindings[0].descriptorType,
                 .pImageInfo = &image_info
             };
             context.logical_device.updateDescriptorSets(write_descriptor_set, {});
@@ -235,6 +235,16 @@ struct Widgets {
         ctx->IO.KeysDown[button] = flag;
     }
 
+    void begin_frame() {
+        ImGui::NewFrame();
+    }
+    void end_frame() {
+        ImGui::Render();
+
+        current_frame += 1;
+        current_frame %= vfx::Context::MAX_FRAMES_IN_FLIGHT;
+    }
+
     void draw(vk::CommandBuffer cmd) {
         const auto viewport = ctx->Viewports[0];
         if (!viewport->DrawDataP.Valid) {
@@ -255,7 +265,7 @@ struct Widgets {
             return;
         }
 
-        auto frame = &frames[context.current_frame];
+        auto frame = &frames[current_frame];
 
         if (draw_data->TotalVtxCount > 0) {
             context.set_vertex_buffer_params(frame, draw_data->TotalVtxCount, sizeof(ImDrawVert));
@@ -273,7 +283,7 @@ struct Widgets {
         }
 
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, material->pipeline);
-        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, material->pipeline_layout, 0, material->descriptor_sets[context.current_frame], {});
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, material->pipeline_layout, 0, material->descriptor_sets[current_frame], {});
 
         setup_render_state(draw_data, cmd, frame, fb_width, fb_height);
 
@@ -341,7 +351,7 @@ struct Widgets {
         i32 width, height;
         ctx->IO.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
-        font_texture = context.create_texture_2d(
+        font_texture = context.create_texture(
             u32(width),
             u32(height),
             vk::Format::eR8G8B8A8Unorm,
@@ -389,10 +399,11 @@ struct Widgets {
         );
     }
 
-    Context& context;
+    vfx::Context& context;
 
     ImGuiContext* ctx;
-    Material* material;
-    Texture* font_texture;
-    std::array<Geometry, Context::MAX_FRAMES_IN_FLIGHT> frames{};
+    vfx::Material* material;
+    vfx::Texture* font_texture;
+    u64 current_frame = 0;
+    std::array<Geometry, vfx::Context::MAX_FRAMES_IN_FLIGHT> frames{};
 };

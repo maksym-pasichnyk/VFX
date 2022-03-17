@@ -8,9 +8,10 @@ find_package(Vulkan REQUIRED)
 
 add_subdirectory(deps/glm)
 add_subdirectory(deps/glfw)
+add_subdirectory(deps/entt)
 add_subdirectory(deps/spdlog)
-add_subdirectory(deps/optional)
 add_subdirectory(deps/range-v3)
+add_subdirectory(deps/optional)
 add_subdirectory(deps/VulkanMemoryAllocator)
 
 function(target_compile_shaders TARGET)
@@ -59,15 +60,16 @@ add_library(VFX STATIC
     src/texture.hpp
     src/buffer.hpp
     src/display.hpp
-    src/graph.hpp
+        src/pass.hpp
     src/material.hpp
     src/assets.hpp
     src/vulkan.cpp
-)
+        src/delegate.hpp src/signal.hpp)
 target_include_directories(VFX PUBLIC src)
 target_link_libraries(VFX PUBLIC
     glm
     glfw
+    EnTT
     imgui
     spdlog
     range-v3

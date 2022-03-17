@@ -1,7 +1,8 @@
 #pragma once
 
+#include <pass.hpp>
+#include <signal.hpp>
 #include <assets.hpp>
-#include <graph.hpp>
 #include <context.hpp>
 #include <glm/glm.hpp>
 
@@ -21,80 +22,102 @@ struct Camera {
     glm::mat4 view{};
     glm::mat4 projection{};
 
-    Camera(f32 fov, f32 aspect) {
+    vfx::Context& context;
+    std::array<vfx::Buffer*, 3> uniforms{};
+
+    Camera(vfx::Context& context, f32 fov, f32 aspect) : context(context) {
         view = glm::mat4(1.0f); // glm::inverse(camera.local_to_world_matrix());
         projection = clip * glm::infinitePerspective(glm::radians(fov), aspect, 0.1f);
+
+        for (u64 i = 0; i < vfx::Context::MAX_FRAMES_IN_FLIGHT; ++i) {
+            uniforms[i] = context.create_buffer(vfx::Buffer::Target::Constant, sizeof(CameraProperties));
+        }
+    }
+
+    ~Camera() {
+        for (u64 i = 0; i < vfx::Context::MAX_FRAMES_IN_FLIGHT; ++i) {
+            context.destroy_buffer(uniforms[i]);
+        }
     }
 };
 
-struct RenderPipelineSettings {};
+namespace vfx {
+    struct RenderPipeline {
+        vfx::Context &context;
+        vfx::Swapchain &swapchain;
 
-struct RenderPipeline {
-    Context& context;
-    RenderGraph graph{context};
-    RenderPipelineSettings settings;
+        RenderPipeline(vfx::Context &context, vfx::Swapchain &swapchain) : context(context), swapchain(swapchain) {}
+        virtual ~RenderPipeline() = default;
 
-    std::array<Texture*, 3> color;
-    std::array<Texture*, 3> depth;
-    std::array<GraphicsBuffer*, 3> uniforms;
-    std::array<vk::Framebuffer, 3> framebuffers;
+        virtual void render(vk::CommandBuffer cmd, std::span<Camera*> cameras) {}
+    };
+}
 
-    Material* material;
-    CameraProperties camera_properties;
+struct DefaultRenderPipeline : vfx::RenderPipeline {
+    vfx::RenderPass pass{context};
 
-    explicit RenderPipeline(Context& context, const RenderPipelineSettings& settings) : context(context), settings(settings) {
-        for (u64 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; ++i) {
-            color[i] = context.create_texture_2d(
-                context.surface_extent.width,
-                context.surface_extent.height,
-                context.surface_format.format,
-                vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment,
-                vk::ImageAspectFlagBits::eColor
-            );
-            depth[i] = context.create_texture_2d(
-                context.surface_extent.width,
-                context.surface_extent.height,
-                context.depth_format,
-                vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment,
-                vk::ImageAspectFlagBits::eDepth
-            );
-            uniforms[i] = context.create_buffer(GraphicsBuffer::Target::Constant, sizeof(CameraProperties));
-        }
+    vfx::Texture* color{};
+    vfx::Texture* depth{};
 
-        auto pass = graph.add_pass("gbuffer");
-        graph.add_present_output(pass, "color", context.surface_format.format);
-        graph.set_depth_output(pass, "depth", context.depth_format);
-        graph.create_render_pass();
+    vfx::Material* material{};
+    std::array<vk::Framebuffer, 3> framebuffers{};
 
-        graph.set_clear_color("color", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-        graph.set_clear_depth("depth", 1.0f, 0);
+    explicit DefaultRenderPipeline(vfx::Context& context, vfx::Swapchain& swapchain) : RenderPipeline(context, swapchain) {
+        color = context.create_texture(
+            swapchain.surface_extent.width,
+            swapchain.surface_extent.height,
+            swapchain.surface_format.format,
+            vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment,
+            vk::ImageAspectFlagBits::eColor
+        );
+        depth = context.create_texture(
+            swapchain.surface_extent.width,
+            swapchain.surface_extent.height,
+            context.depth_format,
+            vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment,
+            vk::ImageAspectFlagBits::eDepth
+        );
 
-        material = create_gbuffer_material();
+        std::vector<vk::SubpassDependency> dependencies{};
+        std::vector<vfx::SubpassDescription> definitions{};
+        std::vector<vk::AttachmentDescription> attachments{};
 
-        for (u64 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; ++i) {
-            auto buffer_info = vk::DescriptorBufferInfo {
-                .buffer = uniforms[i]->buffer,
-                .offset = 0,
-                .range = vk::DeviceSize(sizeof(CameraProperties))
-            };
-            auto write_descriptor_set = vk::WriteDescriptorSet{
-                .dstSet = material->descriptor_sets[i],
-                .dstBinding = 0,
-                .dstArrayElement = 0,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eUniformBuffer,
-                .pBufferInfo = &buffer_info
-            };
-            context.logical_device.updateDescriptorSets({write_descriptor_set}, {});
-        }
+        attachments.emplace_back(vk::AttachmentDescription{
+            .flags = {},
+            .format = swapchain.surface_format.format,
+            .samples = vk::SampleCountFlagBits::e1,
+            .loadOp = vk::AttachmentLoadOp::eClear,
+            .storeOp = vk::AttachmentStoreOp::eStore,
+            .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+            .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+            .initialLayout = vk::ImageLayout::eUndefined,
+            .finalLayout = vk::ImageLayout::ePresentSrcKHR
+        });
+        attachments.emplace_back(vk::AttachmentDescription{
+            .flags = {},
+            .format = context.depth_format,
+            .samples = vk::SampleCountFlagBits::e1,
+            .loadOp = vk::AttachmentLoadOp::eClear,
+            .storeOp = vk::AttachmentStoreOp::eStore,
+            .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+            .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+            .initialLayout = vk::ImageLayout::eUndefined,
+            .finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        });
+        definitions.emplace_back(vfx::SubpassDescription{
+            .pColorAttachments = {
+                vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
+            },
+            .pDepthStencilAttachment = vk::AttachmentReference{1, vk::ImageLayout::eDepthStencilAttachmentOptimal}
+        });
+        pass.init(attachments, definitions, dependencies);
+
+        material = create_material();
     }
 
-    ~RenderPipeline() {
-        for (u64 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; ++i) {
-            context.destroy_texture(depth[i]);
-            context.destroy_texture(color[i]);
-            context.destroy_buffer(uniforms[i]);
-        }
+    ~DefaultRenderPipeline() {
+        context.destroy_texture(depth);
+        context.destroy_texture(color);
         context.destroy_material(material);
 
         for (u64 i = 0; i < 3; ++i) {
@@ -104,33 +127,33 @@ struct RenderPipeline {
         }
     }
 
-    auto create_gbuffer_material() -> Material* {
-        MaterialDescription description{};
+    auto create_material() -> vfx::Material* {
+        vfx::Material::Description description{};
 
         description.dynamic_states = {
             vk::DynamicState::eViewport,
             vk::DynamicState::eScissor
         };
 
-        description.create_uniform_buffer_resource(0, vk::ShaderStageFlagBits::eVertex, sizeof(CameraProperties));
+        description.create_uniform_resource(0, vk::ShaderStageFlagBits::eVertex, sizeof(CameraProperties));
 
         description.create_binding(vk::VertexInputRate::eVertex);
         description.create_attribute(0, vk::Format::eR32G32B32Sfloat, 12);
         description.create_attribute(0, vk::Format::eR8G8B8A8Unorm,    4);
 
-        description.create_attachment(
-            true,
-            vk::BlendFactor::eSrcAlpha,
-            vk::BlendFactor::eOneMinusSrcAlpha,
-            vk::BlendOp::eAdd,
-            vk::BlendFactor::eOneMinusSrcAlpha,
-            vk::BlendFactor::eZero,
-            vk::BlendOp::eAdd,
-            vk::ColorComponentFlagBits::eR |
-            vk::ColorComponentFlagBits::eG |
-            vk::ColorComponentFlagBits::eB |
-            vk::ColorComponentFlagBits::eA
-        );
+        description.create_attachment(vk::PipelineColorBlendAttachmentState{
+            .blendEnable = true,
+            .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+            .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+            .colorBlendOp = vk::BlendOp::eAdd,
+            .srcAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+            .dstAlphaBlendFactor = vk::BlendFactor::eZero,
+            .alphaBlendOp = vk::BlendOp::eAdd,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR |
+                              vk::ColorComponentFlagBits::eG |
+                              vk::ColorComponentFlagBits::eB |
+                              vk::ColorComponentFlagBits::eA
+        });
 
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
         description.inputAssemblyState.primitiveRestartEnable = false;
@@ -173,51 +196,81 @@ struct RenderPipeline {
             .module = context.create_shader_module(frag_data),
             .pName = "main"
         });
-        return context.create_material(description, graph.pass, 0);
+        return context.create_material(description, pass.handle, 0);
     }
 
-    void set_camera_properties(const Camera& camera) {
-        camera_properties.projection = camera.projection;
-        camera_properties.view = camera.view;
-    }
+    void begin_frame(vk::CommandBuffer cmd) {
+        auto attachments = std::array{
+            swapchain.views[swapchain.current_frame],
+            depth->view,
+        };
 
-    void begin_render_pass(vk::CommandBuffer cmd) {
-        if (framebuffers[context.current_frame]) {
-            context.logical_device.destroyFramebuffer(framebuffers[context.current_frame]);
-        }
-
-        auto fb_attachments = std::vector{
-            context.views[context.current_frame],
-            depth[context.current_frame]->view,
+        auto clear_values = std::array{
+            vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({0.0f, 0.0f, 0.0f, 0.0f})),
+            vk::ClearValue{}.setDepthStencil(vk::ClearDepthStencilValue{1.0f, 0})
         };
 
         vk::FramebufferCreateInfo fb_create_info{};
-        fb_create_info.renderPass = graph.pass;
-        fb_create_info.attachmentCount = u32(fb_attachments.size());
-        fb_create_info.pAttachments = fb_attachments.data();
-        fb_create_info.width = context.surface_extent.width;
-        fb_create_info.height = context.surface_extent.height;
+        fb_create_info.renderPass = pass.handle;
+        fb_create_info.attachmentCount = u32(attachments.size());
+        fb_create_info.pAttachments = attachments.data();
+        fb_create_info.width = swapchain.surface_extent.width;
+        fb_create_info.height = swapchain.surface_extent.height;
         fb_create_info.layers = 1;
-        framebuffers[context.current_frame] = context.logical_device.createFramebuffer(fb_create_info);
+
+        if (framebuffers[swapchain.current_frame]) {
+            context.logical_device.destroyFramebuffer(framebuffers[swapchain.current_frame]);
+        }
+        framebuffers[swapchain.current_frame] = context.logical_device.createFramebuffer(fb_create_info);
 
         auto area = vk::Rect2D{};
-        area.setExtent(context.surface_extent);
+        area.setExtent(swapchain.surface_extent);
 
         auto begin_info = vk::RenderPassBeginInfo{};
-        begin_info.setRenderPass(graph.pass);
-        begin_info.setFramebuffer(framebuffers[context.current_frame]);
+        begin_info.setRenderPass(pass.handle);
+        begin_info.setFramebuffer(framebuffers[swapchain.current_frame]);
         begin_info.setRenderArea(area);
-        begin_info.setClearValues(graph.clear_values);
+        begin_info.setClearValues(clear_values);
 
         auto viewport = vk::Viewport{};
         viewport.setWidth(static_cast<f32>(area.extent.width));
         viewport.setHeight(static_cast<f32>(area.extent.height));
         viewport.setMaxDepth(1.f);
 
-        context.update_buffer(uniforms[context.current_frame], &camera_properties, sizeof(CameraProperties), 0);
-
         cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
         cmd.setViewport(0, viewport);
         cmd.setScissor(0, area);
+    }
+
+    void setup(vk::CommandBuffer cmd, Camera* camera) {
+        auto buffer_info = vk::DescriptorBufferInfo {
+            .buffer = camera->uniforms[swapchain.current_frame]->buffer,
+            .offset = 0,
+            .range = vk::DeviceSize(sizeof(CameraProperties))
+        };
+        auto write_descriptor_set = vk::WriteDescriptorSet{
+            .dstSet = material->descriptor_sets[swapchain.current_frame],
+            .dstBinding = 0,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .pBufferInfo = &buffer_info
+        };
+        context.logical_device.updateDescriptorSets({write_descriptor_set}, {});
+
+        CameraProperties properties{};
+        properties.projection = camera->projection;
+        properties.view = camera->view;
+
+        context.update_buffer(camera->uniforms[swapchain.current_frame], &properties, sizeof(CameraProperties), 0);
+
+        cmd.bindPipeline(material->pipeline_bind_point, material->pipeline);
+        cmd.bindDescriptorSets(
+            material->pipeline_bind_point,
+            material->pipeline_layout,
+            0,
+            material->descriptor_sets[swapchain.current_frame],
+            {}
+        );
     }
 };
