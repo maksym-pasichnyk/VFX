@@ -32,8 +32,6 @@ struct Geometry {
     u64 idx_stride = 0;
 };
 
-
-
 namespace vfx {
     struct Context {
         static constexpr auto MAX_FRAMES_IN_FLIGHT = 3u;
@@ -41,53 +39,34 @@ namespace vfx {
         vk::DynamicLoader dl{};
         vk::Instance instance{};
         VmaAllocator allocator{};
+        vk::DebugUtilsMessengerEXT debug_utils{};
 
         u32 present_family{};
         u32 graphics_family{};
         vk::Queue present_queue{};
         vk::Queue graphics_queue{};
-        vk::Device logical_device{};
         vk::PhysicalDevice physical_device{};
-        vk::DebugUtilsMessengerEXT debug_utils{};
+
+        vk::Device logical_device{};
 
         vk::Format depth_format{};
 
         std::vector<vk::CommandPool> command_pools;
         std::vector<vk::CommandBuffer> command_buffers;
-        std::list<std::pair<u64, std::function<void()>>> deleters;
-
-        std::array<vk::Framebuffer, 3> framebuffers{};
 
         explicit Context(Display& display) {
             create_instance();
             select_physical_device();
             create_logical_device();
-            create_memory_resource();
-
-            command_pools.resize(MAX_FRAMES_IN_FLIGHT);
-            command_buffers.resize(MAX_FRAMES_IN_FLIGHT);
-
-            for (u32 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-                const auto create_info = vk::CommandPoolCreateInfo {
-                    .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-                    .queueFamilyIndex = graphics_family
-                };
-                command_pools[i] = logical_device.createCommandPool(create_info);
-
-                const auto allocate_info = vk::CommandBufferAllocateInfo{
-                    .commandPool = command_pools[i],
-                    .level = vk::CommandBufferLevel::ePrimary,
-                    .commandBufferCount = 1
-                };
-                command_buffers[i] = logical_device.allocateCommandBuffers(allocate_info)[0];
-            }
+            create_memory_allocator();
+            create_command_buffers();
         }
 
         ~Context() {
-            for (auto& [_, deleter] : deleters) {
-                deleter();
+            for (u64 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; i++) {
+                logical_device.freeCommandBuffers(command_pools[i], command_buffers[i]);
+                logical_device.destroyCommandPool(command_pools[i]);
             }
-
             vmaDestroyAllocator(allocator);
             logical_device.destroy();
 
@@ -96,13 +75,16 @@ namespace vfx {
         }
 
         void create_instance() {
-            VULKAN_HPP_DEFAULT_DISPATCHER.init(dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
+            vk::defaultDispatchLoaderDynamic.init(dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
 
-            u32 count = 0;
-            auto raw_extensions = glfwGetRequiredInstanceExtensions(&count);
-            auto extensions = std::vector<const char *>(raw_extensions, raw_extensions + count);
+            auto extensions = [] {
+                u32 count = 0;
+                auto extensions = glfwGetRequiredInstanceExtensions(&count);
+                return std::vector<const char *>(extensions, extensions + count);
+            }();
 
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+            extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
             extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
             const auto layers = std::array{
@@ -112,12 +94,16 @@ namespace vfx {
             auto app_info = vk::ApplicationInfo{
                 .pApplicationName = nullptr,
                 .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-                .pEngineName = "SRP",
+                .pEngineName = "Vulkan",
                 .engineVersion = VK_MAKE_VERSION(1, 0, 0),
                 .apiVersion = VK_API_VERSION_1_2
             };
 
+            vk::InstanceCreateFlags instance_create_flags{};
+            instance_create_flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
+
             const auto instance_create_info = vk::InstanceCreateInfo {
+                .flags = instance_create_flags,
                 .pApplicationInfo = &app_info,
                 .enabledLayerCount = std::size(layers),
                 .ppEnabledLayerNames = std::data(layers),
@@ -125,15 +111,22 @@ namespace vfx {
                 .ppEnabledExtensionNames = extensions.data(),
             };
             instance = vk::createInstance(instance_create_info);
-            VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
+            vk::defaultDispatchLoaderDynamic.init(instance);
+
+            vk::DebugUtilsMessageSeverityFlagsEXT message_severity_flags{};
+            message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
+            message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo;
+            message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
+            message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+
+            vk::DebugUtilsMessageTypeFlagsEXT message_type_flags{};
+            message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral;
+            message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
+            message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
 
             const auto debug_create_info = vk::DebugUtilsMessengerCreateInfoEXT{
-                .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
-                                   vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-                                   vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
-                .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-                               vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-                               vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+                .messageSeverity = message_severity_flags,
+                .messageType = message_type_flags,
                 .pfnUserCallback = debug_callback
             };
             debug_utils = instance.createDebugUtilsMessengerEXT(debug_create_info);
@@ -220,47 +213,47 @@ namespace vfx {
             };
 
             logical_device = physical_device.createDevice(deviceCreateInfo, nullptr);
-            VULKAN_HPP_DEFAULT_DISPATCHER.init(logical_device);
+            vk::defaultDispatchLoaderDynamic.init(logical_device);
 
             present_queue = logical_device.getQueue(present_family, 0);
             graphics_queue = logical_device.getQueue(graphics_family, 0);
         }
 
-        void create_memory_resource() {
+        void create_memory_allocator() {
             const auto functions = VmaVulkanFunctions{
-                .vkGetInstanceProcAddr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr,
-                .vkGetDeviceProcAddr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr,
-                .vkGetPhysicalDeviceProperties = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceProperties,
-                .vkGetPhysicalDeviceMemoryProperties = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceMemoryProperties,
-                .vkAllocateMemory = VULKAN_HPP_DEFAULT_DISPATCHER.vkAllocateMemory,
-                .vkFreeMemory = VULKAN_HPP_DEFAULT_DISPATCHER.vkFreeMemory,
-                .vkMapMemory = VULKAN_HPP_DEFAULT_DISPATCHER.vkMapMemory,
-                .vkUnmapMemory = VULKAN_HPP_DEFAULT_DISPATCHER.vkUnmapMemory,
-                .vkFlushMappedMemoryRanges = VULKAN_HPP_DEFAULT_DISPATCHER.vkFlushMappedMemoryRanges,
-                .vkInvalidateMappedMemoryRanges = VULKAN_HPP_DEFAULT_DISPATCHER.vkInvalidateMappedMemoryRanges,
-                .vkBindBufferMemory = VULKAN_HPP_DEFAULT_DISPATCHER.vkBindBufferMemory,
-                .vkBindImageMemory = VULKAN_HPP_DEFAULT_DISPATCHER.vkBindImageMemory,
-                .vkGetBufferMemoryRequirements = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetBufferMemoryRequirements,
-                .vkGetImageMemoryRequirements = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetImageMemoryRequirements,
-                .vkCreateBuffer = VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateBuffer,
-                .vkDestroyBuffer = VULKAN_HPP_DEFAULT_DISPATCHER.vkDestroyBuffer,
-                .vkCreateImage = VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateImage,
-                .vkDestroyImage = VULKAN_HPP_DEFAULT_DISPATCHER.vkDestroyImage,
-                .vkCmdCopyBuffer = VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdCopyBuffer,
+                .vkGetInstanceProcAddr = vk::defaultDispatchLoaderDynamic.vkGetInstanceProcAddr,
+                .vkGetDeviceProcAddr = vk::defaultDispatchLoaderDynamic.vkGetDeviceProcAddr,
+                .vkGetPhysicalDeviceProperties = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceProperties,
+                .vkGetPhysicalDeviceMemoryProperties = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceMemoryProperties,
+                .vkAllocateMemory = vk::defaultDispatchLoaderDynamic.vkAllocateMemory,
+                .vkFreeMemory = vk::defaultDispatchLoaderDynamic.vkFreeMemory,
+                .vkMapMemory = vk::defaultDispatchLoaderDynamic.vkMapMemory,
+                .vkUnmapMemory = vk::defaultDispatchLoaderDynamic.vkUnmapMemory,
+                .vkFlushMappedMemoryRanges = vk::defaultDispatchLoaderDynamic.vkFlushMappedMemoryRanges,
+                .vkInvalidateMappedMemoryRanges = vk::defaultDispatchLoaderDynamic.vkInvalidateMappedMemoryRanges,
+                .vkBindBufferMemory = vk::defaultDispatchLoaderDynamic.vkBindBufferMemory,
+                .vkBindImageMemory = vk::defaultDispatchLoaderDynamic.vkBindImageMemory,
+                .vkGetBufferMemoryRequirements = vk::defaultDispatchLoaderDynamic.vkGetBufferMemoryRequirements,
+                .vkGetImageMemoryRequirements = vk::defaultDispatchLoaderDynamic.vkGetImageMemoryRequirements,
+                .vkCreateBuffer = vk::defaultDispatchLoaderDynamic.vkCreateBuffer,
+                .vkDestroyBuffer = vk::defaultDispatchLoaderDynamic.vkDestroyBuffer,
+                .vkCreateImage = vk::defaultDispatchLoaderDynamic.vkCreateImage,
+                .vkDestroyImage = vk::defaultDispatchLoaderDynamic.vkDestroyImage,
+                .vkCmdCopyBuffer = vk::defaultDispatchLoaderDynamic.vkCmdCopyBuffer,
     #if VMA_DEDICATED_ALLOCATION || VMA_VULKAN_VERSION >= 1001000
                 /// Fetch "vkGetBufferMemoryRequirements2" on Vulkan >= 1.1, fetch "vkGetBufferMemoryRequirements2KHR" when using VK_KHR_dedicated_allocation extension.
-                .vkGetBufferMemoryRequirements2KHR = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetBufferMemoryRequirements2KHR,
+                .vkGetBufferMemoryRequirements2KHR = vk::defaultDispatchLoaderDynamic.vkGetBufferMemoryRequirements2KHR,
                 /// Fetch "vkGetImageMemoryRequirements 2" on Vulkan >= 1.1, fetch "vkGetImageMemoryRequirements2KHR" when using VK_KHR_dedicated_allocation extension.
-                .vkGetImageMemoryRequirements2KHR = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetImageMemoryRequirements2KHR,
+                .vkGetImageMemoryRequirements2KHR = vk::defaultDispatchLoaderDynamic.vkGetImageMemoryRequirements2KHR,
     #endif
     #if VMA_BIND_MEMORY2 || VMA_VULKAN_VERSION >= 1001000
                 /// Fetch "vkBindBufferMemory2" on Vulkan >= 1.1, fetch "vkBindBufferMemory2KHR" when using VK_KHR_bind_memory2 extension.
-                .vkBindBufferMemory2KHR = VULKAN_HPP_DEFAULT_DISPATCHER.vkBindBufferMemory2KHR,
+                .vkBindBufferMemory2KHR = vk::defaultDispatchLoaderDynamic.vkBindBufferMemory2KHR,
                 /// Fetch "vkBindImageMemory2" on Vulkan >= 1.1, fetch "vkBindImageMemory2KHR" when using VK_KHR_bind_memory2 extension.
-                .vkBindImageMemory2KHR = VULKAN_HPP_DEFAULT_DISPATCHER.vkBindImageMemory2KHR,
+                .vkBindImageMemory2KHR = vk::defaultDispatchLoaderDynamic.vkBindImageMemory2KHR,
     #endif
     #if VMA_MEMORY_BUDGET || VMA_VULKAN_VERSION >= 1001000
-                .vkGetPhysicalDeviceMemoryProperties2KHR = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceMemoryProperties2KHR,
+                .vkGetPhysicalDeviceMemoryProperties2KHR = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceMemoryProperties2KHR,
     #endif
             };
 
@@ -275,7 +268,27 @@ namespace vfx {
             vmaCreateAllocator(&allocatorCreateInfo, &allocator);
         }
 
-        auto create_shader_module(std::span<const char> bytes) const {
+        void create_command_buffers() {
+            command_pools.resize(MAX_FRAMES_IN_FLIGHT);
+            command_buffers.resize(MAX_FRAMES_IN_FLIGHT);
+
+            for (u32 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                const auto create_info = vk::CommandPoolCreateInfo {
+                    .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+                    .queueFamilyIndex = graphics_family
+                };
+                command_pools[i] = logical_device.createCommandPool(create_info);
+
+                const auto allocate_info = vk::CommandBufferAllocateInfo{
+                    .commandPool = command_pools[i],
+                    .level = vk::CommandBufferLevel::ePrimary,
+                    .commandBufferCount = 1
+                };
+                command_buffers[i] = logical_device.allocateCommandBuffers(allocate_info)[0];
+            }
+        }
+
+        auto create_shader_module(std::span<const char> bytes) const -> vk::ShaderModule {
             auto create_info = vk::ShaderModuleCreateInfo{
                 .codeSize = bytes.size(),
                 .pCode    = reinterpret_cast<const u32 *>(bytes.data())
@@ -325,14 +338,12 @@ namespace vfx {
         }
 
         auto destroy_texture(vfx::Texture* texture) {
-    //        deleters.emplace_back(frame_index, [this, texture] {
-                logical_device.destroyImageView(texture->view);
-                vmaDestroyImage(allocator, texture->image, texture->allocation);
-                if (texture->sampler) {
-                    logical_device.destroySampler(texture->sampler);
-                }
-                delete texture;
-    //        });
+            logical_device.destroyImageView(texture->view);
+            vmaDestroyImage(allocator, texture->image, texture->allocation);
+            if (texture->sampler) {
+                logical_device.destroySampler(texture->sampler);
+            }
+            delete texture;
         }
 
         void set_texture_data(vfx::Texture* texture, std::span<const glm::u8vec4> pixels) {
@@ -442,10 +453,8 @@ namespace vfx {
         }
 
         void destroy_buffer(vfx::Buffer* gb) {
-    //        deleters.emplace_back(frame_index, [this, gb] {
-                vmaDestroyBuffer(allocator, gb->buffer, gb->allocation);
-                delete gb;
-    //        });
+            vmaDestroyBuffer(allocator, gb->buffer, gb->allocation);
+            delete gb;
         }
 
         void update_buffer(vfx::Buffer* gb, const void* src, u64 size, u64 offset) {
@@ -533,12 +542,12 @@ namespace vfx {
             dsl_create_info.setBindings(material->descriptor_set_layout_bindings);
             material->descriptor_set_layout = logical_device.createDescriptorSetLayout(dsl_create_info);
 
-            auto pipeline_layput_create_info = vk::PipelineLayoutCreateInfo{};
+            auto pipeline_layout_create_info = vk::PipelineLayoutCreateInfo{};
             if (material->descriptor_set_layout) {
-                pipeline_layput_create_info.setSetLayouts(material->descriptor_set_layout);
-                pipeline_layput_create_info.setPushConstantRanges(description.constants);
+                pipeline_layout_create_info.setSetLayouts(material->descriptor_set_layout);
+                pipeline_layout_create_info.setPushConstantRanges(description.constants);
             }
-            material->pipeline_layout = logical_device.createPipelineLayout(pipeline_layput_create_info);
+            material->pipeline_layout = logical_device.createPipelineLayout(pipeline_layout_create_info);
 
             auto ds_layouts = std::array{
                 material->descriptor_set_layout,
@@ -717,240 +726,5 @@ namespace vfx {
             }
             return VK_FALSE;
         }
-    };
-
-    struct Swapchain {
-        Context& contex;
-
-        vk::SurfaceKHR surface{};
-        vk::SwapchainKHR swapchain{};
-        std::vector<vk::Image> images{};
-        std::vector<vk::ImageView> views{};
-
-        std::vector<vk::Fence> fences{};
-        std::vector<vk::Fence> image_fences{};
-        std::vector<vk::Semaphore> acquired_semaphores{};
-        std::vector<vk::Semaphore> complete_semaphores{};
-
-        vk::Extent2D surface_extent{};
-        vk::PresentModeKHR present_mode{};
-        vk::SurfaceFormatKHR surface_format{};
-        vk::SurfaceCapabilitiesKHR capabilities{};
-
-        u32 image_index = 0;
-        u64 frame_index = 0;
-        u64 current_frame = 0;
-        u32 min_image_count = 0;
-
-        Swapchain(Context& contex, Display& display) : contex(contex) {
-            surface = display.create_surface(contex.instance);
-            create_swapchain();
-            create_sync_objects();
-        }
-
-        ~Swapchain() {
-            for (u64 i = 0; i < images.size(); i++) {
-                contex.logical_device.destroyImageView(views[i]);
-            }
-            for (u64 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; i++) {
-                contex.logical_device.destroyFence(fences[i]);
-                contex.logical_device.destroySemaphore(acquired_semaphores[i]);
-                contex.logical_device.destroySemaphore(complete_semaphores[i]);
-                contex.logical_device.freeCommandBuffers(contex.command_pools[i], contex.command_buffers[i]);
-                contex.logical_device.destroyCommandPool(contex.command_pools[i]);
-            }
-
-            contex.logical_device.destroySwapchainKHR(swapchain);
-            contex.instance.destroySurfaceKHR(surface);
-        }
-
-        void create_swapchain() {
-            capabilities = contex.physical_device.getSurfaceCapabilitiesKHR(surface);
-
-            const auto formats = contex.physical_device.getSurfaceFormatsKHR(surface);
-            const auto presentModes = contex.physical_device.getSurfacePresentModesKHR(surface);
-
-            const auto request_formats = std::array {
-                vk::Format::eB8G8R8A8Unorm,
-                vk::Format::eR8G8B8A8Unorm,
-                vk::Format::eB8G8R8Unorm,
-                vk::Format::eR8G8B8Unorm
-            };
-
-            const auto request_modes = std::array {
-                vk::PresentModeKHR::eFifo
-            };
-
-            surface_extent = select_surface_extent(vk::Extent2D{0, 0}, capabilities);
-            surface_format = select_surface_format(formats, request_formats, vk::ColorSpaceKHR::eSrgbNonlinear);
-            present_mode = select_present_mode(presentModes, request_modes);
-
-            min_image_count = capabilities.minImageCount + 1;
-            if (capabilities.maxImageCount > 0) {
-                min_image_count = std::min(min_image_count, capabilities.maxImageCount);
-            }
-
-            const auto queue_family_indices = std::array{
-                    contex.graphics_family,
-                    contex. present_family
-            };
-
-            const auto flag = contex.graphics_family != contex.present_family;
-
-            const auto swapchain_create_info = vk::SwapchainCreateInfoKHR {
-                    .surface = surface,
-                    .minImageCount = min_image_count,
-                    .imageFormat = surface_format.format,
-                    .imageColorSpace = surface_format.colorSpace,
-                    .imageExtent = surface_extent,
-                    .imageArrayLayers = 1,
-                    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-                    .imageSharingMode = flag ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive,
-                    .queueFamilyIndexCount = flag ? static_cast<u32>(queue_family_indices.size()) : 0,
-                    .pQueueFamilyIndices = flag ? queue_family_indices.data() : nullptr,
-                    .preTransform = capabilities.currentTransform,
-                    .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
-                    .presentMode = present_mode,
-                    .clipped = true,
-                    .oldSwapchain = nullptr
-            };
-
-            swapchain = contex.logical_device.createSwapchainKHR(swapchain_create_info, nullptr);
-            images = contex.logical_device.getSwapchainImagesKHR(swapchain);
-
-            views.resize(images.size());
-            for (u64 i = 0; i < images.size(); ++i) {
-                const auto view_create_info = vk::ImageViewCreateInfo{
-                        .image = images[i],
-                        .viewType = vk::ImageViewType::e2D,
-                        .format = surface_format.format,
-                        .subresourceRange = {
-                                vk::ImageAspectFlagBits::eColor,
-                                0, 1, 0, 1
-                        }
-                };
-                views[i] = contex.logical_device.createImageView(view_create_info);
-            }
-        }
-
-        void create_sync_objects() {
-            image_fences.resize(images.size());
-
-            fences.resize(Context::MAX_FRAMES_IN_FLIGHT);
-            acquired_semaphores.resize(Context::MAX_FRAMES_IN_FLIGHT);
-            complete_semaphores.resize(Context::MAX_FRAMES_IN_FLIGHT);
-
-            for (u32 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; i++) {
-                fences[i] = contex.logical_device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
-                acquired_semaphores[i] = contex.logical_device.createSemaphore({});
-                complete_semaphores[i] = contex.logical_device.createSemaphore({});
-            }
-        }
-
-        auto acquire_next_image() -> bool {
-            std::ignore = contex.logical_device.waitForFences(fences[current_frame], true, std::numeric_limits<uint64_t>::max());
-            auto result = contex.logical_device.acquireNextImageKHR(
-                swapchain,
-                std::numeric_limits<uint64_t>::max(),
-                acquired_semaphores[current_frame],
-                nullptr,
-                &image_index
-            );
-            if (result == vk::Result::eErrorOutOfDateKHR) {
-//                spdlog::error("out of date swapchain image");
-//                recreate_swapchain();
-                return false;
-            }
-            if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
-                throw std::runtime_error("failed to acquire swapchain image");
-            }
-            return true;
-        }
-
-        void submit() {
-            if (auto fence = std::exchange(image_fences[image_index], fences[current_frame])) {
-                std::ignore = contex.logical_device.waitForFences(fence, true, std::numeric_limits<uint64_t>::max());
-            }
-
-            const auto stages = std::array{
-                vk::PipelineStageFlags{vk::PipelineStageFlagBits::eColorAttachmentOutput}
-            };
-
-            auto submit_info = vk::SubmitInfo{};
-            submit_info.setWaitDstStageMask(stages);
-            submit_info.setCommandBuffers(contex.command_buffers[current_frame]);
-            submit_info.setWaitSemaphores(acquired_semaphores[current_frame]);
-            submit_info.setSignalSemaphores(complete_semaphores[current_frame]);
-
-            contex.logical_device.resetFences(fences[current_frame]);
-            contex.graphics_queue.submit(submit_info, fences[current_frame]);
-        }
-
-        void present() {
-            auto present_info = vk::PresentInfoKHR{};
-            present_info.setWaitSemaphores(complete_semaphores[current_frame]);
-            present_info.setSwapchains(swapchain);
-            present_info.setImageIndices(image_index);
-            auto result = contex.present_queue.presentKHR(present_info);
-
-            if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
-//                spdlog::error("out of date swapchain image");
-//                recreate_swapchain();
-                return;
-            }
-            if (result != vk::Result::eSuccess) {
-                throw std::runtime_error("failed to present swapchain image");
-            }
-            frame_index += 1;
-            current_frame = frame_index % Context::MAX_FRAMES_IN_FLIGHT;
-        }
-
-    private:
-        static auto select_surface_extent(const vk::Extent2D& extent, const vk::SurfaceCapabilitiesKHR &capabilities) -> vk::Extent2D {
-            if (capabilities.currentExtent.width != std::numeric_limits<u32>::max()) {
-                return capabilities.currentExtent;
-            }
-
-            const auto minExtent = capabilities.minImageExtent;
-            const auto maxExtent = capabilities.maxImageExtent;
-
-            return {
-                std::clamp(extent.width, minExtent.width, maxExtent.width),
-                std::clamp(extent.height, minExtent.height, maxExtent.height)
-            };
-        }
-
-        static auto select_surface_format(std::span<const vk::SurfaceFormatKHR> surface_formats, std::span<const vk::Format> request_formats, vk::ColorSpaceKHR request_color_space) -> vk::SurfaceFormatKHR {
-            if (surface_formats.size() == 1) {
-                if (surface_formats.front().format == vk::Format::eUndefined) {
-                    return vk::SurfaceFormatKHR {
-                        .format = request_formats.front(),
-                        .colorSpace = request_color_space
-                    };
-                }
-                return surface_formats.front();
-            }
-
-            for (auto&& request_format : request_formats) {
-                for (auto&& surface_format : surface_formats) {
-                    if (surface_format.format == request_format && surface_format.colorSpace == request_color_space) {
-                        return surface_format;
-                    }
-                }
-            }
-            return surface_formats.front();
-        }
-
-        static auto select_present_mode(std::span<const vk::PresentModeKHR> present_modes, std::span<const vk::PresentModeKHR> request_modes) -> vk::PresentModeKHR {
-            for (auto request_mode : request_modes) {
-                for (auto present_mode : present_modes) {
-                    if (request_mode == present_mode) {
-                        return request_mode;
-                    }
-                }
-            }
-            return vk::PresentModeKHR::eFifo;
-        }
-
     };
 }

@@ -3,8 +3,9 @@
 #include <pass.hpp>
 #include <signal.hpp>
 #include <assets.hpp>
-#include <context.hpp>
 #include <glm/glm.hpp>
+#include <context.hpp>
+#include <swapchain.hpp>
 
 struct CameraProperties {
     glm::mat4 projection;
@@ -22,22 +23,13 @@ struct Camera {
     glm::mat4 view{};
     glm::mat4 projection{};
 
-    vfx::Context& context;
-    std::array<vfx::Buffer*, 3> uniforms{};
-
-    Camera(vfx::Context& context, f32 fov, f32 aspect) : context(context) {
+    Camera(f32 fov, f32 aspect) {
         view = glm::mat4(1.0f); // glm::inverse(camera.local_to_world_matrix());
         projection = clip * glm::infinitePerspective(glm::radians(fov), aspect, 0.1f);
 
-        for (u64 i = 0; i < vfx::Context::MAX_FRAMES_IN_FLIGHT; ++i) {
-            uniforms[i] = context.create_buffer(vfx::Buffer::Target::Constant, sizeof(CameraProperties));
-        }
-    }
-
-    ~Camera() {
-        for (u64 i = 0; i < vfx::Context::MAX_FRAMES_IN_FLIGHT; ++i) {
-            context.destroy_buffer(uniforms[i]);
-        }
+//        for (u64 i = 0; i < vfx::Context::MAX_FRAMES_IN_FLIGHT; ++i) {
+//            uniforms[i] = context.create_buffer(vfx::Buffer::Target::Constant, sizeof(CameraProperties));
+//        }
     }
 };
 
@@ -59,10 +51,18 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
     vfx::Texture* color{};
     vfx::Texture* depth{};
 
+    vfx::Buffer* globals{};
     vfx::Material* material{};
-    std::array<vk::Framebuffer, 3> framebuffers{};
+
+    std::vector<vk::Framebuffer> framebuffers{};
+
+    struct FrameResourcePool {
+        std::vector<vfx::Buffer*> camera_buffers{};
+    };
 
     explicit DefaultRenderPipeline(vfx::Context& context, vfx::Swapchain& swapchain) : RenderPipeline(context, swapchain) {
+        globals = context.create_buffer(vfx::Buffer::Target::Constant, sizeof(CameraProperties));
+
         color = context.create_texture(
             swapchain.surface_extent.width,
             swapchain.surface_extent.height,
@@ -113,17 +113,30 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
         pass.init(attachments, definitions, dependencies);
 
         material = create_material();
+
+        framebuffers.resize(swapchain.images.size());
+        for (u64 i = 0; i < swapchain.images.size(); ++i) {
+            auto fb_attachments = std::array{ swapchain.views[i], depth->view };
+
+            vk::FramebufferCreateInfo fb_create_info{};
+            fb_create_info.setRenderPass(pass.handle);
+            fb_create_info.setAttachments(fb_attachments);
+            fb_create_info.setWidth(swapchain.surface_extent.width);
+            fb_create_info.setHeight(swapchain.surface_extent.height);
+            fb_create_info.setLayers(1);
+
+            framebuffers[i] = context.logical_device.createFramebuffer(fb_create_info);
+        }
     }
 
-    ~DefaultRenderPipeline() {
+    ~DefaultRenderPipeline() override {
+        context.destroy_buffer(globals);
         context.destroy_texture(depth);
         context.destroy_texture(color);
         context.destroy_material(material);
 
-        for (u64 i = 0; i < 3; ++i) {
-            if (framebuffers[i]) {
-                context.logical_device.destroyFramebuffer(framebuffers[i]);
-            }
+        for (u64 i = 0; i < framebuffers.size(); ++i) {
+            context.logical_device.destroyFramebuffer(framebuffers[i]);
         }
     }
 
@@ -199,29 +212,11 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
         return context.create_material(description, pass.handle, 0);
     }
 
-    void begin_frame(vk::CommandBuffer cmd) {
-        auto attachments = std::array{
-            swapchain.views[swapchain.current_frame],
-            depth->view,
-        };
-
+    void begin_rendering(vk::CommandBuffer cmd) {
         auto clear_values = std::array{
             vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({0.0f, 0.0f, 0.0f, 0.0f})),
             vk::ClearValue{}.setDepthStencil(vk::ClearDepthStencilValue{1.0f, 0})
         };
-
-        vk::FramebufferCreateInfo fb_create_info{};
-        fb_create_info.renderPass = pass.handle;
-        fb_create_info.attachmentCount = u32(attachments.size());
-        fb_create_info.pAttachments = attachments.data();
-        fb_create_info.width = swapchain.surface_extent.width;
-        fb_create_info.height = swapchain.surface_extent.height;
-        fb_create_info.layers = 1;
-
-        if (framebuffers[swapchain.current_frame]) {
-            context.logical_device.destroyFramebuffer(framebuffers[swapchain.current_frame]);
-        }
-        framebuffers[swapchain.current_frame] = context.logical_device.createFramebuffer(fb_create_info);
 
         auto area = vk::Rect2D{};
         area.setExtent(swapchain.surface_extent);
@@ -233,8 +228,8 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
         begin_info.setClearValues(clear_values);
 
         auto viewport = vk::Viewport{};
-        viewport.setWidth(static_cast<f32>(area.extent.width));
-        viewport.setHeight(static_cast<f32>(area.extent.height));
+        viewport.setWidth(f32(area.extent.width));
+        viewport.setHeight(f32(area.extent.height));
         viewport.setMaxDepth(1.f);
 
         cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
@@ -244,7 +239,7 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
 
     void setup(vk::CommandBuffer cmd, Camera* camera) {
         auto buffer_info = vk::DescriptorBufferInfo {
-            .buffer = camera->uniforms[swapchain.current_frame]->buffer,
+            .buffer = globals->buffer,
             .offset = 0,
             .range = vk::DeviceSize(sizeof(CameraProperties))
         };
@@ -262,7 +257,7 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
         properties.projection = camera->projection;
         properties.view = camera->view;
 
-        context.update_buffer(camera->uniforms[swapchain.current_frame], &properties, sizeof(CameraProperties), 0);
+        context.update_buffer(globals, &properties, sizeof(CameraProperties), 0);
 
         cmd.bindPipeline(material->pipeline_bind_point, material->pipeline);
         cmd.bindDescriptorSets(

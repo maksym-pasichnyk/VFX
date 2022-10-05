@@ -77,12 +77,11 @@ struct Demo {
             context.set_indices(&geometries[1], indices);
         }
 
-        Scene* scene = new Scene();
+        Scene scene{};
+        Camera camera{60.0f, display.get_aspect()};
 
-        Camera camera{context, 60.0f, display.get_aspect()};
-
-        auto g0 = Entity{scene->create_entity(), scene};
-        auto g1 = Entity{scene->create_entity(), scene};
+        auto g0 = Entity{scene.create_entity(), &scene};
+        auto g1 = Entity{scene.create_entity(), &scene};
 
         g0.emplace<MeshRenderer>(true, &geometries[0], nullptr);
         g1.emplace<MeshRenderer>(true, &geometries[1], nullptr);
@@ -102,10 +101,10 @@ struct Demo {
                 auto cmd = context.command_buffers[swapchain.current_frame];
                 cmd.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
-                pipeline.begin_frame(cmd);
+                pipeline.begin_rendering(cmd);
                 pipeline.setup(cmd, &camera);
 
-                for (auto&& [_, renderer] : scene->registry.view<MeshRenderer>().each()) {
+                for (auto&& [_, renderer] : scene.registry.view<MeshRenderer>().each()) {
                     if (!renderer.enable || !renderer.geometry) {
                         continue;
                     }
@@ -125,7 +124,7 @@ struct Demo {
                 cmd.endRenderPass();
                 cmd.end();
 
-                swapchain.submit();
+                swapchain.submit(cmd);
                 swapchain.present();
             }
         }

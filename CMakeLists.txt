@@ -64,7 +64,7 @@ add_library(VFX STATIC
     src/material.hpp
     src/assets.hpp
     src/vulkan.cpp
-        src/delegate.hpp src/signal.hpp)
+        src/delegate.hpp src/signal.hpp src/swapchain.hpp)
 target_include_directories(VFX PUBLIC src)
 target_link_libraries(VFX PUBLIC
     glm
