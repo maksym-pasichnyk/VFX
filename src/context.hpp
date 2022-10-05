@@ -13,6 +13,8 @@
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_beta.h>
 
+#include "spirv_reflect.h"
+
 struct DefaultVertexFormat {
     glm::vec3 position;
     glm::u8vec4 color;
@@ -171,6 +173,7 @@ namespace vfx {
 
             static constexpr auto device_extensions = std::array{
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+//                VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
                 VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
                 VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
                 VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
@@ -187,17 +190,16 @@ namespace vfx {
                 .samplerAnisotropy = VK_TRUE
             };
 
-            auto imagelessFramebufferFeatures = vk::PhysicalDeviceImagelessFramebufferFeatures{
-                .imagelessFramebuffer = VK_TRUE
-            };
+//            auto imagelessFramebufferFeatures = vk::PhysicalDeviceImagelessFramebufferFeatures{
+//                .imagelessFramebuffer = VK_TRUE
+//            };
 
-    //            auto dynamicRenderingFeaturesKHR = vk::PhysicalDeviceDynamicRenderingFeaturesKHR{
-    //                .dynamicRendering = true
-    //            };
+//            auto dynamicRenderingFeaturesKHR = vk::PhysicalDeviceDynamicRenderingFeaturesKHR{
+//                .dynamicRendering = true
+//            };
 
             const auto physicalDeviceFeatures2 = vk::PhysicalDeviceFeatures2{
     //            .pNext = &dynamicRenderingFeaturesKHR,
-                .pNext = &imagelessFramebufferFeatures,
                 .features = features
             };
 
@@ -511,80 +513,149 @@ namespace vfx {
             update_buffer(geometry->idx, src, size * geometry->idx_stride, offset * geometry->idx_stride);
         }
 
-        auto create_material(const Material::Description& description, vk::RenderPass pass, u32 subpass) -> Material* {
+        auto create_material(const MaterialDescription& description, vk::RenderPass pass, u32 subpass) -> Material* {
             auto material = new Material();
+            material->pipeline_bind_point = vk::PipelineBindPoint::eGraphics;
 
-            std::map<vk::DescriptorType, u32> dp_table{};
-            std::vector<vk::DescriptorPoolSize> dp_sizes{};
 
-            for (auto& resource : description.resources) {
-                dp_table[resource.type] += Context::MAX_FRAMES_IN_FLIGHT;
-                material->descriptor_set_layout_bindings.emplace_back(vk::DescriptorSetLayoutBinding{
-                    .binding = resource.binding,
-                    .descriptorType = resource.type,
-                    .descriptorCount = 1,
-                    .stageFlags = resource.stage,
-                    .pImmutableSamplers = nullptr
-                });
-            }
-
-            dp_sizes.reserve(dp_table.size());
-            for (auto [type, count] : dp_table) {
-                dp_sizes.emplace_back(vk::DescriptorPoolSize{type, count});
-            }
-
-            auto dp_create_info = vk::DescriptorPoolCreateInfo{};
-            dp_create_info.setMaxSets(Context::MAX_FRAMES_IN_FLIGHT);
-            dp_create_info.setPoolSizes(dp_sizes);
-            material->descriptor_pool = logical_device.createDescriptorPool(dp_create_info, nullptr);
-
-            auto dsl_create_info = vk::DescriptorSetLayoutCreateInfo{};
-            dsl_create_info.setBindings(material->descriptor_set_layout_bindings);
-            material->descriptor_set_layout = logical_device.createDescriptorSetLayout(dsl_create_info);
-
-            auto pipeline_layout_create_info = vk::PipelineLayoutCreateInfo{};
-            if (material->descriptor_set_layout) {
-                pipeline_layout_create_info.setSetLayouts(material->descriptor_set_layout);
-                pipeline_layout_create_info.setPushConstantRanges(description.constants);
-            }
-            material->pipeline_layout = logical_device.createPipelineLayout(pipeline_layout_create_info);
-
-            auto ds_layouts = std::array{
-                material->descriptor_set_layout,
-                material->descriptor_set_layout,
-                material->descriptor_set_layout
+            struct DescriptorSetLayoutDescription {
+                std::vector<vk::DescriptorSetLayoutBinding> bindings{};
             };
-            auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
-            ds_allocate_info.setDescriptorPool(material->descriptor_pool);
-            ds_allocate_info.setSetLayouts(ds_layouts);
-            material->descriptor_sets = logical_device.allocateDescriptorSets(ds_allocate_info);
 
-            auto vertexInputState = vk::PipelineVertexInputStateCreateInfo{};
-            vertexInputState.setVertexBindingDescriptions(description.bindings);
-            vertexInputState.setVertexAttributeDescriptions(description.attributes);
+            std::map<u32, DescriptorSetLayoutDescription> descriptor_set_layouts_table{};
 
-            auto colorBlendState = vk::PipelineColorBlendStateCreateInfo{};
-            colorBlendState.setAttachments(description.attachments);
+            i32 maxSet = -1;
+            std::map<vk::DescriptorType, u32> descriptor_set_bindings_table{};
+            std::vector<vk::PushConstantRange> constant_ranges{};
+            std::vector<vk::PipelineShaderStageCreateInfo> stages{};
 
-            auto dynamicState = vk::PipelineDynamicStateCreateInfo{};
-            dynamicState.setDynamicStates(description.dynamic_states);
+            stages.reserve(description.shaders.size());
+            for (auto& stage : description.shaders) {
+                stages.emplace_back(vk::PipelineShaderStageCreateInfo{
+                    .stage  = stage.stage,
+                    .module = create_shader_module(stage.bytes),
+                    .pName = stage.entry.c_str()
+                });
+
+                SpvReflectShaderModule spv_module{};
+                spvReflectCreateShaderModule(stage.bytes.size(), stage.bytes.data(), &spv_module);
+
+                auto stage_flags = vk::ShaderStageFlagBits(spv_module.shader_stage);
+
+                auto refl_constant_blocks = std::span(
+                    spv_module.push_constant_blocks,
+                    spv_module.push_constant_block_count
+                );
+
+                constant_ranges.reserve(refl_constant_blocks.size());
+                for (auto& refl_block : refl_constant_blocks) {
+                    auto& constant_range = constant_ranges.emplace_back();
+
+                    constant_range.setSize(refl_block.size);
+                    constant_range.setOffset(refl_block.offset);
+                    constant_range.setStageFlags(stage_flags);
+                }
+
+                auto refl_descriptor_sets = std::span(
+                    spv_module.descriptor_sets,
+                    spv_module.descriptor_set_count
+                );
+
+                for (auto& refl_set : refl_descriptor_sets) {
+                    maxSet = std::max(maxSet, i32(refl_set.set));
+
+                    auto refl_descriptor_bindings = std::span(
+                        refl_set.bindings,
+                        refl_set.binding_count
+                    );
+
+                    for (auto& refl_binding : refl_descriptor_bindings) {
+                      vk::DescriptorSetLayoutBinding binding{
+                            .binding = refl_binding->binding,
+                            .descriptorType = vk::DescriptorType(refl_binding->descriptor_type),
+                            .descriptorCount = refl_binding->count,
+                            .stageFlags = stage_flags,
+                            .pImmutableSamplers = nullptr
+                        };
+                        descriptor_set_layouts_table[refl_set.set].bindings.emplace_back(binding);
+                        descriptor_set_bindings_table[binding.descriptorType] += Context::MAX_FRAMES_IN_FLIGHT;
+                    }
+                }
+
+                spvReflectDestroyShaderModule(&spv_module);
+            }
+
+            /*create descriptor set layouts*/ {
+                material->descriptor_set_layouts.resize(maxSet + 1);
+                for (u32 i = 0; i < material->descriptor_set_layouts.size(); ++i) {
+                    auto dsl_create_info = vk::DescriptorSetLayoutCreateInfo{};
+                    dsl_create_info.setBindings(descriptor_set_layouts_table[i].bindings);
+                    material->descriptor_set_layouts[i] = logical_device.createDescriptorSetLayout(dsl_create_info);
+                }
+            }
+
+            /*create pipeline layout*/ {
+                auto pipeline_layout_create_info = vk::PipelineLayoutCreateInfo{};
+                pipeline_layout_create_info.setSetLayouts(material->descriptor_set_layouts);
+                pipeline_layout_create_info.setPushConstantRanges(constant_ranges);
+                material->pipeline_layout = logical_device.createPipelineLayout(pipeline_layout_create_info);
+            }
+
+            /*allocate descriptors*/ {
+                std::vector<vk::DescriptorPoolSize> pool_sizes{};
+                pool_sizes.reserve(descriptor_set_bindings_table.size());
+                for (auto& [type, count] : descriptor_set_bindings_table) {
+                    pool_sizes.emplace_back(vk::DescriptorPoolSize{type, count});
+                }
+
+                auto pool_create_info = vk::DescriptorPoolCreateInfo{};
+                pool_create_info.setMaxSets(material->descriptor_set_layouts.size());
+                pool_create_info.setPoolSizes(pool_sizes);
+                material->descriptor_pool = logical_device.createDescriptorPool(pool_create_info, nullptr);
+
+                auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
+                ds_allocate_info.setDescriptorPool(material->descriptor_pool);
+                ds_allocate_info.setSetLayouts(material->descriptor_set_layouts);
+                material->descriptor_sets = logical_device.allocateDescriptorSets(ds_allocate_info);
+            }
+
+            auto vertex_input_state = vk::PipelineVertexInputStateCreateInfo{};
+            vertex_input_state.setVertexBindingDescriptions(description.bindings);
+            vertex_input_state.setVertexAttributeDescriptions(description.attributes);
+
+            auto color_blend_state = vk::PipelineColorBlendStateCreateInfo{};
+            color_blend_state.setAttachments(description.attachments);
+
+            std::array dynamic_states = {
+                vk::DynamicState::eViewport,
+                vk::DynamicState::eScissor
+            };
+
+            vk::PipelineViewportStateCreateInfo viewport_state = {};
+            viewport_state.viewportCount = 1;
+            viewport_state.pViewports = nullptr;
+            viewport_state.scissorCount = 1;
+            viewport_state.pScissors = nullptr;
+
+            auto dynamic_state = vk::PipelineDynamicStateCreateInfo{};
+            dynamic_state.setDynamicStates(dynamic_states);
 
             auto pipeline_create_info = vk::GraphicsPipelineCreateInfo{};
-            pipeline_create_info.pVertexInputState = &vertexInputState;
+            pipeline_create_info.pVertexInputState = &vertex_input_state;
             pipeline_create_info.pInputAssemblyState = &description.inputAssemblyState;
-            pipeline_create_info.pViewportState = &description.viewportState;
+            pipeline_create_info.pViewportState = &viewport_state;
             pipeline_create_info.pRasterizationState = &description.rasterizationState;
             pipeline_create_info.pMultisampleState = &description.multisampleState;
             pipeline_create_info.pDepthStencilState = &description.depthStencilState;
-            pipeline_create_info.pColorBlendState = &colorBlendState;
-            pipeline_create_info.pDynamicState = &dynamicState;
+            pipeline_create_info.pColorBlendState = &color_blend_state;
+            pipeline_create_info.pDynamicState = &dynamic_state;
             pipeline_create_info.layout = material->pipeline_layout;
             pipeline_create_info.renderPass = pass;
             pipeline_create_info.subpass = subpass;
             pipeline_create_info.basePipelineHandle = nullptr;
             pipeline_create_info.basePipelineIndex = 0;
 
-            pipeline_create_info.setStages(description.stages);
+            pipeline_create_info.setStages(stages);
 
             auto result = logical_device.createGraphicsPipelines(
                 {},
@@ -598,7 +669,7 @@ namespace vfx {
                 spdlog::error("{}", vk::to_string(result));
             }
 
-            for (auto& stage : description.stages) {
+            for (auto& stage : stages) {
                 logical_device.destroyShaderModule(stage.module);
             }
 
@@ -606,17 +677,15 @@ namespace vfx {
         }
 
         auto destroy_material(Material* material) {
-    //        for (auto& stage : material->stages) {
-    //            logical_device.destroyShaderModule(stage.module);
-    //        }
             logical_device.destroyPipeline(material->pipeline);
             logical_device.destroyPipelineLayout(material->pipeline_layout);
 
+            for (auto& layout : material->descriptor_set_layouts) {
+                logical_device.destroyDescriptorSetLayout(layout);
+            }
+
             if (material->descriptor_pool) {
                 logical_device.destroyDescriptorPool(material->descriptor_pool);
-            }
-            if (material->descriptor_set_layout) {
-                logical_device.destroyDescriptorSetLayout(material->descriptor_set_layout);
             }
             delete material;
         }

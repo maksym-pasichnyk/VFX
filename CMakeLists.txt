@@ -4,6 +4,10 @@ project(VFX)
 set(CMAKE_CXX_STANDARD 20)
 set(GLFW_LIBRARY_TYPE "STATIC")
 
+set(SPIRV_REFLECT_EXAMPLES OFF)
+set(SPIRV_REFLECT_EXECUTABLE OFF)
+set(SPIRV_REFLECT_STATIC_LIB ON)
+
 find_package(Vulkan REQUIRED)
 
 add_subdirectory(deps/glm)
@@ -12,6 +16,7 @@ add_subdirectory(deps/entt)
 add_subdirectory(deps/spdlog)
 add_subdirectory(deps/range-v3)
 add_subdirectory(deps/optional)
+add_subdirectory(deps/SPIRV-Reflect)
 add_subdirectory(deps/VulkanMemoryAllocator)
 
 function(target_compile_shaders TARGET)
@@ -75,6 +80,7 @@ target_link_libraries(VFX PUBLIC
     range-v3
     tl::optional
     Vulkan::Vulkan
+    spirv-reflect-static
     VulkanMemoryAllocator
 )
 target_compile_definitions(VFX PUBLIC

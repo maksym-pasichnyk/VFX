@@ -56,13 +56,7 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
 
     std::vector<vk::Framebuffer> framebuffers{};
 
-    struct FrameResourcePool {
-        std::vector<vfx::Buffer*> camera_buffers{};
-    };
-
     explicit DefaultRenderPipeline(vfx::Context& context, vfx::Swapchain& swapchain) : RenderPipeline(context, swapchain) {
-        globals = context.create_buffer(vfx::Buffer::Target::Constant, sizeof(CameraProperties));
-
         color = context.create_texture(
             swapchain.surface_extent.width,
             swapchain.surface_extent.height,
@@ -114,6 +108,22 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
 
         material = create_material();
 
+        globals = context.create_buffer(vfx::Buffer::Target::Constant, sizeof(CameraProperties));
+        auto buffer_info = vk::DescriptorBufferInfo {
+            .buffer = globals->buffer,
+            .offset = 0,
+            .range = vk::DeviceSize(sizeof(CameraProperties))
+        };
+        auto write_descriptor_set = vk::WriteDescriptorSet{
+            .dstSet = material->descriptor_sets[0],
+            .dstBinding = 0,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .pBufferInfo = &buffer_info
+        };
+        context.logical_device.updateDescriptorSets({write_descriptor_set}, {});
+
         framebuffers.resize(swapchain.images.size());
         for (u64 i = 0; i < swapchain.images.size(); ++i) {
             auto fb_attachments = std::array{ swapchain.views[i], depth->view };
@@ -141,18 +151,16 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
     }
 
     auto create_material() -> vfx::Material* {
-        vfx::Material::Description description{};
+        vfx::MaterialDescription description{};
 
-        description.dynamic_states = {
-            vk::DynamicState::eViewport,
-            vk::DynamicState::eScissor
+        description.bindings = {
+            {0, sizeof(DefaultVertexFormat), vk::VertexInputRate::eVertex}
         };
 
-        description.create_uniform_resource(0, vk::ShaderStageFlagBits::eVertex, sizeof(CameraProperties));
-
-        description.create_binding(vk::VertexInputRate::eVertex);
-        description.create_attribute(0, vk::Format::eR32G32B32Sfloat, 12);
-        description.create_attribute(0, vk::Format::eR8G8B8A8Unorm,    4);
+        description.attributes = {
+            {0, 0, vk::Format::eR32G32B32Sfloat, offsetof(DefaultVertexFormat, position)},
+            {1, 0, vk::Format::eR8G8B8A8Unorm, offsetof(DefaultVertexFormat, color)}
+        };
 
         description.create_attachment(vk::PipelineColorBlendAttachmentState{
             .blendEnable = true,
@@ -170,11 +178,6 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
 
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
         description.inputAssemblyState.primitiveRestartEnable = false;
-
-        description.viewportState.viewportCount = 1;
-        description.viewportState.pViewports = nullptr;
-        description.viewportState.scissorCount = 1;
-        description.viewportState.pScissors = nullptr;
 
         description.rasterizationState.depthClampEnable        = false;
         description.rasterizationState.rasterizerDiscardEnable = false;
@@ -197,17 +200,15 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
         description.depthStencilState.minDepthBounds        = 0.0f;
         description.depthStencilState.maxDepthBounds        = 0.0f;
 
-        auto vert_data = Assets::read_file("shaders/default.vert.spv");
-        auto frag_data = Assets::read_file("shaders/default.frag.spv");
-        description.stages.emplace_back(vk::PipelineShaderStageCreateInfo{
+        description.shaders.emplace_back(vfx::ShaderDescription{
+            .bytes = Assets::read_file("shaders/default.vert.spv"),
+            .entry = "main",
             .stage  = vk::ShaderStageFlagBits::eVertex,
-            .module = context.create_shader_module(vert_data),
-            .pName = "main"
         });
-        description.stages.emplace_back(vk::PipelineShaderStageCreateInfo{
+        description.shaders.emplace_back(vfx::ShaderDescription{
+            .bytes = Assets::read_file("shaders/default.frag.spv"),
+            .entry = "main",
             .stage  = vk::ShaderStageFlagBits::eFragment,
-            .module = context.create_shader_module(frag_data),
-            .pName = "main"
         });
         return context.create_material(description, pass.handle, 0);
     }
@@ -238,21 +239,6 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
     }
 
     void setup(vk::CommandBuffer cmd, Camera* camera) {
-        auto buffer_info = vk::DescriptorBufferInfo {
-            .buffer = globals->buffer,
-            .offset = 0,
-            .range = vk::DeviceSize(sizeof(CameraProperties))
-        };
-        auto write_descriptor_set = vk::WriteDescriptorSet{
-            .dstSet = material->descriptor_sets[swapchain.current_frame],
-            .dstBinding = 0,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eUniformBuffer,
-            .pBufferInfo = &buffer_info
-        };
-        context.logical_device.updateDescriptorSets({write_descriptor_set}, {});
-
         CameraProperties properties{};
         properties.projection = camera->projection;
         properties.view = camera->view;
@@ -264,7 +250,7 @@ struct DefaultRenderPipeline : vfx::RenderPipeline {
             material->pipeline_bind_point,
             material->pipeline_layout,
             0,
-            material->descriptor_sets[swapchain.current_frame],
+            material->descriptor_sets,
             {}
         );
     }

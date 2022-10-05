@@ -87,20 +87,17 @@ struct Widgets {
 
         create_font_texture();
 
-        vfx::Material::Description description{};
+        vfx::MaterialDescription description{};
 
-        description.dynamic_states = {
-            vk::DynamicState::eViewport,
-            vk::DynamicState::eScissor
+        description.bindings = {
+            {0, sizeof(ImDrawVert), vk::VertexInputRate::eVertex}
         };
 
-        description.create_constant(vk::ShaderStageFlagBits::eVertex, 0, 16);
-        description.create_sampler_resource(0, vk::ShaderStageFlagBits::eFragment);
-
-        description.create_binding(vk::VertexInputRate::eVertex);
-        description.create_attribute(0, vk::Format::eR32G32Sfloat,  8);
-        description.create_attribute(0, vk::Format::eR32G32Sfloat,  8);
-        description.create_attribute(0, vk::Format::eR8G8B8A8Unorm, 4);
+        description.attributes = {
+            {0, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, pos) },
+            {1, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, uv) },
+            {2, 0, vk::Format::eR8G8B8A8Unorm, offsetof(ImDrawVert, col) }
+        };
 
         description.create_attachment(vk::PipelineColorBlendAttachmentState{
             .blendEnable = true,
@@ -117,11 +114,6 @@ struct Widgets {
         });
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
         description.inputAssemblyState.primitiveRestartEnable = false;
-
-        description.viewportState.viewportCount = 1;
-        description.viewportState.pViewports = nullptr;
-        description.viewportState.scissorCount = 1;
-        description.viewportState.pScissors = nullptr;
 
         description.rasterizationState.depthClampEnable        = false;
         description.rasterizationState.rasterizerDiscardEnable = false;
@@ -144,36 +136,32 @@ struct Widgets {
         description.depthStencilState.minDepthBounds        = 0.0f;
         description.depthStencilState.maxDepthBounds        = 0.0f;
 
-        auto vert_data = Assets::read_file("shaders/imgui.vert.spv");
-        auto frag_data = Assets::read_file("shaders/imgui.frag.spv");
-        description.stages.emplace_back(vk::PipelineShaderStageCreateInfo{
-            .stage  = vk::ShaderStageFlagBits::eVertex,
-            .module = context.create_shader_module(vert_data),
-            .pName = "main"
+        description.shaders.emplace_back(vfx::ShaderDescription{
+            .bytes = Assets::read_file("shaders/imgui.vert.spv"),
+            .entry = "main",
+            .stage = vk::ShaderStageFlagBits::eVertex
         });
-        description.stages.emplace_back(vk::PipelineShaderStageCreateInfo{
-            .stage  = vk::ShaderStageFlagBits::eFragment,
-            .module = context.create_shader_module(frag_data),
-            .pName = "main"
+        description.shaders.emplace_back(vfx::ShaderDescription{
+            .bytes = Assets::read_file("shaders/imgui.frag.spv"),
+            .entry = "main",
+            .stage = vk::ShaderStageFlagBits::eFragment
         });
         material = context.create_material(description, pass, 0);
 
-        for (u64 i = 0; i < 3; ++i) {
-            const auto image_info = vk::DescriptorImageInfo{
-                .sampler = font_texture->sampler,
-                .imageView = font_texture->view,
-                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-            };
-            const auto write_descriptor_set = vk::WriteDescriptorSet{
-                .dstSet = material->descriptor_sets[i],
-                .dstBinding = 0,
-                .dstArrayElement = 0,
-                .descriptorCount = 1,
-                .descriptorType = material->descriptor_set_layout_bindings[0].descriptorType,
-                .pImageInfo = &image_info
-            };
-            context.logical_device.updateDescriptorSets(write_descriptor_set, {});
-        }
+        const auto image_info = vk::DescriptorImageInfo{
+            .sampler = font_texture->sampler,
+            .imageView = font_texture->view,
+            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        };
+        const auto write_descriptor_set = vk::WriteDescriptorSet{
+            .dstSet = material->descriptor_sets[0],
+            .dstBinding = 0,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .pImageInfo = &image_info
+        };
+        context.logical_device.updateDescriptorSets(write_descriptor_set, {});
     }
 
     ~Widgets() {
@@ -282,8 +270,8 @@ struct Widgets {
             }
         }
 
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, material->pipeline);
-        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, material->pipeline_layout, 0, material->descriptor_sets[current_frame], {});
+        cmd.bindPipeline(material->pipeline_bind_point, material->pipeline);
+        cmd.bindDescriptorSets(material->pipeline_bind_point, material->pipeline_layout, 0, material->descriptor_sets, {});
 
         setup_render_state(draw_data, cmd, frame, fb_width, fb_height);
 
