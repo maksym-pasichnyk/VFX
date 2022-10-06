@@ -149,7 +149,7 @@ struct Widgets {
         material = context.create_material(description, pass, 0);
 
         const auto image_info = vk::DescriptorImageInfo{
-            .sampler = font_texture->sampler,
+            .sampler = font_sampler,
             .imageView = font_texture->view,
             .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         };
@@ -167,10 +167,11 @@ struct Widgets {
     ~Widgets() {
         ImGui::DestroyContext(ctx);
 
+        context.logical_device.destroySampler(font_sampler);
         context.destroy_texture(font_texture);
         context.destroy_material(material);
 
-        for (auto frame : frames) {
+        for (auto& frame : frames) {
             if (frame.vtx != nullptr) {
                 context.destroy_buffer(frame.vtx);
             }
@@ -347,7 +348,7 @@ struct Widgets {
             vk::ImageAspectFlagBits::eColor
     //        vk::ImageLayout::eShaderReadOnlyOptimal
         );
-        font_texture->sampler = context.logical_device.createSampler(vk::SamplerCreateInfo{
+        font_sampler = context.logical_device.createSampler(vk::SamplerCreateInfo{
     //            .magFilter = vk::Filter::eLinear,
     //            .minFilter = vk::Filter::eLinear,
     //            .mipmapMode = vk::SamplerMipmapMode::eLinear,
@@ -392,6 +393,7 @@ struct Widgets {
     ImGuiContext* ctx;
     vfx::Material* material;
     vfx::Texture* font_texture;
+    vk::Sampler font_sampler;
     u64 current_frame = 0;
     std::array<Geometry, vfx::Context::MAX_FRAMES_IN_FLIGHT> frames{};
 };

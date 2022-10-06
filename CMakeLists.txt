@@ -107,4 +107,6 @@ target_compile_shaders(VFX-example
     assets/shaders/default.vert
     assets/shaders/imgui.frag
     assets/shaders/imgui.vert
+    assets/shaders/blit.vert
+    assets/shaders/blit.frag
 )

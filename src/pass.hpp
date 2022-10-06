@@ -9,12 +9,12 @@
 
 namespace vfx {
     struct SubpassDescription {
-        vk::PipelineBindPoint pipelineBindPoint{};
-        std::vector<vk::AttachmentReference> pInputAttachments{};
-        std::vector<vk::AttachmentReference> pColorAttachments{};
-        std::vector<vk::AttachmentReference> pResolveAttachments{};
-        tl::optional<vk::AttachmentReference> pDepthStencilAttachment{};
-        std::vector<u32> pPreserveAttachments{};
+        vk::PipelineBindPoint pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+        std::vector<vk::AttachmentReference> inputAttachments{};
+        std::vector<vk::AttachmentReference> colorAttachments{};
+        std::vector<vk::AttachmentReference> resolveAttachments{};
+        tl::optional<vk::AttachmentReference> depthStencilAttachment{};
+        std::vector<u32> preserveAttachments{};
     };
 
     struct RenderPass {
@@ -29,21 +29,21 @@ namespace vfx {
 
             for (u64 i = 0; i < definitions.size(); ++i) {
                 subpasses[i].flags = {};
-                subpasses[i].pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
-                if (!definitions[i].pInputAttachments.empty()) {
-                    subpasses[i].setInputAttachments(definitions[i].pInputAttachments);
+                subpasses[i].pipelineBindPoint = definitions[i].pipelineBindPoint;
+                if (!definitions[i].inputAttachments.empty()) {
+                    subpasses[i].setInputAttachments(definitions[i].inputAttachments);
                 }
-                if (!definitions[i].pColorAttachments.empty()) {
-                    subpasses[i].setColorAttachments(definitions[i].pColorAttachments);
+                if (!definitions[i].colorAttachments.empty()) {
+                    subpasses[i].setColorAttachments(definitions[i].colorAttachments);
                 }
-                if (!definitions[i].pResolveAttachments.empty()) {
-                    subpasses[i].setResolveAttachments(definitions[i].pResolveAttachments);
+                if (!definitions[i].resolveAttachments.empty()) {
+                    subpasses[i].setResolveAttachments(definitions[i].resolveAttachments);
                 }
-                if (definitions[i].pDepthStencilAttachment.has_value()) {
-                    subpasses[i].setPDepthStencilAttachment(&*definitions[i].pDepthStencilAttachment);
+                if (definitions[i].depthStencilAttachment.has_value()) {
+                    subpasses[i].setPDepthStencilAttachment(&*definitions[i].depthStencilAttachment);
                 }
-                if (!definitions[i].pPreserveAttachments.empty()) {
-                    subpasses[i].setPreserveAttachments(definitions[i].pPreserveAttachments);
+                if (!definitions[i].preserveAttachments.empty()) {
+                    subpasses[i].setPreserveAttachments(definitions[i].preserveAttachments);
                 }
             }
 

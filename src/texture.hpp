@@ -9,7 +9,7 @@ namespace vfx {
         u32 height = 0;
         vk::Image image{};
         vk::ImageView view{};
-        vk::Sampler sampler{};
+//        vk::Sampler sampler{};
         VmaAllocation allocation{};
     };
 }

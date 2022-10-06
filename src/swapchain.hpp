@@ -1,8 +1,5 @@
-//
-// Created by Maksym Pasichnyk on 05.10.2022.
-//
-
 #include "context.hpp"
+#include "pass.hpp"
 
 namespace vfx {
     struct Swapchain {
@@ -10,8 +7,12 @@ namespace vfx {
 
         vk::SurfaceKHR surface{};
         vk::SwapchainKHR swapchain{};
+
         std::vector<vk::Image> images{};
         std::vector<vk::ImageView> views{};
+
+        RenderPass render_pass{context};
+        std::vector<vk::Framebuffer> framebuffers{};
 
         std::vector<vk::Fence> fences{};
         std::vector<vk::Fence> image_fences{};
@@ -28,23 +29,43 @@ namespace vfx {
         u64 current_frame = 0;
         u32 min_image_count = 0;
 
+        bool out_of_date = false;
+
         Swapchain(Context& context, Display& display) : context(context) {
             surface = display.create_surface(context.instance);
+
             create_swapchain();
             create_sync_objects();
+
+            std::vector<vk::SubpassDependency> dependencies{};
+            std::vector<vfx::SubpassDescription> definitions{};
+            std::vector<vk::AttachmentDescription> attachments{};
+            attachments.emplace_back(vk::AttachmentDescription{
+                .flags = {},
+                .format = surface_format.format,
+                .samples = vk::SampleCountFlagBits::e1,
+                .loadOp = vk::AttachmentLoadOp::eClear,
+                .storeOp = vk::AttachmentStoreOp::eStore,
+                .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+                .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+                .initialLayout = vk::ImageLayout::eUndefined,
+                .finalLayout = vk::ImageLayout::ePresentSrcKHR
+            });
+            definitions.emplace_back(vfx::SubpassDescription{
+                .colorAttachments = {
+                    vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
+                }
+            });
+            render_pass.init(attachments, definitions, dependencies);
+
+            create_framebuffers();
         }
 
         ~Swapchain() {
-            for (u64 i = 0; i < images.size(); i++) {
-                context.logical_device.destroyImageView(views[i]);
-            }
-            for (u64 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; i++) {
-                context.logical_device.destroyFence(fences[i]);
-                context.logical_device.destroySemaphore(acquired_semaphores[i]);
-                context.logical_device.destroySemaphore(complete_semaphores[i]);
-            }
+            destroy_framebuffers();
+            destroy_sync_objects();
+            destroy_swapchain();
 
-            context.logical_device.destroySwapchainKHR(swapchain);
             context.instance.destroySurfaceKHR(surface);
         }
 
@@ -52,7 +73,7 @@ namespace vfx {
             capabilities = context.physical_device.getSurfaceCapabilitiesKHR(surface);
 
             const auto formats = context.physical_device.getSurfaceFormatsKHR(surface);
-            const auto presentModes = context.physical_device.getSurfacePresentModesKHR(surface);
+            const auto present_modes = context.physical_device.getSurfacePresentModesKHR(surface);
 
             const auto request_formats = std::array {
                 vk::Format::eB8G8R8A8Unorm,
@@ -67,7 +88,7 @@ namespace vfx {
 
             surface_extent = select_surface_extent(vk::Extent2D{0, 0}, capabilities);
             surface_format = select_surface_format(formats, request_formats, vk::ColorSpaceKHR::eSrgbNonlinear);
-            present_mode = select_present_mode(presentModes, request_modes);
+            present_mode = select_present_mode(present_modes, request_modes);
 
             min_image_count = capabilities.minImageCount + 1;
             if (capabilities.maxImageCount > 0) {
@@ -103,6 +124,7 @@ namespace vfx {
             images = context.logical_device.getSwapchainImagesKHR(swapchain);
 
             views.resize(images.size());
+            image_fences.resize(images.size());
             for (u64 i = 0; i < images.size(); ++i) {
                 const auto view_create_info = vk::ImageViewCreateInfo{
                     .image = images[i],
@@ -117,9 +139,14 @@ namespace vfx {
             }
         }
 
-        void create_sync_objects() {
-            image_fences.resize(images.size());
+        void destroy_swapchain() {
+            for (u64 i = 0; i < images.size(); i++) {
+                context.logical_device.destroyImageView(views[i]);
+            }
+            context.logical_device.destroySwapchainKHR(swapchain);
+        }
 
+        void create_sync_objects() {
             fences.resize(Context::MAX_FRAMES_IN_FLIGHT);
             acquired_semaphores.resize(Context::MAX_FRAMES_IN_FLIGHT);
             complete_semaphores.resize(Context::MAX_FRAMES_IN_FLIGHT);
@@ -128,6 +155,36 @@ namespace vfx {
                 fences[i] = context.logical_device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
                 acquired_semaphores[i] = context.logical_device.createSemaphore({});
                 complete_semaphores[i] = context.logical_device.createSemaphore({});
+            }
+        }
+
+        void destroy_sync_objects() {
+            for (u64 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; i++) {
+                context.logical_device.destroyFence(fences[i]);
+                context.logical_device.destroySemaphore(acquired_semaphores[i]);
+                context.logical_device.destroySemaphore(complete_semaphores[i]);
+            }
+        }
+
+        void create_framebuffers() {
+            framebuffers.resize(images.size());
+            for (u64 i = 0; i < images.size(); ++i) {
+                auto fb_attachments = std::array{ views[i] };
+
+                vk::FramebufferCreateInfo fb_create_info{};
+                fb_create_info.setRenderPass(render_pass.handle);
+                fb_create_info.setAttachments(fb_attachments);
+                fb_create_info.setWidth(surface_extent.width);
+                fb_create_info.setHeight(surface_extent.height);
+                fb_create_info.setLayers(1);
+
+                framebuffers[i] = context.logical_device.createFramebuffer(fb_create_info);
+            }
+        }
+
+        void destroy_framebuffers() {
+            for (u64 i = 0; i < images.size(); ++i) {
+                context.logical_device.destroyFramebuffer(framebuffers[i]);
             }
         }
 
@@ -141,11 +198,8 @@ namespace vfx {
                 &image_index
             );
             if (result == vk::Result::eErrorOutOfDateKHR) {
-                spdlog::error("out of date swapchain");
-//                recreate_swapchain();
-                return false;
-            }
-            if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+                out_of_date = true;
+            } else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
                 throw std::runtime_error("failed to acquire swapchain image");
             }
             return true;
@@ -178,15 +232,24 @@ namespace vfx {
             auto result = context.present_queue.presentKHR(present_info);
 
             if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
-                spdlog::error("out of date swapchain");
-//                recreate_swapchain();
-                return;
-            }
-            if (result != vk::Result::eSuccess) {
+                out_of_date = true;
+            } else if (result != vk::Result::eSuccess) {
                 throw std::runtime_error("failed to present swapchain image");
             }
             frame_index += 1;
             current_frame = frame_index % Context::MAX_FRAMES_IN_FLIGHT;
+
+            if (out_of_date) {
+                out_of_date = false;
+
+                spdlog::info("Rebuild swapchain...");
+                context.logical_device.waitIdle();
+
+                destroy_framebuffers();
+                destroy_swapchain();
+                create_swapchain();
+                create_framebuffers();
+            }
         }
 
     private:

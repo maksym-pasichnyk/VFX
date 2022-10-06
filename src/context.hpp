@@ -334,7 +334,7 @@ namespace vfx {
                 .height = height,
                 .image = image,
                 .view = view,
-                .sampler = {},
+//                .sampler = {},
                 .allocation = allocation
             };
         }
@@ -342,9 +342,9 @@ namespace vfx {
         auto destroy_texture(vfx::Texture* texture) {
             logical_device.destroyImageView(texture->view);
             vmaDestroyImage(allocator, texture->image, texture->allocation);
-            if (texture->sampler) {
-                logical_device.destroySampler(texture->sampler);
-            }
+//            if (texture->sampler) {
+//                logical_device.destroySampler(texture->sampler);
+//            }
             delete texture;
         }
 
