@@ -1,6 +1,7 @@
 #pragma once
 
 #include <list>
+#include <pass.hpp>
 #include <types.hpp>
 #include <buffer.hpp>
 #include <display.hpp>
@@ -21,8 +22,8 @@ struct DefaultVertexFormat {
 };
 
 struct Geometry {
-    vfx::Buffer* vtx = nullptr;
-    vfx::Buffer* idx = nullptr;
+    Box<vfx::Buffer> vtx = {};
+    Box<vfx::Buffer> idx = {};
 
     u64 vtx_buf_size = 0;
     u64 idx_buf_size = 0;
@@ -35,7 +36,17 @@ struct Geometry {
 };
 
 namespace vfx {
+    struct ContextDescription {
+        std::string app_name = {};
+        vk::InstanceCreateFlags flags{};
+        std::vector<const char*> layers{};
+        std::vector<const char*> extensions{};
+
+        bool enable_debug = false;
+    };
+
     struct Context {
+    public:
         static constexpr auto MAX_FRAMES_IN_FLIGHT = 3u;
 
         vk::DynamicLoader dl{};
@@ -50,14 +61,13 @@ namespace vfx {
         vk::PhysicalDevice physical_device{};
 
         vk::Device logical_device{};
-
         vk::Format depth_format{};
 
         std::vector<vk::CommandPool> command_pools;
         std::vector<vk::CommandBuffer> command_buffers;
 
-        explicit Context(Display& display) {
-            create_instance();
+        explicit Context(const ContextDescription& description) {
+            create_instance(description);
             select_physical_device();
             create_logical_device();
             create_memory_allocator();
@@ -69,69 +79,55 @@ namespace vfx {
                 logical_device.freeCommandBuffers(command_pools[i], command_buffers[i]);
                 logical_device.destroyCommandPool(command_pools[i]);
             }
+
             vmaDestroyAllocator(allocator);
             logical_device.destroy();
 
-            instance.destroyDebugUtilsMessengerEXT(debug_utils);
+            if (debug_utils) {
+                instance.destroyDebugUtilsMessengerEXT(debug_utils);
+            }
             instance.destroy();
         }
 
-        void create_instance() {
+    private:
+        void create_instance(const ContextDescription& description) {
             vk::defaultDispatchLoaderDynamic.init(dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
 
-            auto extensions = [] {
-                u32 count = 0;
-                auto extensions = glfwGetRequiredInstanceExtensions(&count);
-                return std::vector<const char *>(extensions, extensions + count);
-            }();
-
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-            extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-            extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-
-            const auto layers = std::array{
-                "VK_LAYER_KHRONOS_validation"
-            };
-
-            auto app_info = vk::ApplicationInfo{
-                .pApplicationName = nullptr,
+            auto application_info = vk::ApplicationInfo{
+                .pApplicationName = description.app_name.c_str(),
                 .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
                 .pEngineName = "Vulkan",
                 .engineVersion = VK_MAKE_VERSION(1, 0, 0),
                 .apiVersion = VK_API_VERSION_1_2
             };
 
-            vk::InstanceCreateFlags instance_create_flags{};
-            instance_create_flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
-
-            const auto instance_create_info = vk::InstanceCreateInfo {
-                .flags = instance_create_flags,
-                .pApplicationInfo = &app_info,
-                .enabledLayerCount = std::size(layers),
-                .ppEnabledLayerNames = std::data(layers),
-                .enabledExtensionCount = u32(extensions.size()),
-                .ppEnabledExtensionNames = extensions.data(),
-            };
+            auto instance_create_info = vk::InstanceCreateInfo {};
+            instance_create_info.setFlags(description.flags);
+            instance_create_info.setPApplicationInfo(&application_info);
+            instance_create_info.setPEnabledLayerNames(description.layers);
+            instance_create_info.setPEnabledExtensionNames(description.extensions);
             instance = vk::createInstance(instance_create_info);
             vk::defaultDispatchLoaderDynamic.init(instance);
 
-            vk::DebugUtilsMessageSeverityFlagsEXT message_severity_flags{};
-            message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
-            message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo;
-            message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
-            message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+            if (description.enable_debug) {
+                vk::DebugUtilsMessageSeverityFlagsEXT message_severity_flags{};
+                message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
+                message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo;
+                message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
+                message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
 
-            vk::DebugUtilsMessageTypeFlagsEXT message_type_flags{};
-            message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral;
-            message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
-            message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
+                vk::DebugUtilsMessageTypeFlagsEXT message_type_flags{};
+                message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral;
+                message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
+                message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
 
-            const auto debug_create_info = vk::DebugUtilsMessengerCreateInfoEXT{
-                .messageSeverity = message_severity_flags,
-                .messageType = message_type_flags,
-                .pfnUserCallback = debug_callback
-            };
-            debug_utils = instance.createDebugUtilsMessengerEXT(debug_create_info);
+                const auto debug_create_info = vk::DebugUtilsMessengerCreateInfoEXT{
+                    .messageSeverity = message_severity_flags,
+                    .messageType = message_type_flags,
+                    .pfnUserCallback = debug_callback
+                };
+                debug_utils = instance.createDebugUtilsMessengerEXT(debug_create_info);
+            }
         }
 
         void select_physical_device() {
@@ -173,7 +169,6 @@ namespace vfx {
 
             static constexpr auto device_extensions = std::array{
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-//                VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
                 VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
                 VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
                 VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
@@ -181,8 +176,10 @@ namespace vfx {
                 VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
     #endif
                 VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME,
-                VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME
-    //                VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME
+                VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME,
+                VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
+                VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
+                VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME
             };
 
             const auto features = vk::PhysicalDeviceFeatures{
@@ -190,21 +187,17 @@ namespace vfx {
                 .samplerAnisotropy = VK_TRUE
             };
 
-//            auto imagelessFramebufferFeatures = vk::PhysicalDeviceImagelessFramebufferFeatures{
-//                .imagelessFramebuffer = VK_TRUE
-//            };
+            auto dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures{
+                .dynamicRendering = true,
+            };
 
-//            auto dynamicRenderingFeaturesKHR = vk::PhysicalDeviceDynamicRenderingFeaturesKHR{
-//                .dynamicRendering = true
-//            };
-
-            const auto physicalDeviceFeatures2 = vk::PhysicalDeviceFeatures2{
-    //            .pNext = &dynamicRenderingFeaturesKHR,
+            const auto features_2 = vk::PhysicalDeviceFeatures2{
+                .pNext = &dynamic_rendering_features,
                 .features = features
             };
 
-            const auto deviceCreateInfo = vk::DeviceCreateInfo {
-                .pNext = &physicalDeviceFeatures2,
+            const auto device_create_info = vk::DeviceCreateInfo {
+                .pNext = &features_2,
                 .queueCreateInfoCount = u32(std::size(queueCreateInfos)),
                 .pQueueCreateInfos = std::data(queueCreateInfos),
     //                .enabledLayerCount = std::size(enabledLayers),
@@ -214,7 +207,7 @@ namespace vfx {
     //            .pEnabledFeatures = &features
             };
 
-            logical_device = physical_device.createDevice(deviceCreateInfo, nullptr);
+            logical_device = physical_device.createDevice(device_create_info, nullptr);
             vk::defaultDispatchLoaderDynamic.init(logical_device);
 
             present_queue = logical_device.getQueue(present_family, 0);
@@ -298,58 +291,98 @@ namespace vfx {
             return logical_device.createShaderModule(create_info);
         }
 
-        auto create_texture(u32 width, u32 height, vk::Format format, vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect) -> vfx::Texture* {
+    public:
+        auto makeRenderPass(const RenderPassDescription& description) -> Box<RenderPass> {
+            std::vector<vk::SubpassDescription> subpasses{};
+            subpasses.resize(description.definitions.size());
+
+            for (u64 i = 0; i < description.definitions.size(); ++i) {
+                subpasses[i].flags = {};
+                subpasses[i].pipelineBindPoint = description.definitions[i].pipelineBindPoint;
+                if (!description.definitions[i].inputAttachments.empty()) {
+                    subpasses[i].setInputAttachments(description.definitions[i].inputAttachments);
+                }
+                if (!description.definitions[i].colorAttachments.empty()) {
+                    subpasses[i].setColorAttachments(description.definitions[i].colorAttachments);
+                }
+                if (!description.definitions[i].resolveAttachments.empty()) {
+                    subpasses[i].setResolveAttachments(description.definitions[i].resolveAttachments);
+                }
+                if (description.definitions[i].depthStencilAttachment.has_value()) {
+                    subpasses[i].setPDepthStencilAttachment(&*description.definitions[i].depthStencilAttachment);
+                }
+                if (!description.definitions[i].preserveAttachments.empty()) {
+                    subpasses[i].setPreserveAttachments(description.definitions[i].preserveAttachments);
+                }
+            }
+
+            auto create_info = vk::RenderPassCreateInfo{};
+            create_info.setSubpasses(subpasses);
+            create_info.setAttachments(description.attachments.elements);
+            create_info.setDependencies(description.dependencies);
+
+            auto out = Box<RenderPass>::alloc();
+            out->handle = logical_device.createRenderPass(create_info);
+            return out;
+        }
+
+        void freeRenderPass(const Box<RenderPass>& pass) {
+            logical_device.destroyRenderPass(pass->handle);
+        }
+
+        auto makeTexture(const TextureDescription& description) -> Box<Texture> {
             const auto image_create_info = static_cast<VkImageCreateInfo>(vk::ImageCreateInfo{
                 .imageType = vk::ImageType::e2D,
-                .format = format,
+                .format = description.format,
                 .extent = {
-                    .width = width,
-                    .height = height,
+                    .width = description.width,
+                    .height = description.height,
                     .depth = 1
                 },
                 .mipLevels = 1,
                 .arrayLayers = 1,
-                .usage = usage
+                .usage = description.usage
             });
 
             VkImage image;
             VmaAllocation allocation;
 
-            const auto allocation_create_info = VmaAllocationCreateInfo{.usage = VMA_MEMORY_USAGE_GPU_ONLY};
+            const auto allocation_create_info = VmaAllocationCreateInfo{.usage = VMA_MEMORY_USAGE_AUTO};
             vmaCreateImage(allocator, &image_create_info, &allocation_create_info, &image, &allocation, nullptr);
 
             const auto view_create_info = vk::ImageViewCreateInfo{
                 .image = image,
                 .viewType = vk::ImageViewType::e2D,
-                .format = format,
+                .format = description.format,
                 .subresourceRange = vk::ImageSubresourceRange{
-                    aspect,
-                    0, 1, 0, 1
+                    .aspectMask     = description.aspect,
+                    .baseMipLevel   = 0,
+                    .levelCount     = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount     = 1
                 }
             };
             auto view = logical_device.createImageView(view_create_info);
 
-            return new vfx::Texture{
-                .width = width,
-                .height = height,
-                .image = image,
-                .view = view,
-//                .sampler = {},
-                .allocation = allocation
-            };
+            auto out = Box<Texture>::alloc();
+            out->width = description.width;
+            out->height = description.height;
+            out->format = description.format;
+            out->image = image;
+            out->view = view;
+            out->allocation = allocation;
+            return out;
         }
 
-        auto destroy_texture(vfx::Texture* texture) {
+        auto freeTexture(const Box<Texture>& texture) {
             logical_device.destroyImageView(texture->view);
-            vmaDestroyImage(allocator, texture->image, texture->allocation);
-//            if (texture->sampler) {
-//                logical_device.destroySampler(texture->sampler);
-//            }
-            delete texture;
+            if (texture->allocation != nullptr) {
+                vmaDestroyImage(allocator, texture->image, texture->allocation);
+            }
         }
 
-        void set_texture_data(vfx::Texture* texture, std::span<const glm::u8vec4> pixels) {
-            auto tmp = create_buffer(vfx::Buffer::Target::CopySrc, static_cast<int>(pixels.size_bytes()));
+        void set_texture_data(Texture* texture, std::span<const glm::u8vec4> pixels) {
+            auto tmp = create_buffer(BufferUsage::CopySrc, static_cast<int>(pixels.size_bytes()));
             update_buffer(tmp, pixels.data(), pixels.size_bytes(), 0);
 
             const auto copy_barrier = vk::ImageMemoryBarrier{
@@ -422,10 +455,10 @@ namespace vfx {
             logical_device.freeCommandBuffers(cmd_pool, cmd);
             logical_device.destroyCommandPool(cmd_pool);
             logical_device.destroyFence(fence);
-            destroy_buffer(tmp);
+            freeBuffer(tmp);
         }
 
-        auto create_buffer(vfx::Buffer::Target target, u64 size) -> vfx::Buffer* {
+        auto create_buffer(BufferUsage target, u64 size) -> Box<Buffer> {
             const auto buffer_create_info = static_cast<VkBufferCreateInfo>(vk::BufferCreateInfo {
                 .size = static_cast<vk::DeviceSize>(size),
                 .usage = get_buffer_usage_from_target(target)
@@ -447,19 +480,18 @@ namespace vfx {
                 &allocation,
                 &allocation_info
             );
-            return new vfx::Buffer{
-                buffer,
-                allocation,
-                allocation_info
-            };
+            auto out = Box<Buffer>::alloc();
+            out->buffer = buffer;
+            out->allocation = allocation;
+            out->allocation_info = allocation_info;
+            return out;
         }
 
-        void destroy_buffer(vfx::Buffer* gb) {
+        void freeBuffer(const Box<Buffer>& gb) {
             vmaDestroyBuffer(allocator, gb->buffer, gb->allocation);
-            delete gb;
         }
 
-        void update_buffer(vfx::Buffer* gb, const void* src, u64 size, u64 offset) {
+        void update_buffer(const Box<Buffer>& gb, const void* src, u64 size, u64 offset) {
             void* ptr = nullptr;
             vmaMapMemory(allocator, gb->allocation, &ptr);
             auto dst = static_cast<std::byte*>(ptr) + offset;
@@ -485,9 +517,9 @@ namespace vfx {
             if (buf_size > geometry->vtx_buf_size) {
                 geometry->vtx_buf_size = buf_size;
                 if (geometry->vtx != nullptr) {
-                    destroy_buffer(geometry->vtx);
+                    freeBuffer(geometry->vtx);
                 }
-                geometry->vtx = create_buffer(vfx::Buffer::Target::Vertex, buf_size);
+                geometry->vtx = create_buffer(BufferUsage::Vertex, buf_size);
             }
         }
 
@@ -499,9 +531,9 @@ namespace vfx {
             if (buf_size > geometry->idx_buf_size) {
                 geometry->idx_buf_size = buf_size;
                 if (geometry->idx != nullptr) {
-                    destroy_buffer(geometry->idx);
+                    freeBuffer(geometry->idx);
                 }
-                geometry->idx = create_buffer(vfx::Buffer::Target::Index, buf_size);
+                geometry->idx = create_buffer(BufferUsage::Index, buf_size);
             }
         }
 
@@ -513,10 +545,9 @@ namespace vfx {
             update_buffer(geometry->idx, src, size * geometry->idx_stride, offset * geometry->idx_stride);
         }
 
-        auto create_material(const MaterialDescription& description, vk::RenderPass pass, u32 subpass) -> Material* {
-            auto material = new Material();
-            material->pipeline_bind_point = vk::PipelineBindPoint::eGraphics;
-
+        auto makeMaterial(const MaterialDescription& description, const Box<RenderPass>& pass, u32 subpass) -> Box<Material> {
+            auto out = Box<Material>::alloc();
+            out->pipeline_bind_point = vk::PipelineBindPoint::eGraphics;
 
             struct DescriptorSetLayoutDescription {
                 std::vector<vk::DescriptorSetLayoutBinding> bindings{};
@@ -586,19 +617,19 @@ namespace vfx {
             }
 
             /*create descriptor set layouts*/ {
-                material->descriptor_set_layouts.resize(maxSet + 1);
-                for (u32 i = 0; i < material->descriptor_set_layouts.size(); ++i) {
+                out->descriptor_set_layouts.resize(maxSet + 1);
+                for (u32 i = 0; i < out->descriptor_set_layouts.size(); ++i) {
                     auto dsl_create_info = vk::DescriptorSetLayoutCreateInfo{};
                     dsl_create_info.setBindings(descriptor_set_layouts_table[i].bindings);
-                    material->descriptor_set_layouts[i] = logical_device.createDescriptorSetLayout(dsl_create_info);
+                    out->descriptor_set_layouts[i] = logical_device.createDescriptorSetLayout(dsl_create_info);
                 }
             }
 
             /*create pipeline layout*/ {
                 auto pipeline_layout_create_info = vk::PipelineLayoutCreateInfo{};
-                pipeline_layout_create_info.setSetLayouts(material->descriptor_set_layouts);
+                pipeline_layout_create_info.setSetLayouts(out->descriptor_set_layouts);
                 pipeline_layout_create_info.setPushConstantRanges(constant_ranges);
-                material->pipeline_layout = logical_device.createPipelineLayout(pipeline_layout_create_info);
+                out->pipeline_layout = logical_device.createPipelineLayout(pipeline_layout_create_info);
             }
 
             /*allocate descriptors*/ {
@@ -609,14 +640,14 @@ namespace vfx {
                 }
 
                 auto pool_create_info = vk::DescriptorPoolCreateInfo{};
-                pool_create_info.setMaxSets(material->descriptor_set_layouts.size());
+                pool_create_info.setMaxSets(out->descriptor_set_layouts.size());
                 pool_create_info.setPoolSizes(pool_sizes);
-                material->descriptor_pool = logical_device.createDescriptorPool(pool_create_info, nullptr);
+                out->descriptor_pool = logical_device.createDescriptorPool(pool_create_info, nullptr);
 
                 auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
-                ds_allocate_info.setDescriptorPool(material->descriptor_pool);
-                ds_allocate_info.setSetLayouts(material->descriptor_set_layouts);
-                material->descriptor_sets = logical_device.allocateDescriptorSets(ds_allocate_info);
+                ds_allocate_info.setDescriptorPool(out->descriptor_pool);
+                ds_allocate_info.setSetLayouts(out->descriptor_set_layouts);
+                out->descriptor_sets = logical_device.allocateDescriptorSets(ds_allocate_info);
             }
 
             auto vertex_input_state = vk::PipelineVertexInputStateCreateInfo{};
@@ -624,7 +655,7 @@ namespace vfx {
             vertex_input_state.setVertexAttributeDescriptions(description.attributes);
 
             auto color_blend_state = vk::PipelineColorBlendStateCreateInfo{};
-            color_blend_state.setAttachments(description.attachments);
+            color_blend_state.setAttachments(description.attachments.elements);
 
             std::array dynamic_states = {
                 vk::DynamicState::eViewport,
@@ -649,8 +680,8 @@ namespace vfx {
             pipeline_create_info.pDepthStencilState = &description.depthStencilState;
             pipeline_create_info.pColorBlendState = &color_blend_state;
             pipeline_create_info.pDynamicState = &dynamic_state;
-            pipeline_create_info.layout = material->pipeline_layout;
-            pipeline_create_info.renderPass = pass;
+            pipeline_create_info.layout = out->pipeline_layout;
+            pipeline_create_info.renderPass = pass ? pass->handle : nullptr;
             pipeline_create_info.subpass = subpass;
             pipeline_create_info.basePipelineHandle = nullptr;
             pipeline_create_info.basePipelineIndex = 0;
@@ -662,7 +693,7 @@ namespace vfx {
                 1,
                 &pipeline_create_info,
                 nullptr,
-                &material->pipeline
+                &out->pipeline
             );
 
             if (result != vk::Result::eSuccess) {
@@ -673,10 +704,10 @@ namespace vfx {
                 logical_device.destroyShaderModule(stage.module);
             }
 
-            return material;
+            return out;
         }
 
-        auto destroy_material(Material* material) {
+        auto freeMaterial(const Box<Material>& material) {
             logical_device.destroyPipeline(material->pipeline);
             logical_device.destroyPipelineLayout(material->pipeline_layout);
 
@@ -687,40 +718,39 @@ namespace vfx {
             if (material->descriptor_pool) {
                 logical_device.destroyDescriptorPool(material->descriptor_pool);
             }
-            delete material;
         }
 
     private:
-        static constexpr auto get_buffer_usage_from_target(vfx::Buffer::Target target) -> vk::BufferUsageFlags {
-            using Type = std::underlying_type_t<vfx::Buffer::Target>;
+        static constexpr auto get_buffer_usage_from_target(BufferUsage target) -> vk::BufferUsageFlags {
+            using Type = std::underlying_type_t<BufferUsage>;
 
             auto flags = vk::BufferUsageFlags{};
-            if (static_cast<Type>(target) & static_cast<Type>(vfx::Buffer::Target::Vertex)) {
+            if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::Vertex)) {
                 flags |= vk::BufferUsageFlagBits::eVertexBuffer;
             }
-            if (static_cast<Type>(target) & static_cast<Type>(vfx::Buffer::Target::Index)) {
+            if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::Index)) {
                 flags |= vk::BufferUsageFlagBits::eIndexBuffer;
             }
-            if (static_cast<Type>(target) & static_cast<Type>(vfx::Buffer::Target::CopySrc)) {
+            if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::CopySrc)) {
                 flags |= vk::BufferUsageFlagBits::eTransferSrc;
             }
-            if (static_cast<Type>(target) & static_cast<Type>(vfx::Buffer::Target::CopyDst)) {
+            if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::CopyDst)) {
                 flags |= vk::BufferUsageFlagBits::eTransferDst;
             }
-            if (static_cast<Type>(target) & static_cast<Type>(vfx::Buffer::Target::Constant)) {
+            if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::Constant)) {
                 flags |= vk::BufferUsageFlagBits::eUniformBuffer;
             }
             return flags;
         }
 
-        static constexpr auto get_memory_usage_from_target(vfx::Buffer::Target target) -> VmaMemoryUsage {
-            using Type = std::underlying_type_t<vfx::Buffer::Target>;
+        static constexpr auto get_memory_usage_from_target(BufferUsage target) -> VmaMemoryUsage {
+            using Type = std::underlying_type_t<BufferUsage>;
 
             auto flags = VMA_MEMORY_USAGE_CPU_TO_GPU;
-            if (static_cast<Type>(target) & static_cast<Type>(vfx::Buffer::Target::CopySrc)) {
+            if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::CopySrc)) {
                 flags = VMA_MEMORY_USAGE_CPU_ONLY;
             }
-            if (static_cast<Type>(target) & static_cast<Type>(vfx::Buffer::Target::CopyDst)) {
+            if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::CopyDst)) {
                 flags = VMA_MEMORY_USAGE_GPU_ONLY;
             }
             return flags;

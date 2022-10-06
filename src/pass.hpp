@@ -1,11 +1,9 @@
 #pragma once
 
-#include <map>
 #include <vector>
 #include <types.hpp>
-#include <context.hpp>
-#include <glm/vec4.hpp>
 #include <tl/optional.hpp>
+#include <vulkan/vulkan.hpp>
 
 namespace vfx {
     struct SubpassDescription {
@@ -17,45 +15,25 @@ namespace vfx {
         std::vector<u32> preserveAttachments{};
     };
 
-    struct RenderPass {
-        vfx::Context& context;
-        vk::RenderPass handle;
+    struct AttachmentDescriptionArray {
+        std::vector<vk::AttachmentDescription> elements{};
 
-        explicit RenderPass(vfx::Context& context) : context(context) {}
-
-        void init(const std::vector<vk::AttachmentDescription>& attachments, const std::vector<SubpassDescription>& definitions, const std::vector<vk::SubpassDependency>& dependencies) {
-            std::vector<vk::SubpassDescription> subpasses{};
-            subpasses.resize(definitions.size());
-
-            for (u64 i = 0; i < definitions.size(); ++i) {
-                subpasses[i].flags = {};
-                subpasses[i].pipelineBindPoint = definitions[i].pipelineBindPoint;
-                if (!definitions[i].inputAttachments.empty()) {
-                    subpasses[i].setInputAttachments(definitions[i].inputAttachments);
-                }
-                if (!definitions[i].colorAttachments.empty()) {
-                    subpasses[i].setColorAttachments(definitions[i].colorAttachments);
-                }
-                if (!definitions[i].resolveAttachments.empty()) {
-                    subpasses[i].setResolveAttachments(definitions[i].resolveAttachments);
-                }
-                if (definitions[i].depthStencilAttachment.has_value()) {
-                    subpasses[i].setPDepthStencilAttachment(&*definitions[i].depthStencilAttachment);
-                }
-                if (!definitions[i].preserveAttachments.empty()) {
-                    subpasses[i].setPreserveAttachments(definitions[i].preserveAttachments);
-                }
+        auto operator[](size_t i) -> vk::AttachmentDescription& {
+            if (elements.size() >= i) {
+                elements.resize(i + 1, vk::AttachmentDescription{});
             }
-
-            auto create_info = vk::RenderPassCreateInfo{};
-            create_info.setSubpasses(subpasses);
-            create_info.setAttachments(attachments);
-            create_info.setDependencies(dependencies);
-            handle = context.logical_device.createRenderPass(create_info);
+            return elements[i];
         }
+    };
 
-        ~RenderPass() {
-            context.logical_device.destroyRenderPass(handle);
-        }
+    struct RenderPassDescription {
+        std::vector<SubpassDescription> definitions;
+        std::vector<vk::SubpassDependency> dependencies;
+
+        AttachmentDescriptionArray attachments{};
+    };
+
+    struct RenderPass {
+        vk::RenderPass handle;
     };
 }

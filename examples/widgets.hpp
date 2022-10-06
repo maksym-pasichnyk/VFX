@@ -41,7 +41,7 @@ struct Widgets {
         KeyCode::eZ
     };
 
-    Widgets(vfx::Context& context, vk::RenderPass pass) : context(context) {
+    Widgets(vfx::Context& context, const Box<vfx::RenderPass>& pass) : context(context) {
         IMGUI_CHECKVERSION();
         ctx = ImGui::CreateContext();
 
@@ -99,19 +99,19 @@ struct Widgets {
             {2, 0, vk::Format::eR8G8B8A8Unorm, offsetof(ImDrawVert, col) }
         };
 
-        description.create_attachment(vk::PipelineColorBlendAttachmentState{
-            .blendEnable = true,
-            .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
-            .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
-            .colorBlendOp = vk::BlendOp::eAdd,
-            .srcAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
-            .dstAlphaBlendFactor = vk::BlendFactor::eZero,
-            .alphaBlendOp = vk::BlendOp::eAdd,
-            .colorWriteMask = vk::ColorComponentFlagBits::eR |
-                              vk::ColorComponentFlagBits::eG |
-                              vk::ColorComponentFlagBits::eB |
-                              vk::ColorComponentFlagBits::eA
-        });
+        description.attachments[0].blendEnable = true;
+        description.attachments[0].srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+        description.attachments[0].dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+        description.attachments[0].colorBlendOp = vk::BlendOp::eAdd;
+        description.attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+        description.attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eZero;
+        description.attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
+        description.attachments[0].colorWriteMask =
+            vk::ColorComponentFlagBits::eR |
+            vk::ColorComponentFlagBits::eG |
+            vk::ColorComponentFlagBits::eB |
+            vk::ColorComponentFlagBits::eA;
+
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
         description.inputAssemblyState.primitiveRestartEnable = false;
 
@@ -146,7 +146,7 @@ struct Widgets {
             .entry = "main",
             .stage = vk::ShaderStageFlagBits::eFragment
         });
-        material = context.create_material(description, pass, 0);
+        font_material = context.makeMaterial(description, pass, 0);
 
         const auto image_info = vk::DescriptorImageInfo{
             .sampler = font_sampler,
@@ -154,7 +154,7 @@ struct Widgets {
             .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         };
         const auto write_descriptor_set = vk::WriteDescriptorSet{
-            .dstSet = material->descriptor_sets[0],
+            .dstSet = font_material->descriptor_sets[0],
             .dstBinding = 0,
             .dstArrayElement = 0,
             .descriptorCount = 1,
@@ -168,15 +168,15 @@ struct Widgets {
         ImGui::DestroyContext(ctx);
 
         context.logical_device.destroySampler(font_sampler);
-        context.destroy_texture(font_texture);
-        context.destroy_material(material);
+        context.freeTexture(font_texture);
+        context.freeMaterial(font_material);
 
         for (auto& frame : frames) {
             if (frame.vtx != nullptr) {
-                context.destroy_buffer(frame.vtx);
+                context.freeBuffer(frame.vtx);
             }
             if (frame.idx != nullptr) {
-                context.destroy_buffer(frame.idx);
+                context.freeBuffer(frame.idx);
             }
         }
     }
@@ -271,8 +271,8 @@ struct Widgets {
             }
         }
 
-        cmd.bindPipeline(material->pipeline_bind_point, material->pipeline);
-        cmd.bindDescriptorSets(material->pipeline_bind_point, material->pipeline_layout, 0, material->descriptor_sets, {});
+        cmd.bindPipeline(font_material->pipeline_bind_point, font_material->pipeline);
+        cmd.bindDescriptorSets(font_material->pipeline_bind_point, font_material->pipeline_layout, 0, font_material->descriptor_sets, {});
 
         setup_render_state(draw_data, cmd, frame, fb_width, fb_height);
 
@@ -340,27 +340,27 @@ struct Widgets {
         i32 width, height;
         ctx->IO.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
-        font_texture = context.create_texture(
-            u32(width),
-            u32(height),
-            vk::Format::eR8G8B8A8Unorm,
-            vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-            vk::ImageAspectFlagBits::eColor
-    //        vk::ImageLayout::eShaderReadOnlyOptimal
-        );
-        font_sampler = context.logical_device.createSampler(vk::SamplerCreateInfo{
-    //            .magFilter = vk::Filter::eLinear,
-    //            .minFilter = vk::Filter::eLinear,
-    //            .mipmapMode = vk::SamplerMipmapMode::eLinear,
+        auto font_texture_description = vfx::TextureDescription{
+            .format = vk::Format::eR8G8B8A8Unorm,
+            .width = u32(width),
+            .height = u32(height),
+            .usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+            .aspect = vk::ImageAspectFlagBits::eColor
+        };
+        font_texture = context.makeTexture(font_texture_description);
+
+        auto font_sampler_description = vk::SamplerCreateInfo{
+            .magFilter = vk::Filter::eLinear,
+            .minFilter = vk::Filter::eLinear,
+            .mipmapMode = vk::SamplerMipmapMode::eLinear,
             .addressModeU = vk::SamplerAddressMode::eRepeat,
             .addressModeV = vk::SamplerAddressMode::eRepeat,
-            .addressModeW = vk::SamplerAddressMode::eRepeat,
-            .maxAnisotropy = 1.0f,
-            .minLod = -1000,
-            .maxLod = 1000
-        });
-        context.set_texture_data(font_texture, std::span(reinterpret_cast<const glm::u8vec4 *>(pixels), width * height));
-        ctx->IO.Fonts->SetTexID(font_texture);
+            .addressModeW = vk::SamplerAddressMode::eRepeat
+        };
+        font_sampler = context.logical_device.createSampler(font_sampler_description);
+
+        context.set_texture_data(font_texture.get(), std::span(reinterpret_cast<const glm::u8vec4 *>(pixels), width * height));
+        ctx->IO.Fonts->SetTexID(font_texture.get());
     }
 
     void setup_render_state(ImDrawData* draw_data, vk::CommandBuffer cmd, Geometry* rb, i32 fb_width, i32 fb_height) {
@@ -380,7 +380,7 @@ struct Widgets {
         };
 
         cmd.pushConstants(
-            material->pipeline_layout,
+            font_material->pipeline_layout,
             vk::ShaderStageFlagBits::eVertex,
             0,
             std::span(transform).size_bytes(),
@@ -391,8 +391,8 @@ struct Widgets {
     vfx::Context& context;
 
     ImGuiContext* ctx;
-    vfx::Material* material;
-    vfx::Texture* font_texture;
+    Box<vfx::Material> font_material;
+    Box<vfx::Texture> font_texture;
     vk::Sampler font_sampler;
     u64 current_frame = 0;
     std::array<Geometry, vfx::Context::MAX_FRAMES_IN_FLIGHT> frames{};

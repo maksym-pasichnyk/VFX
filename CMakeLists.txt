@@ -65,11 +65,14 @@ add_library(VFX STATIC
     src/texture.hpp
     src/buffer.hpp
     src/display.hpp
-        src/pass.hpp
+    src/pass.hpp
     src/material.hpp
     src/assets.hpp
     src/vulkan.cpp
-        src/delegate.hpp src/signal.hpp src/swapchain.hpp)
+    src/delegate.hpp
+    src/signal.hpp
+    src/swapchain.hpp
+)
 target_include_directories(VFX PUBLIC src)
 target_link_libraries(VFX PUBLIC
     glm
@@ -98,8 +101,9 @@ target_compile_definitions(VFX PUBLIC
 
 add_executable(VFX-example
     examples/main.cpp
+    examples/camera.hpp
     examples/widgets.hpp
-    examples/pipeline.hpp
+    examples/renderer.hpp
 )
 target_link_libraries(VFX-example PRIVATE VFX)
 target_compile_shaders(VFX-example

@@ -7,11 +7,9 @@ namespace vfx {
 
         vk::SurfaceKHR surface{};
         vk::SwapchainKHR swapchain{};
+        std::vector<Box<Texture>> textures{};
 
-        std::vector<vk::Image> images{};
-        std::vector<vk::ImageView> views{};
-
-        RenderPass render_pass{context};
+        Box<RenderPass> render_pass;
         std::vector<vk::Framebuffer> framebuffers{};
 
         std::vector<vk::Fence> fences{};
@@ -19,15 +17,10 @@ namespace vfx {
         std::vector<vk::Semaphore> acquired_semaphores{};
         std::vector<vk::Semaphore> complete_semaphores{};
 
-        vk::Extent2D surface_extent{};
-        vk::PresentModeKHR present_mode{};
-        vk::SurfaceFormatKHR surface_format{};
-        vk::SurfaceCapabilitiesKHR capabilities{};
+        vk::Format pixel_format = vk::Format::eUndefined;
+        vk::Extent2D image_extent = {};
 
-        u32 image_index = 0;
-        u64 frame_index = 0;
         u64 current_frame = 0;
-        u32 min_image_count = 0;
 
         bool out_of_date = false;
 
@@ -37,32 +30,30 @@ namespace vfx {
             create_swapchain();
             create_sync_objects();
 
-            std::vector<vk::SubpassDependency> dependencies{};
-            std::vector<vfx::SubpassDescription> definitions{};
-            std::vector<vk::AttachmentDescription> attachments{};
-            attachments.emplace_back(vk::AttachmentDescription{
-                .flags = {},
-                .format = surface_format.format,
-                .samples = vk::SampleCountFlagBits::e1,
-                .loadOp = vk::AttachmentLoadOp::eClear,
-                .storeOp = vk::AttachmentStoreOp::eStore,
-                .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
-                .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
-                .initialLayout = vk::ImageLayout::eUndefined,
-                .finalLayout = vk::ImageLayout::ePresentSrcKHR
-            });
-            definitions.emplace_back(vfx::SubpassDescription{
-                .colorAttachments = {
-                    vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
+            RenderPassDescription pass_description{};
+            pass_description.definitions = {
+                SubpassDescription{
+                    .colorAttachments = {
+                        vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
+                    }
                 }
-            });
-            render_pass.init(attachments, definitions, dependencies);
+            };
+            pass_description.attachments[0].format = pixel_format;
+            pass_description.attachments[0].samples = vk::SampleCountFlagBits::e1;
+            pass_description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+            pass_description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+            pass_description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+            pass_description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+            pass_description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
+            pass_description.attachments[0].finalLayout = vk::ImageLayout::ePresentSrcKHR;
 
+            render_pass = context.makeRenderPass(pass_description);
             create_framebuffers();
         }
 
         ~Swapchain() {
-            destroy_framebuffers();
+            context.freeRenderPass(render_pass);
+
             destroy_sync_objects();
             destroy_swapchain();
 
@@ -70,9 +61,8 @@ namespace vfx {
         }
 
         void create_swapchain() {
-            capabilities = context.physical_device.getSurfaceCapabilitiesKHR(surface);
-
             const auto formats = context.physical_device.getSurfaceFormatsKHR(surface);
+            const auto capabilities = context.physical_device.getSurfaceCapabilitiesKHR(surface);
             const auto present_modes = context.physical_device.getSurfacePresentModesKHR(surface);
 
             const auto request_formats = std::array {
@@ -86,18 +76,21 @@ namespace vfx {
                 vk::PresentModeKHR::eFifo
             };
 
-            surface_extent = select_surface_extent(vk::Extent2D{0, 0}, capabilities);
-            surface_format = select_surface_format(formats, request_formats, vk::ColorSpaceKHR::eSrgbNonlinear);
-            present_mode = select_present_mode(present_modes, request_modes);
+            auto surface_extent = select_surface_extent(vk::Extent2D{0, 0}, capabilities);
+            auto surface_format = select_surface_format(formats, request_formats, vk::ColorSpaceKHR::eSrgbNonlinear);
+            auto present_mode = select_present_mode(present_modes, request_modes);
 
-            min_image_count = capabilities.minImageCount + 1;
+            pixel_format = surface_format.format;
+            image_extent = surface_extent;
+
+            u32 min_image_count = capabilities.minImageCount + 1;
             if (capabilities.maxImageCount > 0) {
                 min_image_count = std::min(min_image_count, capabilities.maxImageCount);
             }
 
             const auto queue_family_indices = std::array{
                 context.graphics_family,
-                context. present_family
+                context.present_family
             };
 
             const auto flag = context.graphics_family != context.present_family;
@@ -121,27 +114,41 @@ namespace vfx {
             };
 
             swapchain = context.logical_device.createSwapchainKHR(swapchain_create_info, nullptr);
-            images = context.logical_device.getSwapchainImagesKHR(swapchain);
 
-            views.resize(images.size());
+            auto images = context.logical_device.getSwapchainImagesKHR(swapchain);
+
+            textures.resize(images.size());
             image_fences.resize(images.size());
+
             for (u64 i = 0; i < images.size(); ++i) {
                 const auto view_create_info = vk::ImageViewCreateInfo{
                     .image = images[i],
                     .viewType = vk::ImageViewType::e2D,
-                    .format = surface_format.format,
+                    .format = pixel_format,
                     .subresourceRange = {
                         vk::ImageAspectFlagBits::eColor,
                         0, 1, 0, 1
                     }
                 };
-                views[i] = context.logical_device.createImageView(view_create_info);
+
+                auto view = context.logical_device.createImageView(view_create_info);
+
+                textures[i] = Box<Texture>::alloc();
+                textures[i]->width = surface_extent.width;
+                textures[i]->height = surface_extent.height;
+                textures[i]->format = surface_format.format;
+                textures[i]->image = images[i];
+                textures[i]->view = view;
+                textures[i]->allocation = {};
             }
         }
 
         void destroy_swapchain() {
-            for (u64 i = 0; i < images.size(); i++) {
-                context.logical_device.destroyImageView(views[i]);
+            for (auto& texture : textures) {
+                context.freeTexture(texture);
+            }
+            for (auto& framebuffer : framebuffers) {
+                context.logical_device.destroyFramebuffer(framebuffer);
             }
             context.logical_device.destroySwapchainKHR(swapchain);
         }
@@ -167,28 +174,22 @@ namespace vfx {
         }
 
         void create_framebuffers() {
-            framebuffers.resize(images.size());
-            for (u64 i = 0; i < images.size(); ++i) {
-                auto fb_attachments = std::array{ views[i] };
+            framebuffers.resize(textures.size());
+            for (u64 i = 0; i < textures.size(); ++i) {
+                auto attachments = std::array{ textures[i]->view };
 
                 vk::FramebufferCreateInfo fb_create_info{};
-                fb_create_info.setRenderPass(render_pass.handle);
-                fb_create_info.setAttachments(fb_attachments);
-                fb_create_info.setWidth(surface_extent.width);
-                fb_create_info.setHeight(surface_extent.height);
+                fb_create_info.setRenderPass(render_pass->handle);
+                fb_create_info.setAttachments(attachments);
+                fb_create_info.setWidth(textures[i]->width);
+                fb_create_info.setHeight(textures[i]->height);
                 fb_create_info.setLayers(1);
 
                 framebuffers[i] = context.logical_device.createFramebuffer(fb_create_info);
             }
         }
 
-        void destroy_framebuffers() {
-            for (u64 i = 0; i < images.size(); ++i) {
-                context.logical_device.destroyFramebuffer(framebuffers[i]);
-            }
-        }
-
-        auto acquire_next_image() -> bool {
+        auto acquire_next_image(u32& image_index) -> bool {
             std::ignore = context.logical_device.waitForFences(fences[current_frame], true, std::numeric_limits<uint64_t>::max());
             auto result = context.logical_device.acquireNextImageKHR(
                 swapchain,
@@ -205,7 +206,7 @@ namespace vfx {
             return true;
         }
 
-        void submit(vk::CommandBuffer command_buffer) {
+        void submit(u32 image_index, vk::CommandBuffer command_buffer) {
             if (auto fence = std::exchange(image_fences[image_index], fences[current_frame])) {
                 std::ignore = context.logical_device.waitForFences(fence, true, std::numeric_limits<uint64_t>::max());
             }
@@ -224,7 +225,7 @@ namespace vfx {
             context.graphics_queue.submit(submit_info, fences[current_frame]);
         }
 
-        void present() {
+        void present(u32 image_index) {
             auto present_info = vk::PresentInfoKHR{};
             present_info.setWaitSemaphores(complete_semaphores[current_frame]);
             present_info.setSwapchains(swapchain);
@@ -236,16 +237,14 @@ namespace vfx {
             } else if (result != vk::Result::eSuccess) {
                 throw std::runtime_error("failed to present swapchain image");
             }
-            frame_index += 1;
-            current_frame = frame_index % Context::MAX_FRAMES_IN_FLIGHT;
+
+            current_frame = (current_frame + 1) % Context::MAX_FRAMES_IN_FLIGHT;
 
             if (out_of_date) {
                 out_of_date = false;
 
-                spdlog::info("Rebuild swapchain...");
                 context.logical_device.waitIdle();
 
-                destroy_framebuffers();
                 destroy_swapchain();
                 create_swapchain();
                 create_framebuffers();
