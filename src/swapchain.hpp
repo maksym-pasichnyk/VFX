@@ -3,9 +3,10 @@
 
 namespace vfx {
     struct Drawable {
-        u32 index;
-        Box<Texture> texture;
-        vk::Framebuffer framebuffer;
+        u32 index{};
+        Box<Texture> texture{};
+        vk::SwapchainKHR swapchain{};
+        vk::Framebuffer framebuffer{};
     };
 
     struct Swapchain {
@@ -17,21 +18,14 @@ namespace vfx {
 
         Box<RenderPass> render_pass;
 
-        std::vector<vk::Fence> fences{};
-        std::vector<vk::Semaphore> acquired_semaphores{};
-        std::vector<vk::Semaphore> complete_semaphores{};
-
         vk::Format pixel_format = vk::Format::eUndefined;
         vk::Extent2D size = {};
-
-        u64 current_frame = 0;
 
         bool out_of_date = false;
 
         Swapchain(Context& context, Display& display) : context(context) {
             surface = display.create_surface(context.instance);
 
-            create_sync_objects();
             create_swapchain();
             create_render_pass();
             create_drawables();
@@ -42,7 +36,6 @@ namespace vfx {
 
             destroy_drawables();
             destroy_swapchain();
-            destroy_sync_objects();
 
             context.instance.destroySurfaceKHR(surface);
         }
@@ -107,26 +100,6 @@ namespace vfx {
             context.logical_device.destroySwapchainKHR(swapchain);
         }
 
-        void create_sync_objects() {
-            fences.resize(Context::MAX_FRAMES_IN_FLIGHT);
-            acquired_semaphores.resize(Context::MAX_FRAMES_IN_FLIGHT);
-            complete_semaphores.resize(Context::MAX_FRAMES_IN_FLIGHT);
-
-            for (u32 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; i++) {
-                fences[i] = context.logical_device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
-                acquired_semaphores[i] = context.logical_device.createSemaphore({});
-                complete_semaphores[i] = context.logical_device.createSemaphore({});
-            }
-        }
-
-        void destroy_sync_objects() {
-            for (u64 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; i++) {
-                context.logical_device.destroyFence(fences[i]);
-                context.logical_device.destroySemaphore(acquired_semaphores[i]);
-                context.logical_device.destroySemaphore(complete_semaphores[i]);
-            }
-        }
-
         void create_render_pass() {
             RenderPassDescription pass_description{};
             pass_description.definitions = {
@@ -167,6 +140,7 @@ namespace vfx {
 
                 drawables[i] = Arc<Drawable>::alloc();
                 drawables[i]->index = u32(i);
+                drawables[i]->swapchain = swapchain;
                 drawables[i]->texture = Box<Texture>::alloc();
                 drawables[i]->texture->size.width = size.width;
                 drawables[i]->texture->size.height = size.height;
@@ -197,46 +171,51 @@ namespace vfx {
             }
         }
 
-        auto getNextDrawable() -> const Arc<Drawable>& {
-//            auto fence = context.logical_device.createFence({});
+        auto getNextDrawable() -> Drawable* {
+            // todo: recycle fences
+            auto fence = context.logical_device.createFence({});
+
             u32 index;
             auto result = context.logical_device.acquireNextImageKHR(
                 swapchain,
                 std::numeric_limits<uint64_t>::max(),
-                acquired_semaphores[current_frame],
-                nullptr, // fence
+                nullptr, // image_available_semaphores[current_frame],
+                fence,
                 &index
             );
-//            context.logical_device.waitForFences(1, &fence, true, std::numeric_limits<uint64_t>::max());
-//            context.logical_device.destroyFence(fence);
+            context.logical_device.waitForFences(1, &fence, true, std::numeric_limits<uint64_t>::max());
+            context.logical_device.destroyFence(fence);
 
-            if (result == vk::Result::eErrorOutOfDateKHR) {
-                out_of_date = true;
-            } else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
-                throw std::runtime_error("failed to acquire swapchain image");
-            }
-            return drawables[size_t(index)];
+//            if (result == vk::Result::eErrorOutOfDateKHR) {
+//                out_of_date = true;
+//            } else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+//                throw std::runtime_error("failed to acquire swapchain image");
+//            }
+            return drawables[size_t(index)].get();
         }
 
-        void submit(vk::CommandBuffer command_buffer, vk::Fence fence) {
-            const auto stages = std::array{
-                vk::PipelineStageFlags{vk::PipelineStageFlagBits::eColorAttachmentOutput}
-            };
+        void present(
+            vk::CommandBuffer command_buffer,
+            vk::Fence fence,
+            vk::Semaphore semaphore,
+            Drawable* drawable
+        ) {
+//            const auto stages = std::array{
+//                vk::PipelineStageFlags{vk::PipelineStageFlagBits::eColorAttachmentOutput}
+//            };
 
             auto submit_info = vk::SubmitInfo{};
-            submit_info.setWaitDstStageMask(stages);
+//            submit_info.setWaitDstStageMask(stages);
             submit_info.setCommandBuffers(command_buffer);
-            submit_info.setWaitSemaphores(acquired_semaphores[current_frame]);
-            submit_info.setSignalSemaphores(complete_semaphores[current_frame]);
+//            submit_info.setWaitSemaphores(image_available_semaphores[current_frame]);
+            submit_info.setSignalSemaphores(semaphore);
 
             context.graphics_queue.submit(submit_info, fence);
-        }
 
-        void present(const Arc<Drawable>& drawable) {
             auto present_info = vk::PresentInfoKHR{};
-            present_info.setWaitSemaphores(complete_semaphores[current_frame]);
+            present_info.setWaitSemaphores(semaphore);
             present_info.setSwapchainCount(1);
-            present_info.setPSwapchains(&swapchain);
+            present_info.setPSwapchains(&drawable->swapchain);
             present_info.setPImageIndices(&drawable->index);
             auto result = context.present_queue.presentKHR(present_info);
 
@@ -245,8 +224,6 @@ namespace vfx {
             } else if (result != vk::Result::eSuccess) {
                 throw std::runtime_error("failed to present swapchain image");
             }
-
-            current_frame = (current_frame + 1) % Context::MAX_FRAMES_IN_FLIGHT;
 
             if (out_of_date) {
                 out_of_date = false;

@@ -4,6 +4,8 @@
 #include "display.hpp"
 #include "renderer.hpp"
 
+// todo: get rid of current frame
+// todo: recycle fences, command buffers, semaphores
 struct Demo {
     Box<Display> display{};
     Box<vfx::Context> context{};
@@ -11,6 +13,14 @@ struct Demo {
 
     Box<Renderer> renderer{};
     Box<Widgets> widgets{};
+
+    u64 current_frame = 0;
+
+    std::vector<vk::Fence> fences{};
+    std::vector<vk::Semaphore> semaphores{};
+
+    vk::CommandPool graphics_command_pool{};
+    std::vector<vk::CommandBuffer> graphics_command_buffers{};
 
     Box<vfx::Material> present_swapchain_material{};
 
@@ -36,53 +46,36 @@ struct Demo {
         renderer = Box<Renderer>::alloc(*context, *swapchain);
         widgets = Box<Widgets>::alloc(*context, *display, *renderer);
 
+        create_gpu_objects();
         create_present_swapchain_material();
     }
 
     ~Demo() {
         context->freeMaterial(present_swapchain_material);
+        destroy_gpu_objects();
     }
 
     void run() {
-        std::array<f32, 60> times{};
-        f32 accumulator = 0;
-        u64 frame_index = 0;
-        i32 frame_count = 0;
-        f32 frame_time = 1.0f / 60.0f;
-
         f64 time = glfwGetTime();
         while (!display->should_close()) {
+            f64 now = glfwGetTime();
+            f32 dt = f32(now - time);
+            time = now;
+
             display->poll_events();
 
-            drawFrame();
-
-            f64 prev_time = time;
-            time = glfwGetTime();
-            f32 delta_time = f32(time - prev_time);
-
-            frame_count = std::min(frame_count + 1, i32(times.size()));
-
-            accumulator += delta_time - times[frame_index];
-            frame_time = accumulator / f32(frame_count);
-            times[frame_index] = delta_time;
-
-            frame_index = (frame_index + 1) % times.size();
+            draw();
         }
         context->logical_device.waitIdle();
     }
 
-    void drawFrame() {
+    void draw() {
         Camera camera{60.0f, display->get_aspect()};
 
-        std::ignore = context->logical_device.waitForFences(
-            swapchain->fences[swapchain->current_frame],
-            true,
-            std::numeric_limits<uint64_t>::max()
-        );
+        context->logical_device.waitForFences(fences[current_frame], true, std::numeric_limits<uint64_t>::max());
+        context->logical_device.resetFences(fences[current_frame]);
 
-        auto drawable = swapchain->getNextDrawable();
-
-        auto cmd = context->command_buffers[swapchain->current_frame];
+        auto cmd = graphics_command_buffers[current_frame];
         cmd.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
         renderer->begin_rendering(cmd);
@@ -101,6 +94,8 @@ struct Demo {
 
         // todo: move to better place
         {
+            auto drawable = swapchain->getNextDrawable();
+
             auto clear_values = std::array{
                 vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({1.0f, 1.0f, 1.0f, 1.0f}))
             };
@@ -130,11 +125,47 @@ struct Demo {
 
             cmd.endRenderPass();
             cmd.end();
+
+            swapchain->present(
+                cmd,
+                fences[current_frame],
+                semaphores[current_frame],
+                drawable
+            );
         }
 
-        context->logical_device.resetFences(swapchain->fences[swapchain->current_frame]);
-        swapchain->submit(cmd, swapchain->fences[swapchain->current_frame]);
-        swapchain->present(drawable);
+        current_frame = (current_frame + 1) % vfx::Context::MAX_FRAMES_IN_FLIGHT;
+    }
+
+    void create_gpu_objects() {
+        const auto pool_create_info = vk::CommandPoolCreateInfo {
+            .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+            .queueFamilyIndex = context->graphics_family
+        };
+        graphics_command_pool = context->logical_device.createCommandPool(pool_create_info);
+
+        const auto command_buffers_allocate_info = vk::CommandBufferAllocateInfo{
+            .commandPool = graphics_command_pool,
+            .level = vk::CommandBufferLevel::ePrimary,
+            .commandBufferCount = vfx::Context::MAX_FRAMES_IN_FLIGHT
+        };
+        graphics_command_buffers = context->logical_device.allocateCommandBuffers(command_buffers_allocate_info);
+
+        fences.resize(vfx::Context::MAX_FRAMES_IN_FLIGHT);
+        semaphores.resize(vfx::Context::MAX_FRAMES_IN_FLIGHT);
+        for (u32 i = 0; i < vfx::Context::MAX_FRAMES_IN_FLIGHT; i++) {
+            fences[i] = context->logical_device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
+            semaphores[i] = context->logical_device.createSemaphore({});
+        }
+    }
+
+    void destroy_gpu_objects() {
+        for (u64 i = 0; i < vfx::Context::MAX_FRAMES_IN_FLIGHT; i++) {
+            context->logical_device.destroyFence(fences[i]);
+            context->logical_device.destroySemaphore(semaphores[i]);
+        }
+        context->logical_device.freeCommandBuffers(graphics_command_pool, graphics_command_buffers);
+        context->logical_device.destroyCommandPool(graphics_command_pool);
     }
 
     void create_present_swapchain_material() {
@@ -143,9 +174,9 @@ struct Demo {
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =
             vk::ColorComponentFlagBits::eR |
-            vk::ColorComponentFlagBits::eG |
-            vk::ColorComponentFlagBits::eB |
-            vk::ColorComponentFlagBits::eA;
+                vk::ColorComponentFlagBits::eG |
+                vk::ColorComponentFlagBits::eB |
+                vk::ColorComponentFlagBits::eA;
 
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
         description.inputAssemblyState.primitiveRestartEnable = false;

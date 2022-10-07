@@ -63,23 +63,14 @@ namespace vfx {
         vk::Device logical_device{};
         vk::Format depth_format{};
 
-        std::vector<vk::CommandPool> command_pools;
-        std::vector<vk::CommandBuffer> command_buffers;
-
         explicit Context(const ContextDescription& description) {
             create_instance(description);
             select_physical_device();
             create_logical_device();
             create_memory_allocator();
-            create_command_buffers();
         }
 
         ~Context() {
-            for (u64 i = 0; i < Context::MAX_FRAMES_IN_FLIGHT; i++) {
-                logical_device.freeCommandBuffers(command_pools[i], command_buffers[i]);
-                logical_device.destroyCommandPool(command_pools[i]);
-            }
-
             vmaDestroyAllocator(allocator);
             logical_device.destroy();
 
@@ -146,25 +137,24 @@ namespace vfx {
         }
 
         void create_logical_device() {
-            const auto queuePriority = 1.0f;
+            f32 queue_priority = 1.0f;
+            auto queue_create_infos = std::vector<vk::DeviceQueueCreateInfo>{};
 
-            auto queueCreateInfos = std::vector<vk::DeviceQueueCreateInfo>{};
-
-            const auto graphicsQueueCreateInfo = vk::DeviceQueueCreateInfo {
+            const auto graphics_queue_create_info = vk::DeviceQueueCreateInfo {
                 .queueFamilyIndex = graphics_family,
                 .queueCount = 1,
-                .pQueuePriorities = &queuePriority
+                .pQueuePriorities = &queue_priority
             };
-            queueCreateInfos.emplace_back(graphicsQueueCreateInfo);
+            queue_create_infos.emplace_back(graphics_queue_create_info);
 
             if (graphics_family != present_family) {
-                const auto presentQueueCreateInfo = vk::DeviceQueueCreateInfo {
+                const auto present_queue_create_info = vk::DeviceQueueCreateInfo {
                     .queueFamilyIndex = present_family,
                     .queueCount = 1,
-                    .pQueuePriorities = &queuePriority
+                    .pQueuePriorities = &queue_priority
                 };
 
-                queueCreateInfos.emplace_back(presentQueueCreateInfo);
+                queue_create_infos.emplace_back(present_queue_create_info);
             }
 
             static constexpr auto device_extensions = std::array{
@@ -179,27 +169,31 @@ namespace vfx {
                 VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME,
                 VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
                 VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
-                VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME
+                VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+                VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME
             };
 
-            const auto features = vk::PhysicalDeviceFeatures{
-                .fillModeNonSolid = VK_TRUE,
-                .samplerAnisotropy = VK_TRUE
+            auto timeline_semaphore_features = vk::PhysicalDeviceTimelineSemaphoreFeatures{
+                .timelineSemaphore = true
             };
 
             auto dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures{
+                .pNext = &timeline_semaphore_features,
                 .dynamicRendering = true,
             };
 
             const auto features_2 = vk::PhysicalDeviceFeatures2{
                 .pNext = &dynamic_rendering_features,
-                .features = features
+                .features = vk::PhysicalDeviceFeatures{
+                    .fillModeNonSolid = VK_TRUE,
+                    .samplerAnisotropy = VK_TRUE
+                }
             };
 
             const auto device_create_info = vk::DeviceCreateInfo {
                 .pNext = &features_2,
-                .queueCreateInfoCount = u32(std::size(queueCreateInfos)),
-                .pQueueCreateInfos = std::data(queueCreateInfos),
+                .queueCreateInfoCount = u32(std::size(queue_create_infos)),
+                .pQueueCreateInfos = std::data(queue_create_infos),
     //                .enabledLayerCount = std::size(enabledLayers),
     //                .ppEnabledLayerNames = std::data(enabledLayers),
                 .enabledExtensionCount = std::size(device_extensions),
@@ -261,26 +255,6 @@ namespace vfx {
             };
 
             vmaCreateAllocator(&allocatorCreateInfo, &allocator);
-        }
-
-        void create_command_buffers() {
-            command_pools.resize(MAX_FRAMES_IN_FLIGHT);
-            command_buffers.resize(MAX_FRAMES_IN_FLIGHT);
-
-            for (u32 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-                const auto create_info = vk::CommandPoolCreateInfo {
-                    .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-                    .queueFamilyIndex = graphics_family
-                };
-                command_pools[i] = logical_device.createCommandPool(create_info);
-
-                const auto allocate_info = vk::CommandBufferAllocateInfo{
-                    .commandPool = command_pools[i],
-                    .level = vk::CommandBufferLevel::ePrimary,
-                    .commandBufferCount = 1
-                };
-                command_buffers[i] = logical_device.allocateCommandBuffers(allocate_info)[0];
-            }
         }
 
         auto create_shader_module(std::span<const char> bytes) const -> vk::ShaderModule {
