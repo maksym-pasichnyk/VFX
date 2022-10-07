@@ -3,11 +3,6 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 
-struct CameraProperties {
-    glm::mat4 projection;
-    glm::mat4 view;
-};
-
 struct Camera {
     static constexpr auto clip = glm::mat4{
         1.0f,  0.0f, 0.0f, 0.0f,

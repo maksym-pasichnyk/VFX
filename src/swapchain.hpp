@@ -2,23 +2,27 @@
 #include "pass.hpp"
 
 namespace vfx {
+    struct Drawable {
+        u32 index;
+        Box<Texture> texture;
+        vk::Framebuffer framebuffer;
+    };
+
     struct Swapchain {
         Context& context;
 
         vk::SurfaceKHR surface{};
         vk::SwapchainKHR swapchain{};
-        std::vector<Box<Texture>> textures{};
+        std::vector<Arc<Drawable>> drawables{};
 
         Box<RenderPass> render_pass;
-        std::vector<vk::Framebuffer> framebuffers{};
 
         std::vector<vk::Fence> fences{};
-        std::vector<vk::Fence> image_fences{};
         std::vector<vk::Semaphore> acquired_semaphores{};
         std::vector<vk::Semaphore> complete_semaphores{};
 
         vk::Format pixel_format = vk::Format::eUndefined;
-        vk::Extent2D image_extent = {};
+        vk::Extent2D size = {};
 
         u64 current_frame = 0;
 
@@ -27,35 +31,18 @@ namespace vfx {
         Swapchain(Context& context, Display& display) : context(context) {
             surface = display.create_surface(context.instance);
 
-            create_swapchain();
             create_sync_objects();
-
-            RenderPassDescription pass_description{};
-            pass_description.definitions = {
-                SubpassDescription{
-                    .colorAttachments = {
-                        vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
-                    }
-                }
-            };
-            pass_description.attachments[0].format = pixel_format;
-            pass_description.attachments[0].samples = vk::SampleCountFlagBits::e1;
-            pass_description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
-            pass_description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
-            pass_description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-            pass_description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-            pass_description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
-            pass_description.attachments[0].finalLayout = vk::ImageLayout::ePresentSrcKHR;
-
-            render_pass = context.makeRenderPass(pass_description);
-            create_framebuffers();
+            create_swapchain();
+            create_render_pass();
+            create_drawables();
         }
 
         ~Swapchain() {
             context.freeRenderPass(render_pass);
 
-            destroy_sync_objects();
+            destroy_drawables();
             destroy_swapchain();
+            destroy_sync_objects();
 
             context.instance.destroySurfaceKHR(surface);
         }
@@ -81,7 +68,7 @@ namespace vfx {
             auto present_mode = select_present_mode(present_modes, request_modes);
 
             pixel_format = surface_format.format;
-            image_extent = surface_extent;
+            size = surface_extent;
 
             u32 min_image_count = capabilities.minImageCount + 1;
             if (capabilities.maxImageCount > 0) {
@@ -114,42 +101,9 @@ namespace vfx {
             };
 
             swapchain = context.logical_device.createSwapchainKHR(swapchain_create_info, nullptr);
-
-            auto images = context.logical_device.getSwapchainImagesKHR(swapchain);
-
-            textures.resize(images.size());
-            image_fences.resize(images.size());
-
-            for (u64 i = 0; i < images.size(); ++i) {
-                const auto view_create_info = vk::ImageViewCreateInfo{
-                    .image = images[i],
-                    .viewType = vk::ImageViewType::e2D,
-                    .format = pixel_format,
-                    .subresourceRange = {
-                        vk::ImageAspectFlagBits::eColor,
-                        0, 1, 0, 1
-                    }
-                };
-
-                auto view = context.logical_device.createImageView(view_create_info);
-
-                textures[i] = Box<Texture>::alloc();
-                textures[i]->width = surface_extent.width;
-                textures[i]->height = surface_extent.height;
-                textures[i]->format = surface_format.format;
-                textures[i]->image = images[i];
-                textures[i]->view = view;
-                textures[i]->allocation = {};
-            }
         }
 
         void destroy_swapchain() {
-            for (auto& texture : textures) {
-                context.freeTexture(texture);
-            }
-            for (auto& framebuffer : framebuffers) {
-                context.logical_device.destroyFramebuffer(framebuffer);
-            }
             context.logical_device.destroySwapchainKHR(swapchain);
         }
 
@@ -173,44 +127,98 @@ namespace vfx {
             }
         }
 
-        void create_framebuffers() {
-            framebuffers.resize(textures.size());
-            for (u64 i = 0; i < textures.size(); ++i) {
-                auto attachments = std::array{ textures[i]->view };
+        void create_render_pass() {
+            RenderPassDescription pass_description{};
+            pass_description.definitions = {
+                SubpassDescription{
+                    .colorAttachments = {
+                        vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
+                    }
+                }
+            };
+            pass_description.attachments[0].format = pixel_format;
+            pass_description.attachments[0].samples = vk::SampleCountFlagBits::e1;
+            pass_description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+            pass_description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+            pass_description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+            pass_description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+            pass_description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
+            pass_description.attachments[0].finalLayout = vk::ImageLayout::ePresentSrcKHR;
+
+            render_pass = context.makeRenderPass(pass_description);
+        }
+
+        void create_drawables() {
+            auto images = context.logical_device.getSwapchainImagesKHR(swapchain);
+
+            drawables.resize(images.size());
+            for (u64 i = 0; i < images.size(); ++i) {
+                const auto view_create_info = vk::ImageViewCreateInfo{
+                    .image = images[i],
+                    .viewType = vk::ImageViewType::e2D,
+                    .format = pixel_format,
+                    .subresourceRange = {
+                        vk::ImageAspectFlagBits::eColor,
+                        0, 1, 0, 1
+                    }
+                };
+
+                auto view = context.logical_device.createImageView(view_create_info);
+
+                drawables[i] = Arc<Drawable>::alloc();
+                drawables[i]->index = u32(i);
+                drawables[i]->texture = Box<Texture>::alloc();
+                drawables[i]->texture->size.width = size.width;
+                drawables[i]->texture->size.height = size.height;
+                drawables[i]->texture->format = pixel_format;
+                drawables[i]->texture->image = images[i];
+                drawables[i]->texture->view = view;
+                drawables[i]->texture->allocation = {};
+
+                auto attachments = std::array{
+                    drawables[i]->texture->view
+                };
 
                 vk::FramebufferCreateInfo fb_create_info{};
                 fb_create_info.setRenderPass(render_pass->handle);
                 fb_create_info.setAttachments(attachments);
-                fb_create_info.setWidth(textures[i]->width);
-                fb_create_info.setHeight(textures[i]->height);
+                fb_create_info.setWidth(drawables[i]->texture->size.width);
+                fb_create_info.setHeight(drawables[i]->texture->size.height);
                 fb_create_info.setLayers(1);
 
-                framebuffers[i] = context.logical_device.createFramebuffer(fb_create_info);
+                drawables[i]->framebuffer = context.logical_device.createFramebuffer(fb_create_info);
             }
         }
 
-        auto acquire_next_image(u32& image_index) -> bool {
-            std::ignore = context.logical_device.waitForFences(fences[current_frame], true, std::numeric_limits<uint64_t>::max());
+        void destroy_drawables() {
+            for (auto& drawable : drawables) {
+                context.freeTexture(drawable->texture);
+                context.logical_device.destroyFramebuffer(drawable->framebuffer);
+            }
+        }
+
+        auto getNextDrawable() -> const Arc<Drawable>& {
+//            auto fence = context.logical_device.createFence({});
+            u32 index;
             auto result = context.logical_device.acquireNextImageKHR(
                 swapchain,
                 std::numeric_limits<uint64_t>::max(),
                 acquired_semaphores[current_frame],
-                nullptr,
-                &image_index
+                nullptr, // fence
+                &index
             );
+//            context.logical_device.waitForFences(1, &fence, true, std::numeric_limits<uint64_t>::max());
+//            context.logical_device.destroyFence(fence);
+
             if (result == vk::Result::eErrorOutOfDateKHR) {
                 out_of_date = true;
             } else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
                 throw std::runtime_error("failed to acquire swapchain image");
             }
-            return true;
+            return drawables[size_t(index)];
         }
 
-        void submit(u32 image_index, vk::CommandBuffer command_buffer) {
-            if (auto fence = std::exchange(image_fences[image_index], fences[current_frame])) {
-                std::ignore = context.logical_device.waitForFences(fence, true, std::numeric_limits<uint64_t>::max());
-            }
-
+        void submit(vk::CommandBuffer command_buffer, vk::Fence fence) {
             const auto stages = std::array{
                 vk::PipelineStageFlags{vk::PipelineStageFlagBits::eColorAttachmentOutput}
             };
@@ -221,15 +229,15 @@ namespace vfx {
             submit_info.setWaitSemaphores(acquired_semaphores[current_frame]);
             submit_info.setSignalSemaphores(complete_semaphores[current_frame]);
 
-            context.logical_device.resetFences(fences[current_frame]);
-            context.graphics_queue.submit(submit_info, fences[current_frame]);
+            context.graphics_queue.submit(submit_info, fence);
         }
 
-        void present(u32 image_index) {
+        void present(const Arc<Drawable>& drawable) {
             auto present_info = vk::PresentInfoKHR{};
             present_info.setWaitSemaphores(complete_semaphores[current_frame]);
-            present_info.setSwapchains(swapchain);
-            present_info.setImageIndices(image_index);
+            present_info.setSwapchainCount(1);
+            present_info.setPSwapchains(&swapchain);
+            present_info.setPImageIndices(&drawable->index);
             auto result = context.present_queue.presentKHR(present_info);
 
             if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
@@ -245,9 +253,10 @@ namespace vfx {
 
                 context.logical_device.waitIdle();
 
+                destroy_drawables();
                 destroy_swapchain();
                 create_swapchain();
-                create_framebuffers();
+                create_drawables();
             }
         }
 

@@ -13,8 +13,7 @@ namespace vfx {
     };
 
     struct Texture {
-        u32 width = 0;
-        u32 height = 0;
+        vk::Extent2D size{};
         vk::Format format{};
         vk::Image image{};
         vk::ImageView view{};

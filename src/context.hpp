@@ -365,8 +365,8 @@ namespace vfx {
             auto view = logical_device.createImageView(view_create_info);
 
             auto out = Box<Texture>::alloc();
-            out->width = description.width;
-            out->height = description.height;
+            out->size.width = description.width;
+            out->size.height = description.height;
             out->format = description.format;
             out->image = image;
             out->view = view;
@@ -405,8 +405,8 @@ namespace vfx {
                     .layerCount = 1
                 },
                 .imageExtent = {
-                    .width = texture->width,
-                    .height = texture->height,
+                    .width = texture->size.width,
+                    .height = texture->size.height,
                     .depth = 1
                 }
             };
@@ -632,7 +632,8 @@ namespace vfx {
                 out->pipeline_layout = logical_device.createPipelineLayout(pipeline_layout_create_info);
             }
 
-            /*allocate descriptors*/ {
+            /*allocate descriptors*/
+            if (!out->descriptor_set_layouts.empty()) {
                 std::vector<vk::DescriptorPoolSize> pool_sizes{};
                 pool_sizes.reserve(descriptor_set_bindings_table.size());
                 for (auto& [type, count] : descriptor_set_bindings_table) {

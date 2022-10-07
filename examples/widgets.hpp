@@ -1,47 +1,18 @@
 #pragma once
 
-#include <assets.hpp>
-#include <pass.hpp>
-#include <display.hpp>
-#include <context.hpp>
-#include <material.hpp>
+#include "pass.hpp"
+#include "assets.hpp"
+#include "display.hpp"
+#include "context.hpp"
+#include "renderer.hpp"
+#include "material.hpp"
 
-#include <imgui.h>
-#include <imgui_internal.h>
+#include "imgui.h"
+#include "imgui_internal.h"
+#include "backends/imgui_impl_glfw.cpp"
 
 struct Widgets {
-    static constexpr auto buttons = std::array{
-        MouseButton::Left,
-        MouseButton::Right,
-        MouseButton::Middle,
-    };
-
-    static constexpr auto keycodes = std::array {
-        KeyCode::eTab,
-        KeyCode::eLeft,
-        KeyCode::eRight,
-        KeyCode::eUp,
-        KeyCode::eDown,
-        KeyCode::ePageUp,
-        KeyCode::ePageDown,
-        KeyCode::eHome,
-        KeyCode::eEnd,
-        KeyCode::eInsert,
-        KeyCode::eDelete,
-        KeyCode::eBackspace,
-        KeyCode::eSpace,
-        KeyCode::eEnter,
-        KeyCode::eEscape,
-        KeyCode::eKeyPadEnter,
-        KeyCode::eA,
-        KeyCode::eC,
-        KeyCode::eV,
-        KeyCode::eX,
-        KeyCode::eY,
-        KeyCode::eZ
-    };
-
-    Widgets(vfx::Context& context, const Box<vfx::RenderPass>& pass) : context(context) {
+    Widgets(vfx::Context& context, Display& display, Renderer& renderer) : context(context) {
         IMGUI_CHECKVERSION();
         ctx = ImGui::CreateContext();
 
@@ -52,29 +23,7 @@ struct Widgets {
         ctx->IO.BackendPlatformName = "imgui_impl_glfw";
         ctx->IO.BackendRendererName = "imgui_impl_vulkan";
 
-    // Keyboard mapping. ImGui will use those indices to peek into the ctx->IO.KeysDown[] array.
-        ctx->IO.KeyMap[ImGuiKey_Tab] = i32(KeyCode::eTab);
-        ctx->IO.KeyMap[ImGuiKey_LeftArrow] = i32(KeyCode::eLeft);
-        ctx->IO.KeyMap[ImGuiKey_RightArrow] = i32(KeyCode::eRight);
-        ctx->IO.KeyMap[ImGuiKey_UpArrow] = i32(KeyCode::eUp);
-        ctx->IO.KeyMap[ImGuiKey_DownArrow] = i32(KeyCode::eDown);
-        ctx->IO.KeyMap[ImGuiKey_PageUp] = i32(KeyCode::ePageUp);
-        ctx->IO.KeyMap[ImGuiKey_PageDown] = i32(KeyCode::ePageDown);
-        ctx->IO.KeyMap[ImGuiKey_Home] = i32(KeyCode::eHome);
-        ctx->IO.KeyMap[ImGuiKey_End] = i32(KeyCode::eEnd);
-        ctx->IO.KeyMap[ImGuiKey_Insert] = i32(KeyCode::eInsert);
-        ctx->IO.KeyMap[ImGuiKey_Delete] = i32(KeyCode::eDelete);
-        ctx->IO.KeyMap[ImGuiKey_Backspace] = i32(KeyCode::eBackspace);
-        ctx->IO.KeyMap[ImGuiKey_Space] = i32(KeyCode::eSpace);
-        ctx->IO.KeyMap[ImGuiKey_Enter] = i32(KeyCode::eEnter);
-        ctx->IO.KeyMap[ImGuiKey_Escape] = i32(KeyCode::eEscape);
-        ctx->IO.KeyMap[ImGuiKey_KeyPadEnter] = i32(KeyCode::eKeyPadEnter);
-        ctx->IO.KeyMap[ImGuiKey_A] = i32(KeyCode::eA);
-        ctx->IO.KeyMap[ImGuiKey_C] = i32(KeyCode::eC);
-        ctx->IO.KeyMap[ImGuiKey_V] = i32(KeyCode::eV);
-        ctx->IO.KeyMap[ImGuiKey_X] = i32(KeyCode::eX);
-        ctx->IO.KeyMap[ImGuiKey_Y] = i32(KeyCode::eY);
-        ctx->IO.KeyMap[ImGuiKey_Z] = i32(KeyCode::eZ);
+        ImGui_ImplGlfw_InitForVulkan(display.window, true);
 
         ImGui::StyleColorsDark(&ctx->Style);
 
@@ -146,7 +95,7 @@ struct Widgets {
             .entry = "main",
             .stage = vk::ShaderStageFlagBits::eFragment
         });
-        font_material = context.makeMaterial(description, pass, 0);
+        font_material = context.makeMaterial(description, renderer.render_pass, 0);
 
         const auto image_info = vk::DescriptorImageInfo{
             .sampler = font_sampler,
@@ -181,57 +130,14 @@ struct Widgets {
         }
     }
 
-    void update(Display& display) {
-        set_display_size(display.get_size());
-        set_display_scale(display.get_scale());
-        set_mouse_position(display.get_mouse_position());
-
-        for (auto button : buttons) {
-            set_mouse_pressed(i32(button), display.get_mouse_pressed(button));
-        }
-        for (auto keycode : keycodes) {
-            set_key_pressed(i32(keycode), display.get_key_pressed(keycode));
-        }
-    }
-
-    void set_display_size(const glm::ivec2& size) {
-        ctx->IO.DisplaySize = {
-            static_cast<f32>(size.x),
-            static_cast<f32>(size.y)
-        };
-    }
-
-    void set_display_scale(const glm::vec2& scale) {
-        ctx->IO.DisplayFramebufferScale = {
-            scale.x,
-            scale.y
-        };
-    }
-
-    void set_delta_time(f32 delta) {
-        ctx->IO.DeltaTime = delta;
-    }
-
-    void set_mouse_position(const glm::vec2& pos) {
-        ctx->IO.MousePos = { pos.x, pos.y };
-    }
-
-    void set_mouse_pressed(i32 button, bool flag) {
-        ctx->IO.MouseDown[button] = flag;
-    }
-
-    void set_key_pressed(i32 button, bool flag) {
-        ctx->IO.KeysDown[button] = flag;
-    }
-
     void begin_frame() {
+        ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
     }
+
     void end_frame() {
         ImGui::Render();
-
-        current_frame += 1;
-        current_frame %= vfx::Context::MAX_FRAMES_IN_FLIGHT;
+        current_frame = (current_frame + 1) % vfx::Context::MAX_FRAMES_IN_FLIGHT;
     }
 
     void draw(vk::CommandBuffer cmd) {
@@ -318,23 +224,6 @@ struct Widgets {
         }
     }
 
-    void set_current_context() {
-        ImGui::SetCurrentContext(ctx);
-    }
-
-    auto want_capture_mouse() -> bool {
-        return ctx->IO.WantCaptureMouse;
-    }
-
-    void add_input_character(char ch) {
-        ctx->IO.AddInputCharacter(ch);
-    }
-
-    void add_scroll_mouse(f32 x, f32 y) {
-        ctx->IO.MouseWheelH += x;
-        ctx->IO.MouseWheel += y;
-    }
-
     void create_font_texture() {
         uint8_t *pixels;
         i32 width, height;
@@ -391,9 +280,9 @@ struct Widgets {
     vfx::Context& context;
 
     ImGuiContext* ctx;
-    Box<vfx::Material> font_material;
-    Box<vfx::Texture> font_texture;
-    vk::Sampler font_sampler;
     u64 current_frame = 0;
+    vk::Sampler font_sampler;
+    Box<vfx::Texture> font_texture;
+    Box<vfx::Material> font_material;
     std::array<Geometry, vfx::Context::MAX_FRAMES_IN_FLIGHT> frames{};
 };

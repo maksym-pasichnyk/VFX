@@ -9,6 +9,11 @@
 #include "context.hpp"
 #include "swapchain.hpp"
 
+struct Globals {
+    vk::Extent2D Resolution;
+    f32 Time;
+};
+
 // todo: dynamic resolution
 struct Renderer {
     vfx::Context &context;
@@ -23,9 +28,10 @@ struct Renderer {
     Box<vfx::Texture> color_texture{};
     Box<vfx::Texture> depth_texture{};
 
-    Box<vfx::Buffer> globals{};
     Box<vfx::Material> material{};
     Box<vfx::RenderPass> render_pass{};
+
+    Globals globals{};
 
     explicit Renderer(vfx::Context& context, vfx::Swapchain& swapchain)
     : context(context), swapchain(swapchain) {
@@ -91,13 +97,11 @@ struct Renderer {
 
         create_framebuffer();
         create_material();
-        create_globals();
     }
 
     ~Renderer() {
         context.logical_device.destroySampler(sampler);
 
-        context.freeBuffer(globals);
         context.freeRenderPass(render_pass);
         context.freeTexture(depth_texture);
         context.freeTexture(color_texture);
@@ -115,8 +119,8 @@ struct Renderer {
         vk::FramebufferCreateInfo fb_create_info{};
         fb_create_info.setRenderPass(render_pass->handle);
         fb_create_info.setAttachments(attachments);
-        fb_create_info.setWidth(color_texture->width);
-        fb_create_info.setHeight(color_texture->height);
+        fb_create_info.setWidth(color_texture->size.width);
+        fb_create_info.setHeight(color_texture->size.height);
         fb_create_info.setLayers(1);
 
         framebuffer = context.logical_device.createFramebuffer(fb_create_info);
@@ -125,22 +129,7 @@ struct Renderer {
     void create_material() {
         vfx::MaterialDescription description{};
 
-        description.bindings = {
-            {0, sizeof(DefaultVertexFormat), vk::VertexInputRate::eVertex}
-        };
-
-        description.attributes = {
-            {0, 0, vk::Format::eR32G32B32Sfloat, offsetof(DefaultVertexFormat, position)},
-            {1, 0, vk::Format::eR8G8B8A8Unorm, offsetof(DefaultVertexFormat, color)}
-        };
-
-        description.attachments[0].blendEnable = true;
-        description.attachments[0].srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
-        description.attachments[0].dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
-        description.attachments[0].colorBlendOp = vk::BlendOp::eAdd;
-        description.attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
-        description.attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eZero;
-        description.attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
+        description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =
             vk::ColorComponentFlagBits::eR |
             vk::ColorComponentFlagBits::eG |
@@ -185,24 +174,6 @@ struct Renderer {
         material = context.makeMaterial(description, render_pass, 0);
     }
 
-    void create_globals() {
-        globals = context.create_buffer(vfx::BufferUsage::Constant, sizeof(CameraProperties));
-        auto buffer_info = vk::DescriptorBufferInfo {
-            .buffer = globals->buffer,
-            .offset = 0,
-            .range = vk::DeviceSize(sizeof(CameraProperties))
-        };
-        auto write_descriptor_set = vk::WriteDescriptorSet{
-            .dstSet = material->descriptor_sets[0],
-            .dstBinding = 0,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eUniformBuffer,
-            .pBufferInfo = &buffer_info
-        };
-        context.logical_device.updateDescriptorSets({write_descriptor_set}, {});
-    }
-
     void begin_rendering(vk::CommandBuffer cmd) {
         auto clear_values = std::array{
             vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({0.0f, 0.0f, 0.0f, 0.0f})),
@@ -211,7 +182,7 @@ struct Renderer {
 
         auto area = vk::Rect2D{};
         area.setOffset(vk::Offset2D{0, 0});
-        area.setExtent(vk::Extent2D{color_texture->width, color_texture->height});
+        area.setExtent(color_texture->size);
 
         auto begin_info = vk::RenderPassBeginInfo{};
         begin_info.setRenderPass(render_pass->handle);
@@ -220,8 +191,8 @@ struct Renderer {
         begin_info.setClearValues(clear_values);
 
         auto viewport = vk::Viewport{};
-        viewport.setWidth(f32(color_texture->width));
-        viewport.setHeight(f32(color_texture->height));
+        viewport.setWidth(f32(color_texture->size.width));
+        viewport.setHeight(f32(color_texture->size.height));
         viewport.setMaxDepth(1.f);
 
         cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
@@ -233,20 +204,11 @@ struct Renderer {
         cmd.endRenderPass();
     }
 
-    void setup(vk::CommandBuffer cmd, Camera& camera) {
-        CameraProperties properties{};
-        properties.projection = camera.get_projection();
-        properties.view = camera.get_view();
-
-        context.update_buffer(globals, &properties, sizeof(CameraProperties), 0);
+    void draw(vk::CommandBuffer cmd, Camera& camera) {
+        globals.Resolution = color_texture->size;
 
         cmd.bindPipeline(material->pipeline_bind_point, material->pipeline);
-        cmd.bindDescriptorSets(
-            material->pipeline_bind_point,
-            material->pipeline_layout,
-            0,
-            material->descriptor_sets,
-            {}
-        );
+        cmd.pushConstants(material->pipeline_layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
+        cmd.draw(6, 1, 0, 0);
     }
 };

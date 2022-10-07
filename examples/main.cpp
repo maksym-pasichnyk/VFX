@@ -1,38 +1,8 @@
 #include <map>
-#include <entt/entt.hpp>
 
 #include "widgets.hpp"
 #include "display.hpp"
 #include "renderer.hpp"
-
-struct MeshRenderer {
-    bool enable = true;
-    Geometry* geometry{};
-    vfx::Material* material{};
-};
-
-struct Scene {
-    entt::registry registry{};
-
-    auto create_entity() -> entt::entity {
-        return registry.create();
-    }
-};
-
-struct Entity {
-    entt::entity id;
-    Scene* scene;
-
-    template<typename T>
-    void get() {
-        scene->registry.get<T>(id);
-    }
-
-    template<typename T, typename... Args>
-    auto emplace(Args&&... args) -> T& {
-        return scene->registry.emplace<T>(id, std::forward<Args>(args)...);
-    }
-};
 
 struct Demo {
     Box<Display> display{};
@@ -62,9 +32,9 @@ struct Demo {
             .enable_debug = true
         });
         swapchain = Box<vfx::Swapchain>::alloc(*context, *display);
-        
+
         renderer = Box<Renderer>::alloc(*context, *swapchain);
-        widgets = Box<Widgets>::alloc(*context, renderer->render_pass);
+        widgets = Box<Widgets>::alloc(*context, *display, *renderer);
 
         create_present_swapchain_material();
     }
@@ -74,125 +44,97 @@ struct Demo {
     }
 
     void run() {
-        static std::vector<Geometry> geometries;
+        std::array<f32, 60> times{};
+        f32 accumulator = 0;
+        u64 frame_index = 0;
+        i32 frame_count = 0;
+        f32 frame_time = 1.0f / 60.0f;
 
-        geometries.resize(2);
-
-        std::vector<u32> indices{
-            0, 1, 2, 0, 2, 3
-        };
-        {
-            std::vector<DefaultVertexFormat> vertices{
-                DefaultVertexFormat{.position = glm::vec3(-1.0, -0.5, -1), .color = glm::u8vec4(0, 0, 255, 255)},
-                DefaultVertexFormat{.position = glm::vec3(-1.0,  0.5, -1), .color = glm::u8vec4(0, 0, 255, 255)},
-                DefaultVertexFormat{.position = glm::vec3( 0.0,  0.5, -1), .color = glm::u8vec4(0, 0, 255, 255)},
-                DefaultVertexFormat{.position = glm::vec3( 0.0, -0.5, -1), .color = glm::u8vec4(0, 0, 255, 255)},
-            };
-
-            context->set_vertices(&geometries[0], vertices);
-            context->set_indices(&geometries[0], indices);
-        }
-        {
-            std::vector<DefaultVertexFormat> vertices{
-                DefaultVertexFormat{.position = glm::vec3(0.0, -0.5, -1), .color = glm::u8vec4(255, 0, 0, 255)},
-                DefaultVertexFormat{.position = glm::vec3(0.0,  0.5, -1), .color = glm::u8vec4(255, 0, 0, 255)},
-                DefaultVertexFormat{.position = glm::vec3(1.0,  0.5, -1), .color = glm::u8vec4(255, 0, 0, 255)},
-                DefaultVertexFormat{.position = glm::vec3(1.0, -0.5, -1), .color = glm::u8vec4(255, 0, 0, 255)},
-            };
-
-            context->set_vertices(&geometries[1], vertices);
-            context->set_indices(&geometries[1], indices);
-        }
-
-        Scene scene{};
-        Camera camera{60.0f, display->get_aspect()};
-
-        auto g0 = Entity{scene.create_entity(), &scene};
-        auto g1 = Entity{scene.create_entity(), &scene};
-
-        g0.emplace<MeshRenderer>(true, &geometries[0], nullptr);
-        g1.emplace<MeshRenderer>(true, &geometries[1], nullptr);
-
-        auto last_time = std::chrono::high_resolution_clock::now();
+        f64 time = glfwGetTime();
         while (!display->should_close()) {
-            const auto current_time = std::chrono::high_resolution_clock::now();
-            const auto delta_time = std::chrono::duration<f32, std::chrono::seconds::period>(current_time - last_time).count();
-            last_time = current_time;
-
             display->poll_events();
 
-            widgets->set_delta_time(delta_time);
-            widgets->update(*display);
+            drawFrame();
 
-            u32 image_index;
-            if (swapchain->acquire_next_image(image_index)) {
-                auto cmd = context->command_buffers[swapchain->current_frame];
-                cmd.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+            f64 prev_time = time;
+            time = glfwGetTime();
+            f32 delta_time = f32(time - prev_time);
 
-                renderer->begin_rendering(cmd);
-                renderer->setup(cmd, camera);
+            frame_count = std::min(frame_count + 1, i32(times.size()));
 
-                for (auto&& [_, mesh_renderer] : scene.registry.view<MeshRenderer>().each()) {
-                    if (!mesh_renderer.enable || !mesh_renderer.geometry) {
-                        continue;
-                    }
-                    cmd.bindVertexBuffers(0, mesh_renderer.geometry->vtx->buffer, vk::DeviceSize{0});
-                    cmd.bindIndexBuffer(mesh_renderer.geometry->idx->buffer, 0, vk::IndexType::eUint32);
-                    cmd.drawIndexed(mesh_renderer.geometry->idx_count, 1, 0, 0, 0);
-                }
+            accumulator += delta_time - times[frame_index];
+            frame_time = accumulator / f32(frame_count);
+            times[frame_index] = delta_time;
 
-                widgets->begin_frame();
-                ImGui::Begin("Stats");
-                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-                ImGui::End();
-                widgets->end_frame();
-
-                widgets->draw(cmd);
-                renderer->end_rendering(cmd);
-
-                // todo: move to better place
-                {
-                    auto clear_values = std::array{
-                        vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({1.0f, 1.0f, 1.0f, 1.0f}))
-                    };
-
-                    auto area = vk::Rect2D{};
-                    area.setExtent(swapchain->image_extent);
-
-                    auto begin_info = vk::RenderPassBeginInfo{};
-                    begin_info.setRenderPass(swapchain->render_pass->handle);
-                    begin_info.setFramebuffer(swapchain->framebuffers[image_index]);
-                    begin_info.setRenderArea(area);
-                    begin_info.setClearValues(clear_values);
-
-                    auto viewport = vk::Viewport{};
-                    viewport.setWidth(f32(swapchain->image_extent.width));
-                    viewport.setHeight(f32(swapchain->image_extent.height));
-                    viewport.setMaxDepth(1.f);
-
-                    cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
-                    cmd.setViewport(0, viewport);
-                    cmd.setScissor(0, area);
-
-                    cmd.bindPipeline(present_swapchain_material->pipeline_bind_point, present_swapchain_material->pipeline);
-                    cmd.bindDescriptorSets(present_swapchain_material->pipeline_bind_point, present_swapchain_material->pipeline_layout, 0, present_swapchain_material->descriptor_sets, {});
-
-                    cmd.draw(6, 1, 0, 0);
-
-                    cmd.endRenderPass();
-                    cmd.end();
-                }
-
-                swapchain->submit(image_index, cmd);
-                swapchain->present(image_index);
-            }
+            frame_index = (frame_index + 1) % times.size();
         }
         context->logical_device.waitIdle();
+    }
 
-        for (auto& geometry : geometries) {
-            context->freeBuffer(geometry.vtx);
-            context->freeBuffer(geometry.idx);
+    void drawFrame() {
+        Camera camera{60.0f, display->get_aspect()};
+
+        std::ignore = context->logical_device.waitForFences(
+            swapchain->fences[swapchain->current_frame],
+            true,
+            std::numeric_limits<uint64_t>::max()
+        );
+
+        auto drawable = swapchain->getNextDrawable();
+
+        auto cmd = context->command_buffers[swapchain->current_frame];
+        cmd.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+
+        renderer->begin_rendering(cmd);
+        renderer->draw(cmd, camera);
+
+        widgets->begin_frame();
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(0, 0));
+        ImGui::Begin("Stats");
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::End();
+        widgets->end_frame();
+
+        widgets->draw(cmd);
+        renderer->end_rendering(cmd);
+
+        // todo: move to better place
+        {
+            auto clear_values = std::array{
+                vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({1.0f, 1.0f, 1.0f, 1.0f}))
+            };
+
+            auto area = vk::Rect2D{};
+            area.setExtent(swapchain->size);
+
+            auto begin_info = vk::RenderPassBeginInfo{};
+            begin_info.setRenderPass(swapchain->render_pass->handle);
+            begin_info.setFramebuffer(drawable->framebuffer);
+            begin_info.setRenderArea(area);
+            begin_info.setClearValues(clear_values);
+
+            auto viewport = vk::Viewport{};
+            viewport.setWidth(f32(swapchain->size.width));
+            viewport.setHeight(f32(swapchain->size.height));
+            viewport.setMaxDepth(1.f);
+
+            cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
+            cmd.setViewport(0, viewport);
+            cmd.setScissor(0, area);
+
+            cmd.bindPipeline(present_swapchain_material->pipeline_bind_point, present_swapchain_material->pipeline);
+            cmd.bindDescriptorSets(present_swapchain_material->pipeline_bind_point, present_swapchain_material->pipeline_layout, 0, present_swapchain_material->descriptor_sets, {});
+
+            cmd.draw(6, 1, 0, 0);
+
+            cmd.endRenderPass();
+            cmd.end();
         }
+
+        context->logical_device.resetFences(swapchain->fences[swapchain->current_frame]);
+        swapchain->submit(cmd, swapchain->fences[swapchain->current_frame]);
+        swapchain->present(drawable);
     }
 
     void create_present_swapchain_material() {
@@ -201,9 +143,9 @@ struct Demo {
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =
             vk::ColorComponentFlagBits::eR |
-                vk::ColorComponentFlagBits::eG |
-                vk::ColorComponentFlagBits::eB |
-                vk::ColorComponentFlagBits::eA;
+            vk::ColorComponentFlagBits::eG |
+            vk::ColorComponentFlagBits::eB |
+            vk::ColorComponentFlagBits::eA;
 
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
         description.inputAssemblyState.primitiveRestartEnable = false;

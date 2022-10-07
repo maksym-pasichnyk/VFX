@@ -1,23 +1,32 @@
 #version 450 core
 
-layout(location = 0) in vec3 in_pos;
-layout(location = 1) in vec4 in_color;
-
-layout(set = 0, binding = 0) uniform GlobalUniformBuffer {
-    mat4 projection;
-    mat4 view;
-} global;
-
 out gl_PerVertex {
 	vec4 gl_Position;
 };
 
 layout(location = 0) out struct {
-	vec4 color;
+	vec2 fragCoord;
 } v_out;
 
-void main() {
-	v_out.color = in_color;
+layout(push_constant) uniform Globals {
+	ivec2 Resolution;
+	float Time;
+};
 
-	gl_Position = global.projection * global.view * vec4(in_pos, 1);
+const vec2 vertices[6] = vec2[](
+	vec2(-1, -1), vec2(-1,  1),
+	vec2( 1, -1), vec2( 1, -1),
+	vec2(-1,  1), vec2( 1,  1)
+);
+
+const vec2 texcoords[6] = vec2[](
+	vec2(0, 1), vec2(0, 0),
+	vec2(1, 1), vec2(1, 1),
+	vec2(0, 0), vec2(1, 0)
+);
+
+void main() {
+	v_out.fragCoord = texcoords[gl_VertexIndex] * vec2(Resolution);
+
+	gl_Position = vec4(vertices[gl_VertexIndex], 0, 1);
 }
