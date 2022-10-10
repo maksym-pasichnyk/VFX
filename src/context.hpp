@@ -63,6 +63,7 @@ namespace vfx {
         vk::Device logical_device{};
         vk::Format depth_format{};
 
+    public:
         explicit Context(const ContextDescription& description) {
             create_instance(description);
             select_physical_device();
@@ -229,21 +230,21 @@ namespace vfx {
                 .vkCreateImage = vk::defaultDispatchLoaderDynamic.vkCreateImage,
                 .vkDestroyImage = vk::defaultDispatchLoaderDynamic.vkDestroyImage,
                 .vkCmdCopyBuffer = vk::defaultDispatchLoaderDynamic.vkCmdCopyBuffer,
-    #if VMA_DEDICATED_ALLOCATION || VMA_VULKAN_VERSION >= 1001000
+#if VMA_DEDICATED_ALLOCATION || VMA_VULKAN_VERSION >= 1001000
                 /// Fetch "vkGetBufferMemoryRequirements2" on Vulkan >= 1.1, fetch "vkGetBufferMemoryRequirements2KHR" when using VK_KHR_dedicated_allocation extension.
                 .vkGetBufferMemoryRequirements2KHR = vk::defaultDispatchLoaderDynamic.vkGetBufferMemoryRequirements2KHR,
                 /// Fetch "vkGetImageMemoryRequirements 2" on Vulkan >= 1.1, fetch "vkGetImageMemoryRequirements2KHR" when using VK_KHR_dedicated_allocation extension.
                 .vkGetImageMemoryRequirements2KHR = vk::defaultDispatchLoaderDynamic.vkGetImageMemoryRequirements2KHR,
-    #endif
-    #if VMA_BIND_MEMORY2 || VMA_VULKAN_VERSION >= 1001000
+#endif
+#if VMA_BIND_MEMORY2 || VMA_VULKAN_VERSION >= 1001000
                 /// Fetch "vkBindBufferMemory2" on Vulkan >= 1.1, fetch "vkBindBufferMemory2KHR" when using VK_KHR_bind_memory2 extension.
                 .vkBindBufferMemory2KHR = vk::defaultDispatchLoaderDynamic.vkBindBufferMemory2KHR,
                 /// Fetch "vkBindImageMemory2" on Vulkan >= 1.1, fetch "vkBindImageMemory2KHR" when using VK_KHR_bind_memory2 extension.
                 .vkBindImageMemory2KHR = vk::defaultDispatchLoaderDynamic.vkBindImageMemory2KHR,
-    #endif
-    #if VMA_MEMORY_BUDGET || VMA_VULKAN_VERSION >= 1001000
+#endif
+#if VMA_MEMORY_BUDGET || VMA_VULKAN_VERSION >= 1001000
                 .vkGetPhysicalDeviceMemoryProperties2KHR = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceMemoryProperties2KHR,
-    #endif
+#endif
             };
 
             const auto allocatorCreateInfo = VmaAllocatorCreateInfo{
@@ -521,7 +522,7 @@ namespace vfx {
 
         auto makeMaterial(const MaterialDescription& description, const Box<RenderPass>& pass, u32 subpass) -> Box<Material> {
             auto out = Box<Material>::alloc();
-            out->pipeline_bind_point = vk::PipelineBindPoint::eGraphics;
+//            out->pipeline_bind_point = vk::PipelineBindPoint::eGraphics;
 
             struct DescriptorSetLayoutDescription {
                 std::vector<vk::DescriptorSetLayoutBinding> bindings{};
@@ -647,6 +648,10 @@ namespace vfx {
             dynamic_state.setDynamicStates(dynamic_states);
 
             auto pipeline_create_info = vk::GraphicsPipelineCreateInfo{};
+            if (description.rendering.has_value()) {
+                pipeline_create_info.pNext = &*description.rendering;
+            }
+
             pipeline_create_info.pVertexInputState = &vertex_input_state;
             pipeline_create_info.pInputAssemblyState = &description.inputAssemblyState;
             pipeline_create_info.pViewportState = &viewport_state;

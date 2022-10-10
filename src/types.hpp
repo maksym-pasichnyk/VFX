@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 using i8 = int8_t;
 using i16 = int16_t;

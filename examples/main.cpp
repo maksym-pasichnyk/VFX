@@ -42,8 +42,9 @@ struct Demo {
             .enable_debug = true
         });
         swapchain = Box<vfx::Swapchain>::alloc(*context, *display);
+        renderer = Box<Renderer>::alloc(*context, swapchain->pixelFormat);
+        renderer->setDrawableSize(swapchain->drawableSize);
 
-        renderer = Box<Renderer>::alloc(*context, *swapchain);
         widgets = Box<Widgets>::alloc(*context, *display, *renderer);
 
         create_gpu_objects();
@@ -70,8 +71,6 @@ struct Demo {
     }
 
     void draw() {
-        Camera camera{60.0f, display->get_aspect()};
-
         context->logical_device.waitForFences(fences[current_frame], true, std::numeric_limits<uint64_t>::max());
         context->logical_device.resetFences(fences[current_frame]);
 
@@ -79,7 +78,7 @@ struct Demo {
         cmd.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
         renderer->begin_rendering(cmd);
-        renderer->draw(cmd, camera);
+        renderer->draw(cmd);
 
         widgets->begin_frame();
         ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -92,49 +91,55 @@ struct Demo {
         widgets->draw(cmd);
         renderer->end_rendering(cmd);
 
-        // todo: move to better place
-        {
-            auto drawable = swapchain->getNextDrawable();
+        auto drawable = swapchain->nextDrawable();
+        final_render_pass(cmd, drawable);
+        cmd.end();
 
-            auto clear_values = std::array{
-                vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({1.0f, 1.0f, 1.0f, 1.0f}))
-            };
+        drawable->present(
+            cmd,
+            fences[current_frame],
+            semaphores[current_frame]
+        );
 
-            auto area = vk::Rect2D{};
-            area.setExtent(swapchain->size);
+        if (swapchain->out_of_date) {
+            swapchain->rebuild();
+            renderer->setDrawableSize(swapchain->drawableSize);
 
-            auto begin_info = vk::RenderPassBeginInfo{};
-            begin_info.setRenderPass(swapchain->render_pass->handle);
-            begin_info.setFramebuffer(drawable->framebuffer);
-            begin_info.setRenderArea(area);
-            begin_info.setClearValues(clear_values);
-
-            auto viewport = vk::Viewport{};
-            viewport.setWidth(f32(swapchain->size.width));
-            viewport.setHeight(f32(swapchain->size.height));
-            viewport.setMaxDepth(1.f);
-
-            cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
-            cmd.setViewport(0, viewport);
-            cmd.setScissor(0, area);
-
-            cmd.bindPipeline(present_swapchain_material->pipeline_bind_point, present_swapchain_material->pipeline);
-            cmd.bindDescriptorSets(present_swapchain_material->pipeline_bind_point, present_swapchain_material->pipeline_layout, 0, present_swapchain_material->descriptor_sets, {});
-
-            cmd.draw(6, 1, 0, 0);
-
-            cmd.endRenderPass();
-            cmd.end();
-
-            swapchain->present(
-                cmd,
-                fences[current_frame],
-                semaphores[current_frame],
-                drawable
-            );
+            update_descriptors();
         }
 
         current_frame = (current_frame + 1) % vfx::Context::MAX_FRAMES_IN_FLIGHT;
+    }
+
+    void final_render_pass(vk::CommandBuffer cmd, vfx::Drawable* drawable) {
+        auto clear_values = std::array{
+            vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({0.0f, 0.0f, 0.0f, 0.0f})),
+        };
+
+        auto render_area = vk::Rect2D{};
+        render_area.setExtent(drawable->texture->size);
+
+        auto begin_info = vk::RenderPassBeginInfo{};
+        begin_info.setRenderPass(swapchain->final_render_pass->handle);
+        begin_info.setFramebuffer(drawable->framebuffer);
+        begin_info.setRenderArea(render_area);
+        begin_info.setClearValues(clear_values);
+
+        cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
+
+        auto viewport = vk::Viewport{};
+        viewport.setWidth(f32(drawable->texture->size.width));
+        viewport.setHeight(f32(drawable->texture->size.height));
+
+        cmd.setViewport(0, 1, &viewport);
+        cmd.setScissor(0, 1, &render_area);
+
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, present_swapchain_material->pipeline);
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, present_swapchain_material->pipeline_layout, 0, present_swapchain_material->descriptor_sets, {});
+
+        cmd.draw(6, 1, 0, 0);
+
+        cmd.endRenderPass();
     }
 
     void create_gpu_objects() {
@@ -174,9 +179,9 @@ struct Demo {
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =
             vk::ColorComponentFlagBits::eR |
-                vk::ColorComponentFlagBits::eG |
-                vk::ColorComponentFlagBits::eB |
-                vk::ColorComponentFlagBits::eA;
+            vk::ColorComponentFlagBits::eG |
+            vk::ColorComponentFlagBits::eB |
+            vk::ColorComponentFlagBits::eA;
 
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
         description.inputAssemblyState.primitiveRestartEnable = false;
@@ -212,8 +217,12 @@ struct Demo {
             .entry = "main",
             .stage = vk::ShaderStageFlagBits::eFragment
         });
-        present_swapchain_material = context->makeMaterial(description, swapchain->render_pass, 0);
+        present_swapchain_material = context->makeMaterial(description, swapchain->final_render_pass, 0);
 
+        update_descriptors();
+    }
+
+    void update_descriptors() {
         const auto image_info = vk::DescriptorImageInfo{
             .sampler = renderer->sampler,
             .imageView = renderer->color_texture->view,
@@ -232,7 +241,12 @@ struct Demo {
 };
 
 auto main() -> i32 {
-    Demo demo{};
-    demo.run();
-    return 0;
+    try {
+        Demo demo{};
+        demo.run();
+        return 0;
+    } catch (const std::exception& e) {
+        spdlog::error("{}", e.what());
+        return 1;
+    }
 }

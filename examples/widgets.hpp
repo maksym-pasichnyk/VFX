@@ -177,8 +177,8 @@ struct Widgets {
             }
         }
 
-        cmd.bindPipeline(font_material->pipeline_bind_point, font_material->pipeline);
-        cmd.bindDescriptorSets(font_material->pipeline_bind_point, font_material->pipeline_layout, 0, font_material->descriptor_sets, {});
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, font_material->pipeline);
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, font_material->pipeline_layout, 0, font_material->descriptor_sets, {});
 
         setup_render_state(draw_data, cmd, frame, fb_width, fb_height);
 

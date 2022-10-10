@@ -1,7 +1,3 @@
-//
-// Created by Maksym Pasichnyk on 06.10.2022.
-//
-
 #pragma once
 
 #include "camera.hpp"
@@ -14,10 +10,8 @@ struct Globals {
     f32 Time;
 };
 
-// todo: dynamic resolution
 struct Renderer {
     vfx::Context &context;
-    vfx::Swapchain& swapchain;
 
     vk::Format pixel_format;
     vk::Format depth_format;
@@ -33,29 +27,10 @@ struct Renderer {
 
     Globals globals{};
 
-    explicit Renderer(vfx::Context& context, vfx::Swapchain& swapchain)
-    : context(context), swapchain(swapchain) {
-        pixel_format = swapchain.pixel_format;
-        depth_format = context.depth_format;
-
-        auto color_texture_description = vfx::TextureDescription{
-            .format = pixel_format,
-            .width = 1600,
-            .height = 1200,
-            .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
-            .aspect = vk::ImageAspectFlagBits::eColor
-        };
-        color_texture = context.makeTexture(color_texture_description);
-
-        auto depth_texture_description = vfx::TextureDescription{
-            .format = depth_format,
-            .width = 1600,
-            .height = 1200,
-            .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
-            .aspect = vk::ImageAspectFlagBits::eDepth
-        };
-        depth_texture = context.makeTexture(depth_texture_description);
-
+    explicit Renderer(vfx::Context& context, vk::Format pixel_format)
+    : context(context)
+    , pixel_format(pixel_format)
+    , depth_format(context.depth_format) {
         auto sampler_description = vk::SamplerCreateInfo{
             .magFilter = vk::Filter::eNearest,
             .minFilter = vk::Filter::eNearest,
@@ -75,7 +50,7 @@ struct Renderer {
                 .depthStencilAttachment = vk::AttachmentReference{1, vk::ImageLayout::eDepthStencilAttachmentOptimal}
             }
         };
-        pass_description.attachments[0].format = color_texture->format;
+        pass_description.attachments[0].format = pixel_format;
         pass_description.attachments[0].samples = vk::SampleCountFlagBits::e1;
         pass_description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
         pass_description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
@@ -84,7 +59,7 @@ struct Renderer {
         pass_description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
         pass_description.attachments[0].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-        pass_description.attachments[1].format = depth_texture->format;
+        pass_description.attachments[1].format = depth_format;
         pass_description.attachments[1].samples = vk::SampleCountFlagBits::e1;
         pass_description.attachments[1].loadOp = vk::AttachmentLoadOp::eClear;
         pass_description.attachments[1].storeOp = vk::AttachmentStoreOp::eStore;
@@ -95,22 +70,55 @@ struct Renderer {
 
         render_pass = context.makeRenderPass(pass_description);
 
-        create_framebuffer();
         create_material();
     }
 
     ~Renderer() {
         context.logical_device.destroySampler(sampler);
 
-        context.freeRenderPass(render_pass);
-        context.freeTexture(depth_texture);
-        context.freeTexture(color_texture);
-        context.freeMaterial(material);
+        if (framebuffer) {
+            context.logical_device.destroyFramebuffer(framebuffer);
+        }
+        if (depth_texture) {
+            context.freeTexture(depth_texture);
+        }
+        if (color_texture) {
+            context.freeTexture(color_texture);
+        }
 
-        context.logical_device.destroyFramebuffer(framebuffer);
+        context.freeRenderPass(render_pass);
+        context.freeMaterial(material);
     }
 
-    void create_framebuffer() {
+    void setDrawableSize(const vk::Extent2D& size) {
+        if (framebuffer) {
+            context.logical_device.destroyFramebuffer(framebuffer);
+        }
+        if (depth_texture) {
+            context.freeTexture(depth_texture);
+        }
+        if (color_texture) {
+            context.freeTexture(color_texture);
+        }
+
+        auto color_texture_description = vfx::TextureDescription{
+            .format = pixel_format,
+            .width = size.width,
+            .height = size.height,
+            .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
+            .aspect = vk::ImageAspectFlagBits::eColor
+        };
+        color_texture = context.makeTexture(color_texture_description);
+
+        auto depth_texture_description = vfx::TextureDescription{
+            .format = depth_format,
+            .width = size.width,
+            .height = size.height,
+            .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
+            .aspect = vk::ImageAspectFlagBits::eDepth
+        };
+        depth_texture = context.makeTexture(depth_texture_description);
+
         auto attachments = std::array{
             color_texture->view,
             depth_texture->view
@@ -119,8 +127,8 @@ struct Renderer {
         vk::FramebufferCreateInfo fb_create_info{};
         fb_create_info.setRenderPass(render_pass->handle);
         fb_create_info.setAttachments(attachments);
-        fb_create_info.setWidth(color_texture->size.width);
-        fb_create_info.setHeight(color_texture->size.height);
+        fb_create_info.setWidth(size.width);
+        fb_create_info.setHeight(size.height);
         fb_create_info.setLayers(1);
 
         framebuffer = context.logical_device.createFramebuffer(fb_create_info);
@@ -204,10 +212,10 @@ struct Renderer {
         cmd.endRenderPass();
     }
 
-    void draw(vk::CommandBuffer cmd, Camera& camera) {
+    void draw(vk::CommandBuffer cmd) {
         globals.Resolution = color_texture->size;
 
-        cmd.bindPipeline(material->pipeline_bind_point, material->pipeline);
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, material->pipeline);
         cmd.pushConstants(material->pipeline_layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
         cmd.draw(6, 1, 0, 0);
     }

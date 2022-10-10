@@ -24,6 +24,7 @@ namespace vfx {
 
     struct MaterialDescription {
         std::vector<ShaderDescription> shaders = {};
+        std::optional<vk::PipelineRenderingCreateInfo> rendering = {};
 
         vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState = {};
         vk::PipelineTessellationStateCreateInfo tessellationState = {};
@@ -42,7 +43,7 @@ namespace vfx {
     struct Material {
         vk::Pipeline pipeline;
         vk::PipelineLayout pipeline_layout;
-        vk::PipelineBindPoint pipeline_bind_point;
+//        vk::PipelineBindPoint pipeline_bind_point;
 
         // todo: bindless
         vk::DescriptorPool descriptor_pool;
