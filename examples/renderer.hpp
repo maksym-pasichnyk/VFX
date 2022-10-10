@@ -42,35 +42,7 @@ struct Renderer {
         };
         sampler = context.logical_device.createSampler(sampler_description);
 
-        vfx::RenderPassDescription pass_description{};
-        pass_description.definitions = {
-            vfx::SubpassDescription{
-                .colorAttachments = {
-                    vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
-                },
-                .depthStencilAttachment = vk::AttachmentReference{1, vk::ImageLayout::eDepthStencilAttachmentOptimal}
-            }
-        };
-        pass_description.attachments[0].format = pixel_format;
-        pass_description.attachments[0].samples = vk::SampleCountFlagBits::e1;
-        pass_description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
-        pass_description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
-        pass_description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-        pass_description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-        pass_description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
-        pass_description.attachments[0].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-
-        pass_description.attachments[1].format = depth_format;
-        pass_description.attachments[1].samples = vk::SampleCountFlagBits::e1;
-        pass_description.attachments[1].loadOp = vk::AttachmentLoadOp::eClear;
-        pass_description.attachments[1].storeOp = vk::AttachmentStoreOp::eStore;
-        pass_description.attachments[1].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-        pass_description.attachments[1].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-        pass_description.attachments[1].initialLayout = vk::ImageLayout::eUndefined;
-        pass_description.attachments[1].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-
-        render_pass = context.makeRenderPass(pass_description);
-
+        create_render_pass();
         create_material();
     }
 
@@ -93,6 +65,7 @@ struct Renderer {
 
     void setDrawableSize(const vk::Extent2D& size) {
         drawableSize = size;
+        globals.Resolution = drawableSize;
 
         if (framebuffer) {
             context.logical_device.destroyFramebuffer(framebuffer);
@@ -135,6 +108,37 @@ struct Renderer {
         fb_create_info.setLayers(1);
 
         framebuffer = context.logical_device.createFramebuffer(fb_create_info);
+    }
+
+    void create_render_pass() {
+        vfx::RenderPassDescription pass_description{};
+        pass_description.definitions = {
+            vfx::SubpassDescription{
+                .colorAttachments = {
+                    vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
+                },
+                .depthStencilAttachment = vk::AttachmentReference{1, vk::ImageLayout::eDepthStencilAttachmentOptimal}
+            }
+        };
+        pass_description.attachments[0].format = pixel_format;
+        pass_description.attachments[0].samples = vk::SampleCountFlagBits::e1;
+        pass_description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+        pass_description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+        pass_description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+        pass_description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+        pass_description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
+        pass_description.attachments[0].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+
+        pass_description.attachments[1].format = depth_format;
+        pass_description.attachments[1].samples = vk::SampleCountFlagBits::e1;
+        pass_description.attachments[1].loadOp = vk::AttachmentLoadOp::eClear;
+        pass_description.attachments[1].storeOp = vk::AttachmentStoreOp::eStore;
+        pass_description.attachments[1].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+        pass_description.attachments[1].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+        pass_description.attachments[1].initialLayout = vk::ImageLayout::eUndefined;
+        pass_description.attachments[1].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+
+        render_pass = context.makeRenderPass(pass_description);
     }
 
     void create_material() {
@@ -193,7 +197,7 @@ struct Renderer {
 
         auto area = vk::Rect2D{};
         area.setOffset(vk::Offset2D{0, 0});
-        area.setExtent(color_texture->size);
+        area.setExtent(drawableSize);
 
         auto begin_info = vk::RenderPassBeginInfo{};
         begin_info.setRenderPass(render_pass->handle);
@@ -202,8 +206,8 @@ struct Renderer {
         begin_info.setClearValues(clear_values);
 
         auto viewport = vk::Viewport{};
-        viewport.setWidth(f32(color_texture->size.width));
-        viewport.setHeight(f32(color_texture->size.height));
+        viewport.setWidth(f32(drawableSize.width));
+        viewport.setHeight(f32(drawableSize.height));
         viewport.setMaxDepth(1.f);
 
         cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
@@ -216,8 +220,6 @@ struct Renderer {
     }
 
     void draw(vk::CommandBuffer cmd) {
-        globals.Resolution = color_texture->size;
-
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, material->pipeline);
         cmd.pushConstants(material->pipeline_layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
         cmd.draw(6, 1, 0, 0);
