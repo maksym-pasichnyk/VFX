@@ -17,8 +17,9 @@ struct Renderer {
     vk::Format depth_format;
 
     vk::Sampler sampler{};
+    vk::Extent2D drawableSize{};
     vk::Framebuffer framebuffer{};
-
+    
     Box<vfx::Texture> color_texture{};
     Box<vfx::Texture> depth_texture{};
 
@@ -91,6 +92,8 @@ struct Renderer {
     }
 
     void setDrawableSize(const vk::Extent2D& size) {
+        drawableSize = size;
+
         if (framebuffer) {
             context.logical_device.destroyFramebuffer(framebuffer);
         }

@@ -1,12 +1,6 @@
 #pragma once
 
 #include <list>
-#include <pass.hpp>
-#include <types.hpp>
-#include <buffer.hpp>
-#include <display.hpp>
-#include <texture.hpp>
-#include <material.hpp>
 #include <glm/vec4.hpp>
 #include <GLFW/glfw3.h>
 #include <vk_mem_alloc.h>
@@ -14,6 +8,13 @@
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_beta.h>
 
+#include "pass.hpp"
+#include "queue.hpp"
+#include "types.hpp"
+#include "buffer.hpp"
+#include "display.hpp"
+#include "texture.hpp"
+#include "material.hpp"
 #include "spirv_reflect.h"
 
 struct DefaultVertexFormat {
@@ -687,7 +688,7 @@ namespace vfx {
             return out;
         }
 
-        auto freeMaterial(const Box<Material>& material) {
+        void freeMaterial(const Box<Material>& material) {
             logical_device.destroyPipeline(material->pipeline);
             logical_device.destroyPipelineLayout(material->pipeline_layout);
 
@@ -698,6 +699,42 @@ namespace vfx {
             if (material->descriptor_pool) {
                 logical_device.destroyDescriptorPool(material->descriptor_pool);
             }
+        }
+
+        auto makeCommandQueue(u32 count) -> Box<CommandQueue> {
+            auto out = Box<CommandQueue>::alloc();
+            const auto pool_create_info = vk::CommandPoolCreateInfo {
+                .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+                .queueFamilyIndex = graphics_family
+            };
+            out->context = this;
+            out->queue = logical_device.getQueue(graphics_family, 0);
+            out->pool = logical_device.createCommandPool(pool_create_info);
+
+            const auto command_buffers_allocate_info = vk::CommandBufferAllocateInfo{
+                .commandPool = out->pool,
+                .level = vk::CommandBufferLevel::ePrimary,
+                .commandBufferCount = count
+            };
+            auto command_buffers = logical_device.allocateCommandBuffers(command_buffers_allocate_info);
+
+            out->command_buffers.resize(count);
+            for (size_t i = 0; i < out->command_buffers.size(); i++) {
+                out->command_buffers[i].queue = out->queue;
+                out->command_buffers[i].handle = command_buffers[i];
+                out->command_buffers[i].fence = logical_device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
+                out->command_buffers[i].semaphore = logical_device.createSemaphore({});
+            }
+            return out;
+        }
+
+        void freeCommandQueue(const Box<CommandQueue>& queue) {
+            for (u64 i = 0; i < queue->command_buffers.size(); ++i) {
+                logical_device.freeCommandBuffers(queue->pool, 1, &queue->command_buffers[i].handle);
+                logical_device.destroySemaphore(queue->command_buffers[i].semaphore);
+                logical_device.destroyFence(queue->command_buffers[i].fence);
+            }
+            logical_device.destroyCommandPool(queue->pool);
         }
 
     private:

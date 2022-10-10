@@ -74,9 +74,9 @@ add_library(VFX STATIC
     src/delegate.hpp
     src/signal.hpp
     src/swapchain.hpp
-    src/drawable.cpp
     src/drawable.hpp
-)
+    src/queue.hpp
+    src/queue.cpp)
 target_include_directories(VFX PUBLIC src)
 target_link_libraries(VFX PUBLIC
     glm

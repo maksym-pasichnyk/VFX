@@ -11,7 +11,5 @@ namespace vfx {
         Swapchain* layer{};
         Box<Texture> texture{};
         vk::Framebuffer framebuffer{};
-
-        void present(vk::CommandBuffer command_buffer, vk::Fence fence, vk::Semaphore semaphore);
     };
 }

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "context.hpp"
 #include "drawable.hpp"
 
@@ -15,8 +17,6 @@ namespace vfx {
         vk::ColorSpaceKHR colorSpace = {};
         vk::PresentModeKHR presentMode = {};
         Box<vfx::RenderPass> final_render_pass = {};
-
-        bool out_of_date = false;
 
     public:
         Swapchain(Context& context, Display& display) : context(context) {
@@ -165,9 +165,8 @@ namespace vfx {
 
     public:
         void rebuild() {
-            out_of_date = false;
-
             context.logical_device.waitIdle();
+
             destroy_drawables();
             destroy_swapchain();
             create_swapchain();
@@ -186,11 +185,11 @@ namespace vfx {
                 fence,
                 &index
             );
-            context.logical_device.waitForFences(1, &fence, true, std::numeric_limits<uint64_t>::max());
+            std::ignore = context.logical_device.waitForFences(1, &fence, true, std::numeric_limits<uint64_t>::max());
             context.logical_device.destroyFence(fence);
 
             if (result == vk::Result::eErrorOutOfDateKHR) {
-                out_of_date = true;
+//                rebuild();
             } else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
                 throw std::runtime_error("failed to acquire swapchain image");
             }

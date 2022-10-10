@@ -1,11 +1,10 @@
 #include <map>
 
+#include "queue.hpp"
 #include "widgets.hpp"
 #include "display.hpp"
 #include "renderer.hpp"
 
-// todo: get rid of current frame
-// todo: recycle fences, command buffers, semaphores
 struct Demo {
     Box<Display> display{};
     Box<vfx::Context> context{};
@@ -14,14 +13,7 @@ struct Demo {
     Box<Renderer> renderer{};
     Box<Widgets> widgets{};
 
-    u64 current_frame = 0;
-
-    std::vector<vk::Fence> fences{};
-    std::vector<vk::Semaphore> semaphores{};
-
-    vk::CommandPool graphics_command_pool{};
-    std::vector<vk::CommandBuffer> graphics_command_buffers{};
-
+    Box<vfx::CommandQueue> graphics_command_queue{};
     Box<vfx::Material> present_swapchain_material{};
 
     Demo() {
@@ -47,13 +39,14 @@ struct Demo {
 
         widgets = Box<Widgets>::alloc(*context, *display, *renderer);
 
-        create_gpu_objects();
+        graphics_command_queue = context->makeCommandQueue(16);
+
         create_present_swapchain_material();
     }
 
     ~Demo() {
         context->freeMaterial(present_swapchain_material);
-        destroy_gpu_objects();
+        context->freeCommandQueue(graphics_command_queue);
     }
 
     void run() {
@@ -71,14 +64,11 @@ struct Demo {
     }
 
     void draw() {
-        context->logical_device.waitForFences(fences[current_frame], true, std::numeric_limits<uint64_t>::max());
-        context->logical_device.resetFences(fences[current_frame]);
+        auto cmd = graphics_command_queue->makeCommandBuffer();
+        cmd->handle.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
-        auto cmd = graphics_command_buffers[current_frame];
-        cmd.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-
-        renderer->begin_rendering(cmd);
-        renderer->draw(cmd);
+        renderer->begin_rendering(cmd->handle);
+        renderer->draw(cmd->handle);
 
         widgets->begin_frame();
         ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -88,27 +78,21 @@ struct Demo {
         ImGui::End();
         widgets->end_frame();
 
-        widgets->draw(cmd);
-        renderer->end_rendering(cmd);
+        widgets->draw(cmd->handle);
+        renderer->end_rendering(cmd->handle);
 
         auto drawable = swapchain->nextDrawable();
-        final_render_pass(cmd, drawable);
-        cmd.end();
+        final_render_pass(cmd->handle, drawable);
+        cmd->handle.end();
+        cmd->submit();
+        cmd->present(drawable);
 
-        drawable->present(
-            cmd,
-            fences[current_frame],
-            semaphores[current_frame]
-        );
+        if (swapchain->drawableSize != renderer->drawableSize) {
+            context->logical_device.waitIdle();
 
-        if (swapchain->out_of_date) {
-            swapchain->rebuild();
             renderer->setDrawableSize(swapchain->drawableSize);
-
             update_descriptors();
         }
-
-        current_frame = (current_frame + 1) % vfx::Context::MAX_FRAMES_IN_FLIGHT;
     }
 
     void final_render_pass(vk::CommandBuffer cmd, vfx::Drawable* drawable) {
@@ -140,37 +124,6 @@ struct Demo {
         cmd.draw(6, 1, 0, 0);
 
         cmd.endRenderPass();
-    }
-
-    void create_gpu_objects() {
-        const auto pool_create_info = vk::CommandPoolCreateInfo {
-            .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-            .queueFamilyIndex = context->graphics_family
-        };
-        graphics_command_pool = context->logical_device.createCommandPool(pool_create_info);
-
-        const auto command_buffers_allocate_info = vk::CommandBufferAllocateInfo{
-            .commandPool = graphics_command_pool,
-            .level = vk::CommandBufferLevel::ePrimary,
-            .commandBufferCount = vfx::Context::MAX_FRAMES_IN_FLIGHT
-        };
-        graphics_command_buffers = context->logical_device.allocateCommandBuffers(command_buffers_allocate_info);
-
-        fences.resize(vfx::Context::MAX_FRAMES_IN_FLIGHT);
-        semaphores.resize(vfx::Context::MAX_FRAMES_IN_FLIGHT);
-        for (u32 i = 0; i < vfx::Context::MAX_FRAMES_IN_FLIGHT; i++) {
-            fences[i] = context->logical_device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
-            semaphores[i] = context->logical_device.createSemaphore({});
-        }
-    }
-
-    void destroy_gpu_objects() {
-        for (u64 i = 0; i < vfx::Context::MAX_FRAMES_IN_FLIGHT; i++) {
-            context->logical_device.destroyFence(fences[i]);
-            context->logical_device.destroySemaphore(semaphores[i]);
-        }
-        context->logical_device.freeCommandBuffers(graphics_command_pool, graphics_command_buffers);
-        context->logical_device.destroyCommandPool(graphics_command_pool);
     }
 
     void create_present_swapchain_material() {
