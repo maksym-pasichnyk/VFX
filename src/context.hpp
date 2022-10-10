@@ -716,23 +716,36 @@ namespace vfx {
                 .level = vk::CommandBufferLevel::ePrimary,
                 .commandBufferCount = count
             };
-            auto command_buffers = logical_device.allocateCommandBuffers(command_buffers_allocate_info);
+            out->handles = logical_device.allocateCommandBuffers(command_buffers_allocate_info);
 
-            out->command_buffers.resize(count);
-            for (size_t i = 0; i < out->command_buffers.size(); i++) {
-                out->command_buffers[i].queue = out->queue;
-                out->command_buffers[i].handle = command_buffers[i];
-                out->command_buffers[i].fence = logical_device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
-                out->command_buffers[i].semaphore = logical_device.createSemaphore({});
+            out->list.resize(count);
+            out->fences.resize(count);
+            out->semaphores.resize(count);
+            for (size_t i = 0; i < count; ++i) {
+                vk::FenceCreateInfo fence_create_info{};
+                fence_create_info.setFlags(vk::FenceCreateFlagBits::eSignaled);
+                out->fences[i] = logical_device.createFence(fence_create_info);
+
+                vk::SemaphoreCreateInfo semaphore_create_info{};
+                out->semaphores[i] = logical_device.createSemaphore(semaphore_create_info);
+
+                out->list[i].queue = out->queue;
+                out->list[i].fence = out->fences[i];
+                out->list[i].handle = out->handles[i];
+                out->list[i].semaphore = out->semaphores[i];
             }
             return out;
         }
 
         void freeCommandQueue(const Box<CommandQueue>& queue) {
-            for (u64 i = 0; i < queue->command_buffers.size(); ++i) {
-                logical_device.freeCommandBuffers(queue->pool, 1, &queue->command_buffers[i].handle);
-                logical_device.destroySemaphore(queue->command_buffers[i].semaphore);
-                logical_device.destroyFence(queue->command_buffers[i].fence);
+            logical_device.freeCommandBuffers(queue->pool, queue->handles);
+
+            for (auto& semaphore : queue->semaphores) {
+                logical_device.destroySemaphore(semaphore);
+            }
+
+            for (auto& fence : queue->fences) {
+                logical_device.destroyFence(fence);
             }
             logical_device.destroyCommandPool(queue->pool);
         }
