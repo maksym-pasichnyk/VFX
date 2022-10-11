@@ -1,7 +1,8 @@
 #pragma once
 
+#include "types.hpp"
+
 #include <vector>
-#include <types.hpp>
 #include <tl/optional.hpp>
 #include <vulkan/vulkan.hpp>
 

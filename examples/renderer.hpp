@@ -2,7 +2,9 @@
 
 #include "camera.hpp"
 #include "assets.hpp"
+#include "texture.hpp"
 #include "context.hpp"
+#include "material.hpp"
 #include "swapchain.hpp"
 
 struct Globals {

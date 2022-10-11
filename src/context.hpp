@@ -1,22 +1,10 @@
 #pragma once
 
-#include <list>
-#include <glm/vec4.hpp>
-#include <GLFW/glfw3.h>
+#include "types.hpp"
+
 #include <vk_mem_alloc.h>
-#include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_beta.h>
-
-#include "pass.hpp"
-#include "mesh.hpp"
-#include "queue.hpp"
-#include "types.hpp"
-#include "buffer.hpp"
-#include "display.hpp"
-#include "texture.hpp"
-#include "material.hpp"
-#include "spirv_reflect.h"
 
 namespace vfx {
     struct ContextDescription {
@@ -28,6 +16,17 @@ namespace vfx {
         bool enable_debug = false;
     };
 
+    enum class BufferUsage;
+
+    struct Mesh;
+    struct Buffer;
+    struct Texture;
+    struct RenderPass;
+    struct CommandQueue;
+    struct PipelineState;
+    struct TextureDescription;
+    struct RenderPassDescription;
+    struct PipelineStateDescription;
     struct Context {
     public:
         static constexpr auto MAX_FRAMES_IN_FLIGHT = 3u;

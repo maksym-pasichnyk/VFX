@@ -1,12 +1,10 @@
 #pragma once
 
 #include "types.hpp"
-#include "buffer.hpp"
 
 #include <span>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
-
 #include <vulkan/vulkan.hpp>
 
 namespace vfx {

@@ -1,8 +1,10 @@
 #pragma once
 
 #include "pass.hpp"
+#include "mesh.hpp"
+#include "buffer.hpp"
 #include "assets.hpp"
-#include "display.hpp"
+#include "window.hpp"
 #include "context.hpp"
 #include "renderer.hpp"
 #include "material.hpp"
@@ -12,7 +14,7 @@
 #include "backends/imgui_impl_glfw.cpp"
 
 struct Widgets {
-    Widgets(vfx::Context& context, Display& display, Renderer& renderer) : context(context) {
+    Widgets(vfx::Context& context, vfx::Window& window, Renderer& renderer) : context(context) {
         IMGUI_CHECKVERSION();
         ctx = ImGui::CreateContext();
 
@@ -23,7 +25,7 @@ struct Widgets {
         ctx->IO.BackendPlatformName = "imgui_impl_glfw";
         ctx->IO.BackendRendererName = "imgui_impl_vulkan";
 
-        ImGui_ImplGlfw_InitForVulkan(display.window, true);
+        ImGui_ImplGlfw_InitForVulkan(window.getHandle(), true);
 
         ImGui::StyleColorsDark(&ctx->Style);
 

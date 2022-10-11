@@ -1,25 +1,37 @@
 #pragma once
 
-#include "context.hpp"
-#include "drawable.hpp"
+#include "types.hpp"
+
+#include <vulkan/vulkan.hpp>
 
 namespace vfx {
+    struct Window;
+    struct Context;
+    struct Drawable;
+    struct RenderPass;
+    struct CommandBuffer;
     struct Swapchain {
-    public:
+        friend Window;
+        friend Context;
+        friend Drawable;
+        friend CommandBuffer;
+
+    private:
         Context& context;
 
-        vk::SurfaceKHR surface{};
-        vk::SwapchainKHR swapchain{};
+        vk::SurfaceKHR surface;
+        vk::SwapchainKHR handle{};
+
+        Arc<RenderPass> renderPass = {};
         std::vector<Arc<Drawable>> drawables{};
 
         vk::Format pixelFormat = {};
         vk::Extent2D drawableSize = {};
         vk::ColorSpaceKHR colorSpace = {};
         vk::PresentModeKHR presentMode = {};
-        Arc<vfx::RenderPass> renderPass = {};
 
     public:
-        Swapchain(Context& context, Display& display);
+        Swapchain(Context& context, vk::SurfaceKHR surface);
         ~Swapchain();
 
     private:
@@ -32,5 +44,9 @@ namespace vfx {
     public:
         void rebuild();
         auto nextDrawable() -> Drawable*;
+
+        auto getPixelFormat() -> vk::Format;
+        auto getDrawableSize() -> vk::Extent2D;
+        auto getDefaultRenderPass() -> const Arc<RenderPass>&;
     };
 }

@@ -1,6 +1,11 @@
 #include "queue.hpp"
+#include "pass.hpp"
+#include "context.hpp"
+#include "material.hpp"
 #include "drawable.hpp"
 #include "swapchain.hpp"
+
+#include "spdlog/spdlog.h"
 
 void vfx::CommandBuffer::clear() {
     for (auto& [_, pipeline] : pipelines) {
@@ -90,12 +95,13 @@ void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
     auto present_info = vk::PresentInfoKHR{};
     present_info.setWaitSemaphores(semaphore);
     present_info.setSwapchainCount(1);
-    present_info.setPSwapchains(&drawable->layer->swapchain);
+    present_info.setPSwapchains(&drawable->layer->handle);
     present_info.setPImageIndices(&drawable->index);
 
     vk::Result result = drawable->layer->context.present_queue.presentKHR(present_info);
 
     if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+        // todo: move to window
         drawable->layer->rebuild();
     } else if (result != vk::Result::eSuccess) {
         throw std::runtime_error("failed to present swapchain image");

@@ -1,8 +1,9 @@
 #pragma once
 
-#include "pass.hpp"
-#include "material.hpp"
+#include "types.hpp"
 
+#include <map>
+#include <tuple>
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
@@ -10,6 +11,7 @@ namespace vfx {
     struct Context;
     struct Drawable;
     struct CommandQueue;
+    struct PipelineState;
     struct CommandBuffer final {
         friend CommandQueue;
 

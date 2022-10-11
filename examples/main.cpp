@@ -1,13 +1,19 @@
-#include <map>
+#include <vector>
 
 #include "queue.hpp"
+#include "window.hpp"
 #include "widgets.hpp"
-#include "display.hpp"
+#include "drawable.hpp"
 #include "renderer.hpp"
 
+#include "GLFW/glfw3.h"
+#include "spdlog/spdlog.h"
+
 struct Demo {
-    Arc<Display> display{};
+    Arc<vfx::WindowController> controller{};
+
     Arc<vfx::Context> context{};
+    Arc<vfx::Window> window{};
     Arc<vfx::Swapchain> swapchain{};
 
     Arc<Renderer> renderer{};
@@ -21,7 +27,7 @@ struct Demo {
     std::vector<vk::DescriptorSet> descriptor_sets{};
 
     Demo() {
-        display = Arc<Display>::alloc(800, 600, "Demo", true);
+        controller = Arc<vfx::WindowController>::alloc();
         context = Arc<vfx::Context>::alloc(vfx::ContextDescription{
             .app_name = "Demo",
             .flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR,
@@ -37,11 +43,17 @@ struct Demo {
             },
             .enable_debug = true
         });
-        swapchain = Box<vfx::Swapchain>::alloc(*context, *display);
-        renderer = Box<Renderer>::alloc(*context, swapchain->pixelFormat);
-        renderer->setDrawableSize(swapchain->drawableSize);
+        window = Arc<vfx::Window>::alloc(controller, *context, vfx::WindowDescription{
+            .title = "Demo",
+            .width = 800,
+            .height = 600,
+            .resizable = true,
+        });
+        swapchain = window->getSwapchain();
+        renderer = Box<Renderer>::alloc(*context, swapchain->getPixelFormat());
+        renderer->setDrawableSize(swapchain->getDrawableSize());
 
-        widgets = Box<Widgets>::alloc(*context, *display, *renderer);
+        widgets = Box<Widgets>::alloc(*context, *window, *renderer);
 
         graphics_command_queue = context->makeCommandQueue(16);
 
@@ -56,14 +68,22 @@ struct Demo {
 
     void run() {
         f64 time = glfwGetTime();
-        while (!display->should_close()) {
+        while (!window->windowShouldClose()) {
             f64 now = glfwGetTime();
             f32 dt = f32(now - time);
             time = now;
 
-            display->poll_events();
+            controller->pollEvents();
 
             draw();
+
+            // todo: move to window resize event
+            if (swapchain->getDrawableSize() != renderer->drawableSize) {
+                context->logical_device.waitIdle();
+
+                renderer->setDrawableSize(swapchain->getDrawableSize());
+                update_descriptors();
+            }
         }
         context->logical_device.waitIdle();
     }
@@ -91,13 +111,6 @@ struct Demo {
         cmd->handle.end();
         cmd->submit();
         cmd->present(drawable);
-
-        if (swapchain->drawableSize != renderer->drawableSize) {
-            context->logical_device.waitIdle();
-
-            renderer->setDrawableSize(swapchain->drawableSize);
-            update_descriptors();
-        }
     }
 
     void final_render_pass(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
@@ -109,7 +122,7 @@ struct Demo {
         render_area.setExtent(drawable->texture->size);
 
         auto begin_info = vk::RenderPassBeginInfo{};
-        begin_info.setRenderPass(swapchain->renderPass->handle);
+        begin_info.setRenderPass(swapchain->getDefaultRenderPass()->handle);
         begin_info.setFramebuffer(drawable->framebuffer);
         begin_info.setRenderArea(render_area);
         begin_info.setClearValues(clear_values);

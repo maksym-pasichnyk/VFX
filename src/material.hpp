@@ -1,8 +1,9 @@
 #pragma once
 
+#include "types.hpp"
+
 #include <map>
 #include <vector>
-#include <types.hpp>
 
 namespace vfx {
     struct ShaderDescription {

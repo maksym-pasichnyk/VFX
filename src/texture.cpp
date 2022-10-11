@@ -1,6 +1,7 @@
 #include "texture.hpp"
 #include "context.hpp"
 #include "buffer.hpp"
+#include "queue.hpp"
 
 void vfx::Texture::setPixelData(std::span<const glm::u8vec4> pixels) {
     auto tmp = context->makeBuffer(BufferUsage::CopySrc, pixels.size_bytes());

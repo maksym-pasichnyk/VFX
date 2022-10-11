@@ -1,5 +1,17 @@
 #include "context.hpp"
 
+#include "pass.hpp"
+#include "mesh.hpp"
+#include "queue.hpp"
+#include "types.hpp"
+#include "buffer.hpp"
+#include "texture.hpp"
+#include "material.hpp"
+
+#include "GLFW/glfw3.h"
+#include "spdlog/spdlog.h"
+#include "spirv_reflect.h"
+
 namespace vfx {
     inline constexpr auto get_buffer_usage_from_target(BufferUsage target) -> vk::BufferUsageFlags {
         using Type = std::underlying_type_t<BufferUsage>;
