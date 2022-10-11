@@ -40,6 +40,14 @@ namespace vfx {
         PipelineColorBlendAttachmentStateArray attachments = {};
     };
 
+    struct PipelineState {
+        MaterialDescription description{};
+        std::vector<vk::ShaderModule> modules{};
+
+        vk::PipelineLayout pipelineLayout{};
+        std::vector<vk::DescriptorSetLayout> descriptorSetLayouts{};
+    };
+
     struct Material {
         vk::Pipeline pipeline;
         vk::PipelineLayout pipeline_layout;

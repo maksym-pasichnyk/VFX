@@ -250,7 +250,7 @@ namespace vfx {
         }
 
     public:
-        auto makeRenderPass(const RenderPassDescription& description) -> Box<RenderPass> {
+        auto makeRenderPass(const RenderPassDescription& description) -> Arc<RenderPass> {
             std::vector<vk::SubpassDescription> subpasses{};
             subpasses.resize(description.definitions.size());
 
@@ -284,11 +284,11 @@ namespace vfx {
             return out;
         }
 
-        void freeRenderPass(const Box<RenderPass>& pass) {
+        void freeRenderPass(const Arc<RenderPass>& pass) {
             logical_device.destroyRenderPass(pass->handle);
         }
 
-        auto makeTexture(const TextureDescription& description) -> Box<Texture> {
+        auto makeTexture(const TextureDescription& description) -> Arc<Texture> {
             const auto image_create_info = static_cast<VkImageCreateInfo>(vk::ImageCreateInfo{
                 .imageType = vk::ImageType::e2D,
                 .format = description.format,
@@ -333,14 +333,14 @@ namespace vfx {
             return out;
         }
 
-        auto freeTexture(const Box<Texture>& texture) {
+        auto freeTexture(const Arc<Texture>& texture) {
             logical_device.destroyImageView(texture->view);
             if (texture->allocation != nullptr) {
                 vmaDestroyImage(allocator, texture->image, texture->allocation);
             }
         }
 
-        auto makeBuffer(BufferUsage target, u64 size) -> Box<Buffer> {
+        auto makeBuffer(BufferUsage target, u64 size) -> Arc<Buffer> {
             const auto buffer_create_info = static_cast<VkBufferCreateInfo>(vk::BufferCreateInfo {
                 .size = static_cast<vk::DeviceSize>(size),
                 .usage = get_buffer_usage_from_target(target)
@@ -371,17 +371,17 @@ namespace vfx {
             return out;
         }
 
-        void freeBuffer(const Box<Buffer>& buffer) {
+        void freeBuffer(const Arc<Buffer>& buffer) {
             vmaDestroyBuffer(allocator, buffer->handle, buffer->allocation);
         }
 
-        auto makeMesh() -> Box<Mesh> {
+        auto makeMesh() -> Arc<Mesh> {
             auto out = Box<Mesh>::alloc();
             out->context = this;
             return out;
         }
 
-        void freeMesh(const Box<Mesh>& mesh) {
+        void freeMesh(const Arc<Mesh>& mesh) {
             if (mesh->vertexBuffer) {
                 freeBuffer(mesh->vertexBuffer);
             }
@@ -390,7 +390,7 @@ namespace vfx {
             }
         }
 
-        auto makeMaterial(const MaterialDescription& description, const Box<RenderPass>& pass, u32 subpass) -> Box<Material> {
+        auto makeMaterial(const MaterialDescription& description, const Arc<RenderPass>& pass, u32 subpass) -> Arc<Material> {
             auto out = Box<Material>::alloc();
 //            out->pipeline_bind_point = vk::PipelineBindPoint::eGraphics;
 
@@ -557,7 +557,7 @@ namespace vfx {
             return out;
         }
 
-        void freeMaterial(const Box<Material>& material) {
+        void freeMaterial(const Arc<Material>& material) {
             logical_device.destroyPipeline(material->pipeline);
             logical_device.destroyPipelineLayout(material->pipeline_layout);
 
@@ -570,7 +570,104 @@ namespace vfx {
             }
         }
 
-        auto makeCommandQueue(u32 count) -> Box<CommandQueue> {
+        auto makePipelineState(const MaterialDescription& description) -> Arc<PipelineState> {
+            auto out = Box<PipelineState>::alloc();
+            out->description = description;
+
+            struct DescriptorSetLayoutDescription {
+                std::vector<vk::DescriptorSetLayoutBinding> bindings{};
+            };
+
+            std::map<u32, DescriptorSetLayoutDescription> descriptor_set_layouts_table{};
+
+            i32 maxSet = -1;
+            std::map<vk::DescriptorType, u32> descriptor_set_bindings_table{};
+            std::vector<vk::PushConstantRange> constant_ranges{};
+
+            out->modules.reserve(description.shaders.size());
+            for (auto& stage : description.shaders) {
+                out->modules.emplace_back(create_shader_module(stage.bytes));
+
+                SpvReflectShaderModule spv_module{};
+                spvReflectCreateShaderModule(stage.bytes.size(), stage.bytes.data(), &spv_module);
+
+                auto stage_flags = vk::ShaderStageFlagBits(spv_module.shader_stage);
+
+                auto refl_constant_blocks = std::span(
+                    spv_module.push_constant_blocks,
+                    spv_module.push_constant_block_count
+                );
+
+                constant_ranges.reserve(refl_constant_blocks.size());
+                for (auto& refl_block : refl_constant_blocks) {
+                    auto& constant_range = constant_ranges.emplace_back();
+
+                    constant_range.setSize(refl_block.size);
+                    constant_range.setOffset(refl_block.offset);
+                    constant_range.setStageFlags(stage_flags);
+                }
+
+                auto refl_descriptor_sets = std::span(
+                    spv_module.descriptor_sets,
+                    spv_module.descriptor_set_count
+                );
+
+                for (auto& refl_set : refl_descriptor_sets) {
+                    maxSet = std::max(maxSet, i32(refl_set.set));
+
+                    auto refl_descriptor_bindings = std::span(
+                        refl_set.bindings,
+                        refl_set.binding_count
+                    );
+
+                    for (auto& refl_binding : refl_descriptor_bindings) {
+                        auto binding = vk::DescriptorSetLayoutBinding{
+                            .binding = refl_binding->binding,
+                            .descriptorType = vk::DescriptorType(refl_binding->descriptor_type),
+                            .descriptorCount = refl_binding->count,
+                            .stageFlags = stage_flags,
+                            .pImmutableSamplers = nullptr
+                        };
+                        descriptor_set_layouts_table[refl_set.set].bindings.emplace_back(binding);
+                        descriptor_set_bindings_table[binding.descriptorType] += Context::MAX_FRAMES_IN_FLIGHT;
+                    }
+                }
+
+                spvReflectDestroyShaderModule(&spv_module);
+            }
+
+            /*create descriptor set layouts*/ {
+                out->descriptorSetLayouts.resize(maxSet + 1);
+                for (u32 i = 0; i < out->descriptorSetLayouts.size(); ++i) {
+                    auto dsl_create_info = vk::DescriptorSetLayoutCreateInfo{};
+                    dsl_create_info.setBindings(descriptor_set_layouts_table[i].bindings);
+                    out->descriptorSetLayouts[i] = logical_device.createDescriptorSetLayout(dsl_create_info);
+                }
+            }
+
+            /*create pipeline layout*/ {
+                auto pipeline_layout_create_info = vk::PipelineLayoutCreateInfo{};
+                pipeline_layout_create_info.setSetLayouts(out->descriptorSetLayouts);
+                pipeline_layout_create_info.setPushConstantRanges(constant_ranges);
+                out->pipelineLayout = logical_device.createPipelineLayout(pipeline_layout_create_info);
+            }
+
+            return out;
+        }
+
+        void freePipelineState(const Arc<PipelineState>& pipelineState) {
+            logical_device.destroyPipelineLayout(pipelineState->pipelineLayout);
+
+            for (auto& module : pipelineState->modules) {
+                logical_device.destroyShaderModule(module);
+            }
+
+            for (auto& layout : pipelineState->descriptorSetLayouts) {
+                logical_device.destroyDescriptorSetLayout(layout);
+            }
+        }
+
+        auto makeCommandQueue(u32 count) -> Arc<CommandQueue> {
             auto out = Box<CommandQueue>::alloc();
             const auto pool_create_info = vk::CommandPoolCreateInfo {
                 .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -598,7 +695,7 @@ namespace vfx {
                 vk::SemaphoreCreateInfo semaphore_create_info{};
                 out->semaphores[i] = logical_device.createSemaphore(semaphore_create_info);
 
-                out->list[i].queue = out->queue;
+                out->list[i].owner = out.get();
                 out->list[i].fence = out->fences[i];
                 out->list[i].handle = out->handles[i];
                 out->list[i].semaphore = out->semaphores[i];
@@ -606,7 +703,9 @@ namespace vfx {
             return out;
         }
 
-        void freeCommandQueue(const Box<CommandQueue>& queue) {
+        void freeCommandQueue(const Arc<CommandQueue>& queue) {
+            queue->clearCommandBuffers();
+
             logical_device.freeCommandBuffers(queue->pool, queue->handles);
 
             for (auto& semaphore : queue->semaphores) {

@@ -9,7 +9,7 @@ namespace vfx {
     struct Drawable {
         u32 index{};
         Swapchain* layer{};
-        Box<Texture> texture{};
+        Arc<Texture> texture{};
         vk::Framebuffer framebuffer{};
     };
 }

@@ -16,7 +16,7 @@ namespace vfx {
         vk::Extent2D drawableSize = {};
         vk::ColorSpaceKHR colorSpace = {};
         vk::PresentModeKHR presentMode = {};
-        Box<vfx::RenderPass> renderPass = {};
+        Arc<vfx::RenderPass> renderPass = {};
 
     public:
         Swapchain(Context& context, Display& display);

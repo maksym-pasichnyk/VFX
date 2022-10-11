@@ -19,12 +19,12 @@ struct Renderer {
     vk::Sampler sampler{};
     vk::Extent2D drawableSize{};
     vk::Framebuffer framebuffer{};
-    
-    Box<vfx::Texture> color_texture{};
-    Box<vfx::Texture> depth_texture{};
 
-    Box<vfx::Material> material{};
-    Box<vfx::RenderPass> render_pass{};
+    Arc<vfx::Texture> colorAttachmentTexture{};
+    Arc<vfx::Texture> depthAttachmentTexture{};
+
+    Arc<vfx::RenderPass> renderPass{};
+    Arc<vfx::PipelineState> pipelineState{};
 
     Globals globals{};
 
@@ -42,8 +42,8 @@ struct Renderer {
         };
         sampler = context.logical_device.createSampler(sampler_description);
 
-        create_render_pass();
-        create_material();
+        createRenderPass();
+        createPipelineState();
     }
 
     ~Renderer() {
@@ -52,15 +52,15 @@ struct Renderer {
         if (framebuffer) {
             context.logical_device.destroyFramebuffer(framebuffer);
         }
-        if (depth_texture) {
-            context.freeTexture(depth_texture);
+        if (depthAttachmentTexture) {
+            context.freeTexture(depthAttachmentTexture);
         }
-        if (color_texture) {
-            context.freeTexture(color_texture);
+        if (colorAttachmentTexture) {
+            context.freeTexture(colorAttachmentTexture);
         }
 
-        context.freeRenderPass(render_pass);
-        context.freeMaterial(material);
+        context.freePipelineState(pipelineState);
+        context.freeRenderPass(renderPass);
     }
 
     void setDrawableSize(const vk::Extent2D& size) {
@@ -70,11 +70,11 @@ struct Renderer {
         if (framebuffer) {
             context.logical_device.destroyFramebuffer(framebuffer);
         }
-        if (depth_texture) {
-            context.freeTexture(depth_texture);
+        if (depthAttachmentTexture) {
+            context.freeTexture(depthAttachmentTexture);
         }
-        if (color_texture) {
-            context.freeTexture(color_texture);
+        if (colorAttachmentTexture) {
+            context.freeTexture(colorAttachmentTexture);
         }
 
         auto color_texture_description = vfx::TextureDescription{
@@ -84,7 +84,7 @@ struct Renderer {
             .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
             .aspect = vk::ImageAspectFlagBits::eColor
         };
-        color_texture = context.makeTexture(color_texture_description);
+        colorAttachmentTexture = context.makeTexture(color_texture_description);
 
         auto depth_texture_description = vfx::TextureDescription{
             .format = depth_format,
@@ -93,15 +93,15 @@ struct Renderer {
             .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
             .aspect = vk::ImageAspectFlagBits::eDepth
         };
-        depth_texture = context.makeTexture(depth_texture_description);
+        depthAttachmentTexture = context.makeTexture(depth_texture_description);
 
         auto attachments = std::array{
-            color_texture->view,
-            depth_texture->view
+            colorAttachmentTexture->view,
+            depthAttachmentTexture->view
         };
 
         vk::FramebufferCreateInfo fb_create_info{};
-        fb_create_info.setRenderPass(render_pass->handle);
+        fb_create_info.setRenderPass(renderPass->handle);
         fb_create_info.setAttachments(attachments);
         fb_create_info.setWidth(size.width);
         fb_create_info.setHeight(size.height);
@@ -110,7 +110,7 @@ struct Renderer {
         framebuffer = context.logical_device.createFramebuffer(fb_create_info);
     }
 
-    void create_render_pass() {
+    void createRenderPass() {
         vfx::RenderPassDescription pass_description{};
         pass_description.definitions = {
             vfx::SubpassDescription{
@@ -138,10 +138,10 @@ struct Renderer {
         pass_description.attachments[1].initialLayout = vk::ImageLayout::eUndefined;
         pass_description.attachments[1].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-        render_pass = context.makeRenderPass(pass_description);
+        renderPass = context.makeRenderPass(pass_description);
     }
 
-    void create_material() {
+    void createPipelineState() {
         vfx::MaterialDescription description{};
 
         description.attachments[0].blendEnable = false;
@@ -185,11 +185,10 @@ struct Renderer {
             .entry = "main",
             .stage  = vk::ShaderStageFlagBits::eFragment,
         });
-
-        material = context.makeMaterial(description, render_pass, 0);
+        pipelineState = context.makePipelineState(description);
     }
 
-    void begin_rendering(vk::CommandBuffer cmd) {
+    void beginRendering(vfx::CommandBuffer* cmd) {
         auto clear_values = std::array{
             vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({0.0f, 0.0f, 0.0f, 0.0f})),
             vk::ClearValue{}.setDepthStencil(vk::ClearDepthStencilValue{1.0f, 0})
@@ -200,7 +199,7 @@ struct Renderer {
         area.setExtent(drawableSize);
 
         auto begin_info = vk::RenderPassBeginInfo{};
-        begin_info.setRenderPass(render_pass->handle);
+        begin_info.setRenderPass(renderPass->handle);
         begin_info.setFramebuffer(framebuffer);
         begin_info.setRenderArea(area);
         begin_info.setClearValues(clear_values);
@@ -210,18 +209,18 @@ struct Renderer {
         viewport.setHeight(f32(drawableSize.height));
         viewport.setMaxDepth(1.f);
 
-        cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
-        cmd.setViewport(0, viewport);
-        cmd.setScissor(0, area);
+        cmd->beginRenderPass(begin_info, vk::SubpassContents::eInline);
+        cmd->handle.setViewport(0, viewport);
+        cmd->handle.setScissor(0, area);
     }
 
-    void end_rendering(vk::CommandBuffer cmd) {
-        cmd.endRenderPass();
+    void endRendering(vfx::CommandBuffer* cmd) {
+        cmd->endRenderPass();
     }
 
-    void draw(vk::CommandBuffer cmd) {
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, material->pipeline);
-        cmd.pushConstants(material->pipeline_layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
-        cmd.draw(6, 1, 0, 0);
+    void draw(vfx::CommandBuffer* cmd) {
+        cmd->setPipelineState(pipelineState);
+        cmd->handle.pushConstants(pipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
+        cmd->draw(6, 1, 0, 0);
     }
 };

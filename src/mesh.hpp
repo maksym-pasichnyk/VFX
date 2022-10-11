@@ -26,8 +26,8 @@ namespace vfx {
         i32 vertexCount = 0;
         u64 vertexStride = 0;
 
-        Box<vfx::Buffer> indexBuffer{};
-        Box<vfx::Buffer> vertexBuffer{};
+        Arc<vfx::Buffer> indexBuffer{};
+        Arc<vfx::Buffer> vertexBuffer{};
 
         void setIndexBufferData(const void* src, u64 size, u64 offset);
         void setVertexBufferData(const void* src, u64 size, u64 offset);

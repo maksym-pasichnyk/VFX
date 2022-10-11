@@ -95,7 +95,7 @@ struct Widgets {
             .entry = "main",
             .stage = vk::ShaderStageFlagBits::eFragment
         });
-        font_material = context.makeMaterial(description, renderer.render_pass, 0);
+        font_material = context.makeMaterial(description, renderer.renderPass, 0);
 
         const auto image_info = vk::DescriptorImageInfo{
             .sampler = font_sampler,
@@ -250,7 +250,7 @@ struct Widgets {
         ctx->IO.Fonts->SetTexID(font_texture.get());
     }
 
-    void setup_render_state(ImDrawData* draw_data, vk::CommandBuffer cmd, Box<vfx::Mesh>& mesh, i32 fb_width, i32 fb_height) {
+    void setup_render_state(ImDrawData* draw_data, vk::CommandBuffer cmd, Arc<vfx::Mesh>& mesh, i32 fb_width, i32 fb_height) {
         if (draw_data->TotalVtxCount > 0) {
             cmd.bindVertexBuffers(0, mesh->vertexBuffer->handle, vk::DeviceSize{0});
             cmd.bindIndexBuffer(mesh->indexBuffer->handle, 0, vk::IndexType::eUint16);
@@ -280,7 +280,7 @@ struct Widgets {
     ImGuiContext* ctx;
     u64 current_frame = 0;
     vk::Sampler font_sampler;
-    Box<vfx::Texture> font_texture;
-    Box<vfx::Material> font_material;
-    std::array<Box<vfx::Mesh>, vfx::Context::MAX_FRAMES_IN_FLIGHT> frames{};
+    Arc<vfx::Texture> font_texture;
+    Arc<vfx::Material> font_material;
+    std::array<Arc<vfx::Mesh>, vfx::Context::MAX_FRAMES_IN_FLIGHT> frames{};
 };

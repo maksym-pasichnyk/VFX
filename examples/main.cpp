@@ -6,19 +6,19 @@
 #include "renderer.hpp"
 
 struct Demo {
-    Box<Display> display{};
-    Box<vfx::Context> context{};
-    Box<vfx::Swapchain> swapchain{};
+    Arc<Display> display{};
+    Arc<vfx::Context> context{};
+    Arc<vfx::Swapchain> swapchain{};
 
-    Box<Renderer> renderer{};
-    Box<Widgets> widgets{};
+    Arc<Renderer> renderer{};
+    Arc<Widgets> widgets{};
 
-    Box<vfx::CommandQueue> graphics_command_queue{};
-    Box<vfx::Material> present_swapchain_material{};
+    Arc<vfx::CommandQueue> graphics_command_queue{};
+    Arc<vfx::Material> present_swapchain_material{};
 
     Demo() {
-        display = Box<Display>::alloc(800, 600, "Demo", true);
-        context = Box<vfx::Context>::alloc(vfx::ContextDescription{
+        display = Arc<Display>::alloc(800, 600, "Demo", true);
+        context = Arc<vfx::Context>::alloc(vfx::ContextDescription{
             .app_name = "Demo",
             .flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR,
             .layers = {
@@ -67,8 +67,8 @@ struct Demo {
         auto cmd = graphics_command_queue->makeCommandBuffer();
         cmd->handle.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
-        renderer->begin_rendering(cmd->handle);
-        renderer->draw(cmd->handle);
+        renderer->beginRendering(cmd);
+        renderer->draw(cmd);
 
         widgets->begin_frame();
         ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -79,7 +79,7 @@ struct Demo {
         widgets->end_frame();
 
         widgets->draw(cmd->handle);
-        renderer->end_rendering(cmd->handle);
+        renderer->endRendering(cmd);
 
         auto drawable = swapchain->nextDrawable();
         final_render_pass(cmd->handle, drawable);
@@ -178,7 +178,7 @@ struct Demo {
     void update_descriptors() {
         const auto image_info = vk::DescriptorImageInfo{
             .sampler = renderer->sampler,
-            .imageView = renderer->color_texture->view,
+            .imageView = renderer->colorAttachmentTexture->view,
             .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         };
         const auto write_descriptor_set = vk::WriteDescriptorSet{
