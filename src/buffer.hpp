@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types.hpp"
+
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 
@@ -12,9 +14,14 @@ namespace vfx {
         Constant = 1 << 4
     };
 
+    struct Context;
     struct Buffer {
-        vk::Buffer buffer{};
+        Context* context{};
+        vk::Buffer handle{};
         VmaAllocation allocation{};
-        VmaAllocationInfo allocation_info{};
+        VmaAllocationInfo allocationInfo{};
+        vk::DeviceSize allocationSize = 0;
+
+        void update(const void* src, u64 size, u64 offset);
     };
 }

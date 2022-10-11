@@ -9,6 +9,7 @@
 #include <vulkan/vulkan_beta.h>
 
 #include "pass.hpp"
+#include "mesh.hpp"
 #include "queue.hpp"
 #include "types.hpp"
 #include "buffer.hpp"
@@ -16,25 +17,6 @@
 #include "texture.hpp"
 #include "material.hpp"
 #include "spirv_reflect.h"
-
-struct DefaultVertexFormat {
-    glm::vec3 position;
-    glm::u8vec4 color;
-};
-
-struct Geometry {
-    Box<vfx::Buffer> vtx = {};
-    Box<vfx::Buffer> idx = {};
-
-    u64 vtx_buf_size = 0;
-    u64 idx_buf_size = 0;
-
-    i32 vtx_count = 0;
-    i32 idx_count = 0;
-
-    u64 vtx_stride = 0;
-    u64 idx_stride = 0;
-};
 
 namespace vfx {
     struct ContextDescription {
@@ -341,6 +323,7 @@ namespace vfx {
             auto view = logical_device.createImageView(view_create_info);
 
             auto out = Box<Texture>::alloc();
+            out->context = this;
             out->size.width = description.width;
             out->size.height = description.height;
             out->format = description.format;
@@ -357,84 +340,7 @@ namespace vfx {
             }
         }
 
-        void set_texture_data(Texture* texture, std::span<const glm::u8vec4> pixels) {
-            auto tmp = create_buffer(BufferUsage::CopySrc, static_cast<int>(pixels.size_bytes()));
-            update_buffer(tmp, pixels.data(), pixels.size_bytes(), 0);
-
-            const auto copy_barrier = vk::ImageMemoryBarrier{
-                .dstAccessMask = vk::AccessFlagBits::eTransferWrite,
-                .oldLayout = vk::ImageLayout::eUndefined,
-                .newLayout = vk::ImageLayout::eTransferDstOptimal,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = texture->image,
-                .subresourceRange = {
-                    .aspectMask = vk::ImageAspectFlagBits::eColor,
-                    .levelCount = 1,
-                    .layerCount = 1
-                }
-            };
-
-            const auto region = vk::BufferImageCopy{
-                .imageSubresource = {
-                    .aspectMask = vk::ImageAspectFlagBits::eColor,
-                    .layerCount = 1
-                },
-                .imageExtent = {
-                    .width = texture->size.width,
-                    .height = texture->size.height,
-                    .depth = 1
-                }
-            };
-
-            const auto use_barrier = vk::ImageMemoryBarrier{
-                .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
-                .dstAccessMask = vk::AccessFlagBits::eShaderRead,
-                .oldLayout = vk::ImageLayout::eTransferDstOptimal,
-                .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = texture->image,
-                .subresourceRange = {
-                    .aspectMask = vk::ImageAspectFlagBits::eColor,
-                    .levelCount = 1,
-                    .layerCount = 1
-                }
-            };
-
-            const auto pool_create_info = vk::CommandPoolCreateInfo {
-                .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-                .queueFamilyIndex = graphics_family
-            };
-            auto cmd_pool = logical_device.createCommandPool(pool_create_info);
-
-            const auto cmd_allocate_info = vk::CommandBufferAllocateInfo{
-                .commandPool = cmd_pool,
-                .level = vk::CommandBufferLevel::ePrimary,
-                .commandBufferCount = 1
-            };
-            auto cmd = logical_device.allocateCommandBuffers(cmd_allocate_info)[0];
-
-            auto fence = logical_device.createFence({});
-
-            cmd.begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-            cmd.pipelineBarrier(vk::PipelineStageFlagBits::eHost, vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, {copy_barrier});
-            cmd.copyBufferToImage(tmp->buffer, texture->image, vk::ImageLayout::eTransferDstOptimal, {region});
-            cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader, {}, {}, {}, {use_barrier});
-            cmd.end();
-
-            auto submit_info = vk::SubmitInfo{};
-            submit_info.setCommandBuffers(cmd);
-            std::ignore = graphics_queue.submit(1, &submit_info, fence);
-
-            std::ignore = logical_device.waitForFences(fence, false, std::numeric_limits<uint64_t>::max());
-            logical_device.freeCommandBuffers(cmd_pool, cmd);
-            logical_device.destroyCommandPool(cmd_pool);
-            logical_device.destroyFence(fence);
-            freeBuffer(tmp);
-        }
-
-        auto create_buffer(BufferUsage target, u64 size) -> Box<Buffer> {
+        auto makeBuffer(BufferUsage target, u64 size) -> Box<Buffer> {
             const auto buffer_create_info = static_cast<VkBufferCreateInfo>(vk::BufferCreateInfo {
                 .size = static_cast<vk::DeviceSize>(size),
                 .usage = get_buffer_usage_from_target(target)
@@ -457,68 +363,31 @@ namespace vfx {
                 &allocation_info
             );
             auto out = Box<Buffer>::alloc();
-            out->buffer = buffer;
+            out->context = this;
+            out->handle = buffer;
             out->allocation = allocation;
-            out->allocation_info = allocation_info;
+            out->allocationInfo = allocation_info;
+            out->allocationSize = size;
             return out;
         }
 
-        void freeBuffer(const Box<Buffer>& gb) {
-            vmaDestroyBuffer(allocator, gb->buffer, gb->allocation);
+        void freeBuffer(const Box<Buffer>& buffer) {
+            vmaDestroyBuffer(allocator, buffer->handle, buffer->allocation);
         }
 
-        void update_buffer(const Box<Buffer>& gb, const void* src, u64 size, u64 offset) {
-            void* ptr = nullptr;
-            vmaMapMemory(allocator, gb->allocation, &ptr);
-            auto dst = static_cast<std::byte*>(ptr) + offset;
-            memcpy(dst, src, size);
-            vmaUnmapMemory(allocator, gb->allocation);
+        auto makeMesh() -> Box<Mesh> {
+            auto out = Box<Mesh>::alloc();
+            out->context = this;
+            return out;
         }
 
-        void set_vertices(Geometry* geometry, std::span<const DefaultVertexFormat> vertices) {
-            set_vertex_buffer_params(geometry, i32(vertices.size()), sizeof(DefaultVertexFormat));
-            set_vertex_buffer_data(geometry, vertices.data(), vertices.size(), 0);
-        }
-
-        void set_indices(Geometry* geometry, std::span<const u32> indices) {
-            set_index_buffer_params(geometry, i32(indices.size()), sizeof(u32));
-            set_index_buffer_data(geometry, indices.data(), indices.size(), 0);
-        }
-
-        void set_vertex_buffer_params(Geometry* geometry, i32 count, u64 stride) {
-            const auto buf_size = static_cast<i32>(count * stride);
-
-            geometry->vtx_count = count;
-            geometry->vtx_stride = stride;
-            if (buf_size > geometry->vtx_buf_size) {
-                geometry->vtx_buf_size = buf_size;
-                if (geometry->vtx != nullptr) {
-                    freeBuffer(geometry->vtx);
-                }
-                geometry->vtx = create_buffer(BufferUsage::Vertex, buf_size);
+        void freeMesh(const Box<Mesh>& mesh) {
+            if (mesh->vertexBuffer) {
+                freeBuffer(mesh->vertexBuffer);
             }
-        }
-
-        void set_index_buffer_params(Geometry* geometry, i32 count, u64 stride) {
-            const auto buf_size = static_cast<i32>(count * stride);
-
-            geometry->idx_count = count;
-            geometry->idx_stride = stride;
-            if (buf_size > geometry->idx_buf_size) {
-                geometry->idx_buf_size = buf_size;
-                if (geometry->idx != nullptr) {
-                    freeBuffer(geometry->idx);
-                }
-                geometry->idx = create_buffer(BufferUsage::Index, buf_size);
+            if (mesh->indexBuffer) {
+                freeBuffer(mesh->indexBuffer);
             }
-        }
-
-        void set_vertex_buffer_data(Geometry* geometry, const void* src, u64 size, u64 offset) {
-            update_buffer(geometry->vtx, src, size * geometry->vtx_stride, offset * geometry->vtx_stride);
-        }
-
-        void set_index_buffer_data(Geometry* geometry, const void* src, u64 size, u64 offset) {
-            update_buffer(geometry->idx, src, size * geometry->idx_stride, offset * geometry->idx_stride);
         }
 
         auto makeMaterial(const MaterialDescription& description, const Box<RenderPass>& pass, u32 subpass) -> Box<Material> {

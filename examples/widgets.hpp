@@ -111,6 +111,10 @@ struct Widgets {
             .pImageInfo = &image_info
         };
         context.logical_device.updateDescriptorSets(write_descriptor_set, {});
+
+        for (auto& frame : frames) {
+            frame = context.makeMesh();
+        }
     }
 
     ~Widgets() {
@@ -121,12 +125,7 @@ struct Widgets {
         context.freeMaterial(font_material);
 
         for (auto& frame : frames) {
-            if (frame.vtx != nullptr) {
-                context.freeBuffer(frame.vtx);
-            }
-            if (frame.idx != nullptr) {
-                context.freeBuffer(frame.idx);
-            }
+            context.freeMesh(frame);
         }
     }
 
@@ -160,18 +159,18 @@ struct Widgets {
             return;
         }
 
-        auto frame = &frames[current_frame];
+        auto& frame = frames[current_frame];
 
         if (draw_data->TotalVtxCount > 0) {
-            context.set_vertex_buffer_params(frame, draw_data->TotalVtxCount, sizeof(ImDrawVert));
-            context.set_index_buffer_params(frame, draw_data->TotalIdxCount, sizeof(ImDrawIdx));
+            frame->setIndexBufferParams(draw_data->TotalIdxCount, sizeof(ImDrawIdx));
+            frame->setVertexBufferParams(draw_data->TotalVtxCount, sizeof(ImDrawVert));
 
             auto vtx_dst_offset = 0;
             auto idx_dst_offset = 0;
             for (i32 n = 0; n < draw_data->CmdListsCount; n++) {
                 auto cmd_list = draw_data->CmdLists[n];
-                context.set_vertex_buffer_data(frame, cmd_list->VtxBuffer.Data, cmd_list->VtxBuffer.Size, vtx_dst_offset);
-                context.set_index_buffer_data(frame, cmd_list->IdxBuffer.Data, cmd_list->IdxBuffer.Size, idx_dst_offset);
+                frame->setVertexBufferData(cmd_list->VtxBuffer.Data, cmd_list->VtxBuffer.Size, vtx_dst_offset);
+                frame->setIndexBufferData(cmd_list->IdxBuffer.Data, cmd_list->IdxBuffer.Size, idx_dst_offset);
                 vtx_dst_offset += cmd_list->VtxBuffer.Size;
                 idx_dst_offset += cmd_list->IdxBuffer.Size;
             }
@@ -247,15 +246,14 @@ struct Widgets {
             .addressModeW = vk::SamplerAddressMode::eRepeat
         };
         font_sampler = context.logical_device.createSampler(font_sampler_description);
-
-        context.set_texture_data(font_texture.get(), std::span(reinterpret_cast<const glm::u8vec4 *>(pixels), width * height));
+        font_texture->setPixelData(std::span(reinterpret_cast<const glm::u8vec4 *>(pixels), width * height));
         ctx->IO.Fonts->SetTexID(font_texture.get());
     }
 
-    void setup_render_state(ImDrawData* draw_data, vk::CommandBuffer cmd, Geometry* rb, i32 fb_width, i32 fb_height) {
+    void setup_render_state(ImDrawData* draw_data, vk::CommandBuffer cmd, Box<vfx::Mesh>& mesh, i32 fb_width, i32 fb_height) {
         if (draw_data->TotalVtxCount > 0) {
-            cmd.bindVertexBuffers(0, rb->vtx->buffer, vk::DeviceSize{0});
-            cmd.bindIndexBuffer(rb->idx->buffer, 0, vk::IndexType::eUint16);
+            cmd.bindVertexBuffers(0, mesh->vertexBuffer->handle, vk::DeviceSize{0});
+            cmd.bindIndexBuffer(mesh->indexBuffer->handle, 0, vk::IndexType::eUint16);
         }
 
         cmd.setViewport(0, vk::Viewport{0, 0, f32(fb_width), f32(fb_height), 0, 1});
@@ -284,5 +282,5 @@ struct Widgets {
     vk::Sampler font_sampler;
     Box<vfx::Texture> font_texture;
     Box<vfx::Material> font_material;
-    std::array<Geometry, vfx::Context::MAX_FRAMES_IN_FLIGHT> frames{};
+    std::array<Box<vfx::Mesh>, vfx::Context::MAX_FRAMES_IN_FLIGHT> frames{};
 };

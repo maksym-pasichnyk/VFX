@@ -104,7 +104,7 @@ struct Demo {
         render_area.setExtent(drawable->texture->size);
 
         auto begin_info = vk::RenderPassBeginInfo{};
-        begin_info.setRenderPass(swapchain->final_render_pass->handle);
+        begin_info.setRenderPass(swapchain->renderPass->handle);
         begin_info.setFramebuffer(drawable->framebuffer);
         begin_info.setRenderArea(render_area);
         begin_info.setClearValues(clear_values);
@@ -170,7 +170,7 @@ struct Demo {
             .entry = "main",
             .stage = vk::ShaderStageFlagBits::eFragment
         });
-        present_swapchain_material = context->makeMaterial(description, swapchain->final_render_pass, 0);
+        present_swapchain_material = context->makeMaterial(description, swapchain->renderPass, 0);
 
         update_descriptors();
     }

@@ -76,7 +76,13 @@ add_library(VFX STATIC
     src/swapchain.hpp
     src/drawable.hpp
     src/queue.hpp
-    src/queue.cpp)
+    src/queue.cpp
+    src/texture.cpp
+    src/buffer.cpp
+    src/mesh.cpp
+    src/mesh.hpp
+    src/swapchain.cpp
+)
 target_include_directories(VFX PUBLIC src)
 target_link_libraries(VFX PUBLIC
     glm

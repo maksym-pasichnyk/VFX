@@ -11,7 +11,7 @@ struct Globals {
 };
 
 struct Renderer {
-    vfx::Context &context;
+    vfx::Context& context;
 
     vk::Format pixel_format;
     vk::Format depth_format;
