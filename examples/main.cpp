@@ -45,7 +45,7 @@ struct Demo {
 
         graphics_command_queue = context->makeCommandQueue(16);
 
-        create_present_swapchain_material();
+        create_present_pipeline_state();
     }
 
     ~Demo() {
@@ -83,7 +83,7 @@ struct Demo {
         ImGui::End();
         widgets->end_frame();
 
-        widgets->draw(cmd->handle);
+        widgets->draw(cmd);
         renderer->endRendering(cmd);
 
         auto drawable = swapchain->nextDrawable();
@@ -130,8 +130,8 @@ struct Demo {
         cmd->endRenderPass();
     }
 
-    void create_present_swapchain_material() {
-        vfx::MaterialDescription description{};
+    void create_present_pipeline_state() {
+        vfx::PipelineStateDescription description{};
 
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =

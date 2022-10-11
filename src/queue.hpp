@@ -39,6 +39,7 @@ namespace vfx {
         void endRenderPass();
 
         void draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance);
+        void drawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance);
     };
 
     struct CommandQueue final {

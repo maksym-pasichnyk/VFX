@@ -121,6 +121,11 @@ void vfx::CommandBuffer::draw(u32 vertexCount, u32 instanceCount, u32 firstVerte
     handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
+void vfx::CommandBuffer::drawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance) {
+    handle.bindPipeline(vk::PipelineBindPoint::eGraphics, makePipeline(0));
+    handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+}
+
 auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
     std::ignore = context->logical_device.waitForFences(fences, VK_FALSE, std::numeric_limits<u64>::max());
 

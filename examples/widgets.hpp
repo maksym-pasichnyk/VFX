@@ -34,9 +34,29 @@ struct Widgets {
         ctx->Style.PopupRounding = 0.0f;
         ctx->Style.ScrollbarRounding = 0.0f;
 
+        create_pipeline_state();
         create_font_texture();
 
-        vfx::MaterialDescription description{};
+        for (auto& frame : frames) {
+            frame = context.makeMesh();
+        }
+    }
+
+    ~Widgets() {
+        ImGui::DestroyContext(ctx);
+        
+        context.logical_device.destroyDescriptorPool(descriptor_pool);
+        context.logical_device.destroySampler(font_sampler);
+        context.freePipelineState(pipeline_state);
+        context.freeTexture(font_texture);
+
+        for (auto& frame : frames) {
+            context.freeMesh(frame);
+        }
+    }
+    
+    void create_pipeline_state() {
+        vfx::PipelineStateDescription description{};
 
         description.bindings = {
             {0, sizeof(ImDrawVert), vk::VertexInputRate::eVertex}
@@ -95,38 +115,20 @@ struct Widgets {
             .entry = "main",
             .stage = vk::ShaderStageFlagBits::eFragment
         });
-        font_material = context.makeMaterial(description, renderer.renderPass, 0);
+        pipeline_state = context.makePipelineState(description);
 
-        const auto image_info = vk::DescriptorImageInfo{
-            .sampler = font_sampler,
-            .imageView = font_texture->view,
-            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        auto pool_sizes = std::array{
+            vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1}
         };
-        const auto write_descriptor_set = vk::WriteDescriptorSet{
-            .dstSet = font_material->descriptor_sets[0],
-            .dstBinding = 0,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-            .pImageInfo = &image_info
-        };
-        context.logical_device.updateDescriptorSets(write_descriptor_set, {});
+        auto pool_create_info = vk::DescriptorPoolCreateInfo{};
+        pool_create_info.setMaxSets(1);
+        pool_create_info.setPoolSizes(pool_sizes);
+        descriptor_pool = context.logical_device.createDescriptorPool(pool_create_info, nullptr);
 
-        for (auto& frame : frames) {
-            frame = context.makeMesh();
-        }
-    }
-
-    ~Widgets() {
-        ImGui::DestroyContext(ctx);
-
-        context.logical_device.destroySampler(font_sampler);
-        context.freeTexture(font_texture);
-        context.freeMaterial(font_material);
-
-        for (auto& frame : frames) {
-            context.freeMesh(frame);
-        }
+        auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
+        ds_allocate_info.setDescriptorPool(descriptor_pool);
+        ds_allocate_info.setSetLayouts(pipeline_state->descriptorSetLayouts);
+        descriptor_sets = context.logical_device.allocateDescriptorSets(ds_allocate_info);
     }
 
     void begin_frame() {
@@ -139,7 +141,7 @@ struct Widgets {
         current_frame = (current_frame + 1) % vfx::Context::MAX_FRAMES_IN_FLIGHT;
     }
 
-    void draw(vk::CommandBuffer cmd) {
+    void draw(vfx::CommandBuffer* cmd) {
         const auto viewport = ctx->Viewports[0];
         if (!viewport->DrawDataP.Valid) {
             return;
@@ -176,8 +178,8 @@ struct Widgets {
             }
         }
 
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, font_material->pipeline);
-        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, font_material->pipeline_layout, 0, font_material->descriptor_sets, {});
+        cmd->setPipelineState(pipeline_state);
+        cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_state->pipelineLayout, 0, descriptor_sets, {});
 
         setup_render_state(draw_data, cmd, frame, fb_width, fb_height);
 
@@ -214,8 +216,9 @@ struct Widgets {
                         }
                     };
 
-                    cmd.setScissor(0, 1, &scissor);
-                    cmd.drawIndexed(pcmd->ElemCount, 1, pcmd->IdxOffset + global_idx_offset, i32(pcmd->VtxOffset + global_vtx_offset), 0);
+                    // todo: update texture
+                    cmd->handle.setScissor(0, 1, &scissor);
+                    cmd->drawIndexed(pcmd->ElemCount, 1, pcmd->IdxOffset + global_idx_offset, i32(pcmd->VtxOffset + global_vtx_offset), 0);
                 }
             }
             global_idx_offset += cmd_list->IdxBuffer.Size;
@@ -248,15 +251,30 @@ struct Widgets {
         font_sampler = context.logical_device.createSampler(font_sampler_description);
         font_texture->setPixelData(std::span(reinterpret_cast<const glm::u8vec4 *>(pixels), width * height));
         ctx->IO.Fonts->SetTexID(font_texture.get());
+
+        const auto image_info = vk::DescriptorImageInfo{
+            .sampler = font_sampler,
+            .imageView = font_texture->view,
+            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        };
+        const auto write_descriptor_set = vk::WriteDescriptorSet{
+            .dstSet = descriptor_sets[0],
+            .dstBinding = 0,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .pImageInfo = &image_info
+        };
+        context.logical_device.updateDescriptorSets(write_descriptor_set, {});
     }
 
-    void setup_render_state(ImDrawData* draw_data, vk::CommandBuffer cmd, Arc<vfx::Mesh>& mesh, i32 fb_width, i32 fb_height) {
+    void setup_render_state(ImDrawData* draw_data, vfx::CommandBuffer* cmd, Arc<vfx::Mesh>& mesh, i32 fb_width, i32 fb_height) {
         if (draw_data->TotalVtxCount > 0) {
-            cmd.bindVertexBuffers(0, mesh->vertexBuffer->handle, vk::DeviceSize{0});
-            cmd.bindIndexBuffer(mesh->indexBuffer->handle, 0, vk::IndexType::eUint16);
+            cmd->handle.bindVertexBuffers(0, mesh->vertexBuffer->handle, vk::DeviceSize{0});
+            cmd->handle.bindIndexBuffer(mesh->indexBuffer->handle, 0, vk::IndexType::eUint16);
         }
 
-        cmd.setViewport(0, vk::Viewport{0, 0, f32(fb_width), f32(fb_height), 0, 1});
+        cmd->handle.setViewport(0, vk::Viewport{0, 0, f32(fb_width), f32(fb_height), 0, 1});
 
         const auto pos = glm::vec2(draw_data->DisplayPos.x, draw_data->DisplayPos.y);
         const auto inv_size = 2.0f / glm::vec2(draw_data->DisplaySize.x, draw_data->DisplaySize.y);
@@ -266,8 +284,8 @@ struct Widgets {
             -(pos * inv_size + 1.0f)
         };
 
-        cmd.pushConstants(
-            font_material->pipeline_layout,
+        cmd->handle.pushConstants(
+            pipeline_state->pipelineLayout,
             vk::ShaderStageFlagBits::eVertex,
             0,
             std::span(transform).size_bytes(),
@@ -279,8 +297,12 @@ struct Widgets {
 
     ImGuiContext* ctx;
     u64 current_frame = 0;
-    vk::Sampler font_sampler;
-    Arc<vfx::Texture> font_texture;
-    Arc<vfx::Material> font_material;
+    vk::Sampler font_sampler{};
+    Arc<vfx::Texture> font_texture{};
+    Arc<vfx::PipelineState> pipeline_state{};
     std::array<Arc<vfx::Mesh>, vfx::Context::MAX_FRAMES_IN_FLIGHT> frames{};
+
+    // todo: bindless
+    vk::DescriptorPool descriptor_pool{};
+    std::vector<vk::DescriptorSet> descriptor_sets{};
 };

@@ -142,7 +142,7 @@ struct Renderer {
     }
 
     void createPipelineState() {
-        vfx::MaterialDescription description{};
+        vfx::PipelineStateDescription description{};
 
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =
