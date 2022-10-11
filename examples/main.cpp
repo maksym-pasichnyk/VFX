@@ -14,7 +14,11 @@ struct Demo {
     Arc<Widgets> widgets{};
 
     Arc<vfx::CommandQueue> graphics_command_queue{};
-    Arc<vfx::Material> present_swapchain_material{};
+    Arc<vfx::PipelineState> present_pipeline_state{};
+
+    // todo: bindless
+    vk::DescriptorPool descriptor_pool{};
+    std::vector<vk::DescriptorSet> descriptor_sets{};
 
     Demo() {
         display = Arc<Display>::alloc(800, 600, "Demo", true);
@@ -45,7 +49,8 @@ struct Demo {
     }
 
     ~Demo() {
-        context->freeMaterial(present_swapchain_material);
+        context->logical_device.destroyDescriptorPool(descriptor_pool);
+        context->freePipelineState(present_pipeline_state);
         context->freeCommandQueue(graphics_command_queue);
     }
 
@@ -82,7 +87,7 @@ struct Demo {
         renderer->endRendering(cmd);
 
         auto drawable = swapchain->nextDrawable();
-        final_render_pass(cmd->handle, drawable);
+        final_render_pass(cmd, drawable);
         cmd->handle.end();
         cmd->submit();
         cmd->present(drawable);
@@ -95,7 +100,7 @@ struct Demo {
         }
     }
 
-    void final_render_pass(vk::CommandBuffer cmd, vfx::Drawable* drawable) {
+    void final_render_pass(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
         auto clear_values = std::array{
             vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({0.0f, 0.0f, 0.0f, 0.0f})),
         };
@@ -109,21 +114,20 @@ struct Demo {
         begin_info.setRenderArea(render_area);
         begin_info.setClearValues(clear_values);
 
-        cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
+        cmd->beginRenderPass(begin_info, vk::SubpassContents::eInline);
 
         auto viewport = vk::Viewport{};
         viewport.setWidth(f32(drawable->texture->size.width));
         viewport.setHeight(f32(drawable->texture->size.height));
 
-        cmd.setViewport(0, 1, &viewport);
-        cmd.setScissor(0, 1, &render_area);
+        cmd->handle.setViewport(0, 1, &viewport);
+        cmd->handle.setScissor(0, 1, &render_area);
 
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, present_swapchain_material->pipeline);
-        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, present_swapchain_material->pipeline_layout, 0, present_swapchain_material->descriptor_sets, {});
+        cmd->setPipelineState(present_pipeline_state);
+        cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, present_pipeline_state->pipelineLayout, 0, descriptor_sets, {});
 
-        cmd.draw(6, 1, 0, 0);
-
-        cmd.endRenderPass();
+        cmd->draw(6, 1, 0, 0);
+        cmd->endRenderPass();
     }
 
     void create_present_swapchain_material() {
@@ -170,7 +174,20 @@ struct Demo {
             .entry = "main",
             .stage = vk::ShaderStageFlagBits::eFragment
         });
-        present_swapchain_material = context->makeMaterial(description, swapchain->renderPass, 0);
+        present_pipeline_state = context->makePipelineState(description);
+
+        auto pool_sizes = std::array{
+            vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1}
+        };
+        auto pool_create_info = vk::DescriptorPoolCreateInfo{};
+        pool_create_info.setMaxSets(1);
+        pool_create_info.setPoolSizes(pool_sizes);
+        descriptor_pool = context->logical_device.createDescriptorPool(pool_create_info, nullptr);
+
+        auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
+        ds_allocate_info.setDescriptorPool(descriptor_pool);
+        ds_allocate_info.setSetLayouts(present_pipeline_state->descriptorSetLayouts);
+        descriptor_sets = context->logical_device.allocateDescriptorSets(ds_allocate_info);
 
         update_descriptors();
     }
@@ -182,7 +199,7 @@ struct Demo {
             .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         };
         const auto write_descriptor_set = vk::WriteDescriptorSet{
-            .dstSet = present_swapchain_material->descriptor_sets[0],
+            .dstSet = descriptor_sets[0],
             .dstBinding = 0,
             .dstArrayElement = 0,
             .descriptorCount = 1,
