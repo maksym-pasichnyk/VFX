@@ -119,6 +119,28 @@ namespace vfx {
     }
 }
 
+auto vfx::createSystemDefaultContext() -> Arc<Context> {
+    return Arc<vfx::Context>::alloc(vfx::ContextDescription{
+        .app_name = "Demo",
+        .flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR,
+#ifndef NDEBUG
+        .layers = {
+            "VK_LAYER_KHRONOS_validation"
+        },
+#endif
+        .extensions = {
+            VK_KHR_SURFACE_EXTENSION_NAME,
+            "VK_EXT_metal_surface",
+            VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+            VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
+            VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+        },
+#ifndef NDEBUG
+        .enable_debug = true
+#endif
+    });
+}
+
 vfx::Context::Context(const vfx::ContextDescription& description) {
     create_instance(description);
     select_physical_device();

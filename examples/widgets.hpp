@@ -140,7 +140,7 @@ struct Widgets {
 
     void end_frame() {
         ImGui::Render();
-        current_frame = (current_frame + 1) % vfx::Context::MAX_FRAMES_IN_FLIGHT;
+        current_frame = (current_frame + 1) % frames.size();
     }
 
     void draw(vfx::CommandBuffer* cmd) {

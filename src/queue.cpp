@@ -21,8 +21,6 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
         return it->second;
     }
 
-    spdlog::info("Created pipeline (state = {}, pass = {}, subpass = {})", (void*)pipelineState.get(), (void*)renderPass, subpass);
-
     vk::PipelineViewportStateCreateInfo viewportState = {};
     viewportState.viewportCount = 1;
     viewportState.pViewports = nullptr;
@@ -77,8 +75,9 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
         &pipeline
     );
     if (result != vk::Result::eSuccess) {
-        spdlog::error("{}", vk::to_string(result));
+        throw std::runtime_error(vk::to_string(result));
     }
+    spdlog::debug("Created pipeline (state = {}, pass = {}, subpass = {})", (void*)pipelineState.get(), (void*)renderPass, subpass);
     pipelines.emplace(key, pipeline);
     return pipeline;
 }

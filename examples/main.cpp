@@ -28,21 +28,8 @@ struct Demo {
 
     Demo() {
         controller = Arc<vfx::WindowController>::alloc();
-        context = Arc<vfx::Context>::alloc(vfx::ContextDescription{
-            .app_name = "Demo",
-            .flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR,
-            .layers = {
-                "VK_LAYER_KHRONOS_validation"
-            },
-            .extensions = {
-                VK_KHR_SURFACE_EXTENSION_NAME,
-                "VK_EXT_metal_surface",
-                VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-                VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
-                VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-            },
-            .enable_debug = true
-        });
+        context = vfx::createSystemDefaultContext();
+
         window = Arc<vfx::Window>::alloc(controller, *context, vfx::WindowDescription{
             .title = "Demo",
             .width = 800,
@@ -50,6 +37,7 @@ struct Demo {
             .resizable = true,
         });
         swapchain = window->getSwapchain();
+
         renderer = Box<Renderer>::alloc(*context, swapchain->getPixelFormat());
         renderer->setDrawableSize(swapchain->getDrawableSize());
 

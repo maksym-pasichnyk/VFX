@@ -75,4 +75,6 @@ namespace vfx {
         auto makeCommandQueue(u32 count) -> Arc<CommandQueue>;
         void freeCommandQueue(const Arc<CommandQueue>& queue);
     };
+
+    extern auto createSystemDefaultContext() -> Arc<Context>;
 }
