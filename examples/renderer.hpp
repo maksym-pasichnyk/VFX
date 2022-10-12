@@ -192,8 +192,8 @@ struct Renderer {
         viewport.setMaxDepth(1.f);
 
         cmd->beginRenderPass(begin_info, vk::SubpassContents::eInline);
-        cmd->handle.setViewport(0, viewport);
-        cmd->handle.setScissor(0, area);
+        cmd->setViewport(0, viewport);
+        cmd->setScissor(0, area);
     }
 
     void endRendering(vfx::CommandBuffer* cmd) {

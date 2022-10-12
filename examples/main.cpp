@@ -67,7 +67,7 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
 
     void draw() {
         auto cmd = graphics_command_queue->makeCommandBuffer();
-        cmd->handle.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+        cmd->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
         renderer->beginRendering(cmd);
         renderer->draw(cmd);
@@ -85,7 +85,7 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
 
         auto drawable = swapchain->nextDrawable();
         final_render_pass(swapchain->getDefaultRenderPass(), cmd, drawable);
-        cmd->handle.end();
+        cmd->end();
         cmd->submit();
         cmd->present(drawable);
     }
@@ -110,8 +110,8 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
         viewport.setWidth(f32(drawable->texture->size.width));
         viewport.setHeight(f32(drawable->texture->size.height));
 
-        cmd->handle.setViewport(0, 1, &viewport);
-        cmd->handle.setScissor(0, 1, &render_area);
+        cmd->setViewport(0, viewport);
+        cmd->setScissor(0, render_area);
 
         cmd->setPipelineState(present_pipeline_state);
         cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, present_pipeline_state->pipelineLayout, 0, descriptor_sets, {});

@@ -199,7 +199,7 @@ struct Widgets {
                     };
 
                     // todo: update texture
-                    cmd->handle.setScissor(0, 1, &scissor);
+                    cmd->setScissor(0, scissor);
                     cmd->drawIndexed(pcmd->ElemCount, 1, pcmd->IdxOffset + global_idx_offset, i32(pcmd->VtxOffset + global_vtx_offset), 0);
                 }
             }
@@ -256,7 +256,7 @@ struct Widgets {
             cmd->handle.bindIndexBuffer(mesh->indexBuffer->handle, 0, vk::IndexType::eUint16);
         }
 
-        cmd->handle.setViewport(0, vk::Viewport{0, 0, f32(fb_width), f32(fb_height), 0, 1});
+        cmd->setViewport(0, vk::Viewport{0, 0, f32(fb_width), f32(fb_height), 0, 1});
 
         const auto pos = glm::vec2(draw_data->DisplayPos.x, draw_data->DisplayPos.y);
         const auto inv_size = 2.0f / glm::vec2(draw_data->DisplaySize.x, draw_data->DisplaySize.y);

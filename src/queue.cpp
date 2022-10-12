@@ -83,6 +83,14 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
     return pipeline;
 }
 
+void vfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
+    handle.begin(info);
+}
+
+void vfx::CommandBuffer::end() {
+    handle.end();
+}
+
 void vfx::CommandBuffer::submit() {
     auto submit_info = vk::SubmitInfo{};
     submit_info.setCommandBuffers(handle);
@@ -123,6 +131,14 @@ void vfx::CommandBuffer::endRenderPass() {
     handle.endRenderPass();
 }
 
+void vfx::CommandBuffer::setScissor(u32 firstScissor, const vk::Rect2D& rect) {
+    handle.setScissor(firstScissor, 1, &rect);
+}
+
+void vfx::CommandBuffer::setViewport(u32 firstViewport, const vk::Viewport& viewport) {
+    handle.setViewport(firstViewport, 1, &viewport);
+}
+
 void vfx::CommandBuffer::draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) {
     handle.bindPipeline(vk::PipelineBindPoint::eGraphics, makePipeline(0));
     handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
@@ -131,6 +147,10 @@ void vfx::CommandBuffer::draw(u32 vertexCount, u32 instanceCount, u32 firstVerte
 void vfx::CommandBuffer::drawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance) {
     handle.bindPipeline(vk::PipelineBindPoint::eGraphics, makePipeline(0));
     handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+}
+
+void vfx::CommandBuffer::waitUntilCompleted() {
+    std::ignore = owner->context->logical_device.waitForFences(fence, VK_TRUE, std::numeric_limits<u64>::max());
 }
 
 auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {

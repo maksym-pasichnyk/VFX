@@ -34,11 +34,16 @@ namespace vfx {
         auto makePipeline(i32 subpass) -> vk::Pipeline;
 
     public:
+        void begin(const vk::CommandBufferBeginInfo& info);
+        void end();
         void submit();
         void present(Drawable* drawable);
         void setPipelineState(const Arc<PipelineState>& state);
         void beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents);
         void endRenderPass();
+        void setScissor(u32 firstScissor, const vk::Rect2D& rect);
+        void setViewport(u32 firstViewport, const vk::Viewport& viewport);
+        void waitUntilCompleted();
 
         void draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance);
         void drawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance);
