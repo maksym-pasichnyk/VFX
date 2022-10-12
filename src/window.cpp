@@ -16,6 +16,14 @@ void vfx::Application::pollEvents() {
     glfwPollEvents();
 }
 
+vfx::Surface::Surface() {
+
+}
+
+vfx::Surface::~Surface() {
+    context->instance.destroySurfaceKHR(handle);
+}
+
 vfx::Window::Window(const WindowDescription& description) {
     glfwDefaultWindowHints();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -37,10 +45,14 @@ vfx::Window::~Window() {
     glfwDestroyWindow(handle);
 }
 
-auto vfx::Window::createSurface(const Arc<Context>& context) -> vk::SurfaceKHR {
+auto vfx::Window::makeSurface(const Arc<Context>& context) -> Arc<Surface> {
     VkSurfaceKHR surface{};
     glfwCreateWindowSurface(context->instance, handle, nullptr, &surface);
-    return surface;
+
+    auto out = Arc<Surface>::alloc();
+    out->context = context;
+    out->handle = surface;
+    return out;
 }
 
 auto vfx::Window::getHandle() -> GLFWwindow* {

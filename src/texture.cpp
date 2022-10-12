@@ -3,6 +3,14 @@
 #include "buffer.hpp"
 #include "queue.hpp"
 
+vfx::Texture::Texture() {
+
+}
+
+vfx::Texture::~Texture() {
+    context->freeTexture(this);
+}
+
 void vfx::Texture::setPixelData(std::span<const glm::u8vec4> pixels) {
     auto tmp = context->makeBuffer(BufferUsage::CopySrc, pixels.size_bytes());
     tmp->update(pixels.data(), pixels.size_bytes(), 0);
@@ -58,7 +66,4 @@ void vfx::Texture::setPixelData(std::span<const glm::u8vec4> pixels) {
     cmd->end();
     cmd->submit();
     cmd->waitUntilCompleted();
-
-    context->freeCommandQueue(queue);
-    context->freeBuffer(tmp);
 }

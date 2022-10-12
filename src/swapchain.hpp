@@ -5,45 +5,52 @@
 #include <vulkan/vulkan.hpp>
 
 namespace vfx {
-    struct Window;
     struct Context;
+    struct Surface;
+    struct SwapchainDescription {
+        Arc<Context> context{};
+        Arc<Surface> surface{};
+
+        vk::ColorSpaceKHR  colorSpace = {};
+        vk::Format         pixelFormat = {};
+        vk::PresentModeKHR presentMode = {};
+    };
+
     struct Drawable;
     struct RenderPass;
     struct CommandBuffer;
     struct Swapchain {
-        friend Window;
         friend Context;
         friend Drawable;
         friend CommandBuffer;
 
+        explicit Swapchain(const SwapchainDescription& description);
+        ~Swapchain();
+
     private:
-        Arc<Window> window;
-        Arc<Context> context;
-
-        vk::SurfaceKHR surface;
-        vk::SwapchainKHR handle{};
-
-        Arc<RenderPass> renderPass = {};
-        std::vector<Arc<Drawable>> drawables{};
+        Arc<Context> context{};
+        Arc<Surface> surface{};
 
         vk::Format pixelFormat = {};
         vk::Extent2D drawableSize = {};
         vk::ColorSpaceKHR colorSpace = {};
         vk::PresentModeKHR presentMode = {};
 
-    public:
-        Swapchain(const Arc<Context>& context, const Arc<Window>& window);
-        ~Swapchain();
+        vk::SwapchainKHR handle{};
+        std::vector<Arc<Drawable>> drawables{};
+
+        Arc<RenderPass> renderPass{};
 
     private:
-        void create_render_pass();
-
-    public:
         void makeGpuObjects();
         void freeGpuObjects();
 
-        auto nextDrawable() -> Drawable*;
+    public:
+        void makeDrawables();
+        void freeDrawables();
 
+    public:
+        auto nextDrawable() -> Drawable*;
         auto getPixelFormat() -> vk::Format;
         auto getDrawableSize() -> vk::Extent2D;
         auto getDefaultRenderPass() -> const Arc<RenderPass>&;

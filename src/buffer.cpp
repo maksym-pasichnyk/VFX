@@ -1,6 +1,12 @@
 #include "buffer.hpp"
 #include "context.hpp"
 
+vfx::Buffer::Buffer() {}
+
+vfx::Buffer::~Buffer() {
+    context->freeBuffer(this);
+}
+
 void vfx::Buffer::update(const void* src, u64 size, u64 offset) {
     void* ptr = nullptr;
     vmaMapMemory(context->allocator, allocation, &ptr);

@@ -10,8 +10,8 @@
 #include "spdlog/spdlog.h"
 
 struct Demo : vfx::Application, vfx::WindowDelegate {
-    Arc<vfx::Context> context{};
     Arc<vfx::Window> window{};
+    Arc<vfx::Context> context{};
     Arc<vfx::Swapchain> swapchain{};
 
     Arc<Widgets> widgets{};
@@ -34,7 +34,14 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
         window->delegate = this;
 
         context = vfx::createSystemDefaultContext();
-        swapchain = Arc<vfx::Swapchain>::alloc(context, window);
+
+        swapchain = Arc<vfx::Swapchain>::alloc(vfx::SwapchainDescription{
+            .context = context,
+            .surface = window->makeSurface(context),
+            .colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
+            .pixelFormat = vk::Format::eB8G8R8A8Unorm,
+            .presentMode = vk::PresentModeKHR::eFifo
+        });
 
         renderer = Arc<Renderer>::alloc(context, swapchain->getPixelFormat());
         renderer->setDrawableSize(swapchain->getDrawableSize());
@@ -49,8 +56,6 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
     ~Demo() override {
         context->logical_device.waitIdle();
         context->logical_device.destroyDescriptorPool(descriptor_pool);
-        context->freePipelineState(present_pipeline_state);
-        context->freeCommandQueue(graphics_command_queue);
     }
 
     void run() {
@@ -182,8 +187,8 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
     void windowDidResize() override {
         context->logical_device.waitIdle();
 
-        swapchain->freeGpuObjects();
-        swapchain->makeGpuObjects();
+        swapchain->freeDrawables();
+        swapchain->makeDrawables();
 
         renderer->setDrawableSize(swapchain->getDrawableSize());
 

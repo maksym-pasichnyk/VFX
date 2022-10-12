@@ -250,33 +250,27 @@ void vfx::Context::create_logical_device() {
         VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME
     };
 
-    auto timeline_semaphore_features = vk::PhysicalDeviceTimelineSemaphoreFeatures{
-        .timelineSemaphore = true
-    };
+    auto timeline_semaphore_features = vk::PhysicalDeviceTimelineSemaphoreFeatures{};
+    timeline_semaphore_features.setTimelineSemaphore(VK_TRUE);
 
-    auto dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures{
-        .pNext = &timeline_semaphore_features,
-        .dynamicRendering = true,
-    };
+    auto dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures{};
+    dynamic_rendering_features.setPNext(&timeline_semaphore_features);
+    dynamic_rendering_features.setDynamicRendering(VK_TRUE);
+
+    auto features = vk::PhysicalDeviceFeatures{};
+    features.setFillModeNonSolid(VK_TRUE);
+    features.setSamplerAnisotropy(VK_TRUE);
+    features.setMultiViewport(VK_TRUE);
 
     const auto features_2 = vk::PhysicalDeviceFeatures2{
         .pNext = &dynamic_rendering_features,
-        .features = vk::PhysicalDeviceFeatures{
-            .fillModeNonSolid = VK_TRUE,
-            .samplerAnisotropy = VK_TRUE
-        }
+        .features = features
     };
 
-    const auto device_create_info = vk::DeviceCreateInfo {
-        .pNext = &features_2,
-        .queueCreateInfoCount = u32(std::size(queue_create_infos)),
-        .pQueueCreateInfos = std::data(queue_create_infos),
-        //                .enabledLayerCount = std::size(enabledLayers),
-        //                .ppEnabledLayerNames = std::data(enabledLayers),
-        .enabledExtensionCount = std::size(device_extensions),
-        .ppEnabledExtensionNames = std::data(device_extensions),
-        //            .pEnabledFeatures = &features
-    };
+    auto device_create_info = vk::DeviceCreateInfo{};
+    device_create_info.setPNext(&features_2);
+    device_create_info.setQueueCreateInfos(queue_create_infos);
+    device_create_info.setPEnabledExtensionNames(device_extensions);
 
     logical_device = physical_device.createDevice(device_create_info, nullptr);
     vk::defaultDispatchLoaderDynamic.init(logical_device);
@@ -372,11 +366,12 @@ auto vfx::Context::makeRenderPass(const vfx::RenderPassDescription& description)
     create_info.setDependencies(description.dependencies);
 
     auto out = Box<RenderPass>::alloc();
+    out->context = this;
     out->handle = logical_device.createRenderPass(create_info);
     return out;
 }
 
-void vfx::Context::freeRenderPass(const Arc<RenderPass>& pass) {
+void vfx::Context::freeRenderPass(RenderPass* pass) {
     logical_device.destroyRenderPass(pass->handle);
 }
 
@@ -425,7 +420,7 @@ auto vfx::Context::makeTexture(const vfx::TextureDescription& description) -> Ar
     return out;
 }
 
-void vfx::Context::freeTexture(const Arc<Texture>& texture) {
+void vfx::Context::freeTexture(Texture* texture) {
     logical_device.destroyImageView(texture->view);
     if (texture->allocation != nullptr) {
         vmaDestroyImage(allocator, texture->image, texture->allocation);
@@ -463,27 +458,13 @@ auto vfx::Context::makeBuffer(vfx::BufferUsage target, u64 size) -> Arc<Buffer> 
     return out;
 }
 
-void vfx::Context::freeBuffer(const Arc<Buffer>& buffer) {
+void vfx::Context::freeBuffer(Buffer* buffer) {
     vmaDestroyBuffer(allocator, buffer->handle, buffer->allocation);
-}
-
-auto vfx::Context::makeMesh() -> Arc<Mesh> {
-    auto out = Box<Mesh>::alloc();
-    out->context = this;
-    return out;
-}
-
-void vfx::Context::freeMesh(const Arc<Mesh>& mesh) {
-    if (mesh->vertexBuffer) {
-        freeBuffer(mesh->vertexBuffer);
-    }
-    if (mesh->indexBuffer) {
-        freeBuffer(mesh->indexBuffer);
-    }
 }
 
 auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& description) -> Arc<PipelineState> {
     auto out = Box<PipelineState>::alloc();
+    out->context = this;
     out->description = description;
 
     struct DescriptorSetLayoutDescription {
@@ -567,7 +548,7 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
     return out;
 }
 
-void vfx::Context::freePipelineState(const Arc<PipelineState>& pipelineState) {
+void vfx::Context::freePipelineState(PipelineState* pipelineState) {
     logical_device.destroyPipelineLayout(pipelineState->pipelineLayout);
 
     for (auto& module : pipelineState->modules) {
@@ -581,12 +562,13 @@ void vfx::Context::freePipelineState(const Arc<PipelineState>& pipelineState) {
 
 auto vfx::Context::makeCommandQueue(u32 count) -> Arc<CommandQueue> {
     auto out = Box<CommandQueue>::alloc();
+    out->context = this;
+    out->queue = logical_device.getQueue(graphics_family, 0);
+
     const auto pool_create_info = vk::CommandPoolCreateInfo {
         .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
         .queueFamilyIndex = graphics_family
     };
-    out->context = this;
-    out->queue = logical_device.getQueue(graphics_family, 0);
     out->pool = logical_device.createCommandPool(pool_create_info);
 
     const auto command_buffers_allocate_info = vk::CommandBufferAllocateInfo{
@@ -594,11 +576,11 @@ auto vfx::Context::makeCommandQueue(u32 count) -> Arc<CommandQueue> {
         .level = vk::CommandBufferLevel::ePrimary,
         .commandBufferCount = count
     };
-    out->handles = logical_device.allocateCommandBuffers(command_buffers_allocate_info);
+    out->rawCommandBuffers = logical_device.allocateCommandBuffers(command_buffers_allocate_info);
 
-    out->list.resize(count);
     out->fences.resize(count);
     out->semaphores.resize(count);
+    out->commandBuffers.resize(count);
     for (size_t i = 0; i < count; ++i) {
         vk::FenceCreateInfo fence_create_info{};
         fence_create_info.setFlags(vk::FenceCreateFlagBits::eSignaled);
@@ -607,18 +589,19 @@ auto vfx::Context::makeCommandQueue(u32 count) -> Arc<CommandQueue> {
         vk::SemaphoreCreateInfo semaphore_create_info{};
         out->semaphores[i] = logical_device.createSemaphore(semaphore_create_info);
 
-        out->list[i].owner = out.get();
-        out->list[i].fence = out->fences[i];
-        out->list[i].handle = out->handles[i];
-        out->list[i].semaphore = out->semaphores[i];
+        out->commandBuffers[i].context = this;
+        out->commandBuffers[i].commandQueue = &*out;
+        out->commandBuffers[i].fence = out->fences[i];
+        out->commandBuffers[i].handle = out->rawCommandBuffers[i];
+        out->commandBuffers[i].semaphore = out->semaphores[i];
     }
     return out;
 }
 
-void vfx::Context::freeCommandQueue(const Arc<CommandQueue>& queue) {
-    queue->clearCommandBuffers();
-
-    logical_device.freeCommandBuffers(queue->pool, queue->handles);
+void vfx::Context::freeCommandQueue(CommandQueue* queue) {
+    for (auto& commandBuffer : queue->commandBuffers) {
+        commandBuffer.reset();
+    }
 
     for (auto& semaphore : queue->semaphores) {
         logical_device.destroySemaphore(semaphore);
@@ -627,5 +610,7 @@ void vfx::Context::freeCommandQueue(const Arc<CommandQueue>& queue) {
     for (auto& fence : queue->fences) {
         logical_device.destroyFence(fence);
     }
+
+    logical_device.freeCommandBuffers(queue->pool, queue->rawCommandBuffers);
     logical_device.destroyCommandPool(queue->pool);
 }

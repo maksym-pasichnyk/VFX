@@ -8,11 +8,44 @@
 #include <vulkan/vulkan.hpp>
 
 namespace vfx {
+    struct Texture;
+    struct RenderingAttachmentInfo {
+        Arc<Texture>            texture            = {};
+        vk::ImageLayout         imageLayout        = vk::ImageLayout::eUndefined;
+        vk::ResolveModeFlagBits resolveMode        = vk::ResolveModeFlagBits::eNone;
+        Arc<Texture>            resolveTexture     = {};
+        vk::ImageLayout         resolveImageLayout = vk::ImageLayout::eUndefined;
+        vk::AttachmentLoadOp    loadOp             = vk::AttachmentLoadOp::eLoad;
+        vk::AttachmentStoreOp   storeOp            = vk::AttachmentStoreOp::eStore;
+        vk::ClearValue          clearValue         = {};
+    };
+
+    struct RenderingAttachmentInfoArray {
+        std::vector<RenderingAttachmentInfo> elements{};
+
+        auto operator[](size_t i) -> RenderingAttachmentInfo& {
+            if (elements.size() >= i) {
+                elements.resize(i + 1, RenderingAttachmentInfo{});
+            }
+            return elements[i];
+        }
+    };
+
+    struct RenderingInfo {
+        vk::Rect2D                             renderArea        = {};
+        uint32_t                               layerCount        = {};
+        uint32_t                               viewMask          = {};
+        RenderingAttachmentInfoArray           colorAttachments  = {};
+        std::optional<RenderingAttachmentInfo> depthAttachment   = {};
+        std::optional<RenderingAttachmentInfo> stencilAttachment = {};
+    };
+
     struct Context;
     struct Drawable;
     struct CommandQueue;
     struct PipelineState;
     struct CommandBuffer final {
+        friend Context;
         friend CommandQueue;
 
     private:
@@ -23,14 +56,15 @@ namespace vfx {
         std::map<std::tuple<Arc<PipelineState>, vk::RenderPass, i32>, vk::Pipeline> pipelines{};
 
     public:
-        CommandQueue* owner{};
+        Context* context{};
+        CommandQueue* commandQueue{};
 
         vk::Fence fence{};
         vk::Semaphore semaphore{};
         vk::CommandBuffer handle{};
 
     private:
-        void clear();
+        void reset();
         auto makePipeline(i32 subpass) -> vk::Pipeline;
 
     public:
@@ -41,6 +75,8 @@ namespace vfx {
         void setPipelineState(const Arc<PipelineState>& state);
         void beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents);
         void endRenderPass();
+        void beginRendering(const RenderingInfo& info);
+        void endRendering();
         void setScissor(u32 firstScissor, const vk::Rect2D& rect);
         void setViewport(u32 firstViewport, const vk::Viewport& viewport);
         void waitUntilCompleted();
@@ -53,6 +89,13 @@ namespace vfx {
         friend Context;
         friend CommandBuffer;
 
+    public:
+        CommandQueue();
+        ~CommandQueue();
+
+    public:
+        auto makeCommandBuffer() -> CommandBuffer*;
+
     private:
         Context* context{};
 
@@ -61,14 +104,8 @@ namespace vfx {
 
         std::vector<vk::Fence> fences{};
         std::vector<vk::Semaphore> semaphores{};
-        std::vector<vk::CommandBuffer> handles{};
+        std::vector<vk::CommandBuffer> rawCommandBuffers{};
 
-        std::vector<CommandBuffer> list{};
-
-    public:
-        auto makeCommandBuffer() -> CommandBuffer*;
-
-    private:
-        void clearCommandBuffers();
+        std::vector<CommandBuffer> commandBuffers{};
     };
 }

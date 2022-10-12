@@ -54,15 +54,6 @@ struct Renderer {
         if (framebuffer) {
             context->logical_device.destroyFramebuffer(framebuffer);
         }
-        if (depthAttachmentTexture) {
-            context->freeTexture(depthAttachmentTexture);
-        }
-        if (colorAttachmentTexture) {
-            context->freeTexture(colorAttachmentTexture);
-        }
-
-        context->freePipelineState(pipelineState);
-        context->freeRenderPass(renderPass);
     }
 
     void setDrawableSize(const vk::Extent2D& size) {
@@ -71,12 +62,6 @@ struct Renderer {
 
         if (framebuffer) {
             context->logical_device.destroyFramebuffer(framebuffer);
-        }
-        if (depthAttachmentTexture) {
-            context->freeTexture(depthAttachmentTexture);
-        }
-        if (colorAttachmentTexture) {
-            context->freeTexture(colorAttachmentTexture);
         }
 
         auto color_texture_description = vfx::TextureDescription{

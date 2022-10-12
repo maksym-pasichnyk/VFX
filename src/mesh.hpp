@@ -16,7 +16,8 @@ namespace vfx {
     struct Buffer;
     struct Context;
     struct Mesh {
-        Context* context{};
+    public:
+        Arc<Context> context;
 
         i32 indexCount = 0;
         u64 indexStride = 0;
@@ -27,6 +28,10 @@ namespace vfx {
         Arc<vfx::Buffer> indexBuffer{};
         Arc<vfx::Buffer> vertexBuffer{};
 
+    public:
+        Mesh(const Arc<Context>& context) : context(context) {}
+
+    public:
         void setIndexBufferData(const void* src, u64 size, u64 offset);
         void setVertexBufferData(const void* src, u64 size, u64 offset);
 

@@ -16,9 +16,7 @@ void vfx::Mesh::setIndexBufferParams(i32 count, u64 stride) {
     indexCount = count;
     indexStride = stride;
     if (!indexBuffer || size > indexBuffer->allocationSize) {
-        if (indexBuffer != nullptr) {
-            context->freeBuffer(indexBuffer);
-        }
+        indexBuffer = {};
         indexBuffer = context->makeBuffer(BufferUsage::Index, size);
     }
 }
@@ -29,9 +27,7 @@ void vfx::Mesh::setVertexBufferParams(i32 count, u64 stride) {
     vertexCount = count;
     vertexStride = stride;
     if (!vertexBuffer || size > vertexBuffer->allocationSize) {
-        if (vertexBuffer != nullptr) {
-            context->freeBuffer(vertexBuffer);
-        }
+        vertexBuffer = {};
         vertexBuffer = context->makeBuffer(BufferUsage::Vertex, size);
     }
 }

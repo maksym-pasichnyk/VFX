@@ -34,7 +34,14 @@ namespace vfx {
         AttachmentDescriptionArray attachments{};
     };
 
+    struct Context;
     struct RenderPass {
-        vk::RenderPass handle;
+    public:
+        Context* context{};
+        vk::RenderPass handle{};
+
+    public:
+        RenderPass();
+        ~RenderPass();
     };
 }

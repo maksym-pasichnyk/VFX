@@ -17,14 +17,19 @@ namespace vfx {
     };
 
     struct Texture {
+    public:
         Context* context{};
         vk::Extent2D size{};
         vk::Format format{};
         vk::Image image{};
         vk::ImageView view{};
-//        vk::Sampler sampler{};
         VmaAllocation allocation{};
 
+    public:
+        Texture();
+        ~Texture();
+
+    public:
         void setPixelData(std::span<const glm::u8vec4> pixels);
     };
 }

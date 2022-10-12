@@ -28,8 +28,23 @@ namespace vfx {
         virtual void windowDidResize() = 0;
     };
 
+    struct Window;
     struct Context;
     struct Swapchain;
+    struct Surface {
+        friend Window;
+        friend Context;
+        friend Swapchain;
+
+    public:
+        Surface();
+        ~Surface();
+
+    private:
+        Arc<Context> context;
+        vk::SurfaceKHR handle;
+    };
+
     struct Window {
         friend Context;
         friend Swapchain;
@@ -46,10 +61,10 @@ namespace vfx {
 
     private:
         void windowDidResize();
-        auto createSurface(const Arc<Context>& context) -> vk::SurfaceKHR;
 
     public:
         auto getHandle() -> GLFWwindow*;
         auto windowShouldClose() -> bool;
+        auto makeSurface(const Arc<Context>& context) -> Arc<Surface>;
     };
 }

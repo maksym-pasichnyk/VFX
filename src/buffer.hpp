@@ -16,12 +16,18 @@ namespace vfx {
 
     struct Context;
     struct Buffer {
+    public:
         Context* context{};
         vk::Buffer handle{};
         VmaAllocation allocation{};
         VmaAllocationInfo allocationInfo{};
         vk::DeviceSize allocationSize = 0;
 
+    public:
+        Buffer();
+        ~Buffer();
+
+    public:
         void update(const void* src, u64 size, u64 offset);
     };
 }

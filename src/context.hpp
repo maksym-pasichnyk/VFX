@@ -58,22 +58,19 @@ namespace vfx {
 
     public:
         auto makeRenderPass(const RenderPassDescription& description) -> Arc<RenderPass>;
-        void freeRenderPass(const Arc<RenderPass>& pass);
+        void freeRenderPass(RenderPass* pass);
 
         auto makeTexture(const TextureDescription& description) -> Arc<Texture>;
-        void freeTexture(const Arc<Texture>& texture);
+        void freeTexture(Texture* texture);
 
         auto makeBuffer(BufferUsage target, u64 size) -> Arc<Buffer>;
-        void freeBuffer(const Arc<Buffer>& buffer);
-
-        auto makeMesh() -> Arc<Mesh>;
-        void freeMesh(const Arc<Mesh>& mesh);
+        void freeBuffer(Buffer* buffer);
 
         auto makePipelineState(const PipelineStateDescription& description) -> Arc<PipelineState>;
-        void freePipelineState(const Arc<PipelineState>& pipelineState);
+        void freePipelineState(PipelineState* pipelineState);
 
         auto makeCommandQueue(u32 count) -> Arc<CommandQueue>;
-        void freeCommandQueue(const Arc<CommandQueue>& queue);
+        void freeCommandQueue(CommandQueue* queue);
     };
 
     extern auto createSystemDefaultContext() -> Arc<Context>;

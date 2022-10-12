@@ -84,6 +84,8 @@ add_library(VFX STATIC
     src/mesh.hpp
     src/swapchain.cpp
     src/context.cpp
+    src/material.cpp
+    src/pass.cpp
 )
 target_include_directories(VFX PUBLIC src)
 target_link_libraries(VFX PUBLIC

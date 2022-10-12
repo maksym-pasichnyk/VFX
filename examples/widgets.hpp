@@ -40,7 +40,7 @@ struct Widgets {
         create_font_texture();
 
         for (auto& frame : frames) {
-            frame = context->makeMesh();
+            frame = Arc<vfx::Mesh>::alloc(context);
         }
     }
 
@@ -49,12 +49,6 @@ struct Widgets {
         
         context->logical_device.destroyDescriptorPool(descriptor_pool);
         context->logical_device.destroySampler(font_sampler);
-        context->freePipelineState(pipeline_state);
-        context->freeTexture(font_texture);
-
-        for (auto& frame : frames) {
-            context->freeMesh(frame);
-        }
     }
     
     void create_pipeline_state() {

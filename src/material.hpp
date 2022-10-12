@@ -3,7 +3,10 @@
 #include "types.hpp"
 
 #include <map>
+#include <string>
 #include <vector>
+
+#include <vulkan/vulkan.hpp>
 
 namespace vfx {
     struct ShaderDescription {
@@ -40,12 +43,19 @@ namespace vfx {
         PipelineColorBlendAttachmentStateArray attachments = {};
     };
 
+    struct Context;
     struct PipelineState {
+    public:
+        Context* context{};
         PipelineStateDescription description{};
         std::vector<vk::ShaderModule> modules{};
 
         vk::PipelineLayout pipelineLayout{};
         std::vector<vk::DescriptorSetLayout> descriptorSetLayouts{};
+
+    public:
+        PipelineState();
+        ~PipelineState();
     };
 
     struct Material {

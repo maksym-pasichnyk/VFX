@@ -2,18 +2,18 @@
 #include "pass.hpp"
 #include "window.hpp"
 #include "context.hpp"
+#include "texture.hpp"
 #include "material.hpp"
 #include "drawable.hpp"
 #include "swapchain.hpp"
 
 #include "spdlog/spdlog.h"
 
-void vfx::CommandBuffer::clear() {
+void vfx::CommandBuffer::reset() {
     for (auto& [_, pipeline] : pipelines) {
-        owner->context->logical_device.destroyPipeline(pipeline);
+        commandQueue->context->logical_device.destroyPipeline(pipeline);
     }
     pipelines.clear();
-    pipelineState = {};
 }
 
 auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
@@ -23,10 +23,8 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
     }
 
     vk::PipelineViewportStateCreateInfo viewportState = {};
-    viewportState.viewportCount = 1;
-    viewportState.pViewports = nullptr;
-    viewportState.scissorCount = 1;
-    viewportState.pScissors = nullptr;
+    viewportState.setViewportCount(1);
+    viewportState.setScissorCount(1);
 
     std::array dynamicStates = {
         vk::DynamicState::eViewport,
@@ -53,22 +51,22 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
 
     auto pipeline_create_info = vk::GraphicsPipelineCreateInfo{};
     pipeline_create_info.setStages(stages);
-    pipeline_create_info.pVertexInputState = &vertexInputState;
-    pipeline_create_info.pInputAssemblyState = &pipelineState->description.inputAssemblyState;
-    pipeline_create_info.pViewportState = &viewportState;
-    pipeline_create_info.pRasterizationState = &pipelineState->description.rasterizationState;
-    pipeline_create_info.pMultisampleState = &pipelineState->description.multisampleState;
-    pipeline_create_info.pDepthStencilState = &pipelineState->description.depthStencilState;
-    pipeline_create_info.pColorBlendState = &colorBlendState;
-    pipeline_create_info.pDynamicState = &dynamicState;
-    pipeline_create_info.layout = pipelineState->pipelineLayout;
-    pipeline_create_info.renderPass = renderPass;
-    pipeline_create_info.subpass = subpass;
-    pipeline_create_info.basePipelineHandle = nullptr;
-    pipeline_create_info.basePipelineIndex = 0;
+    pipeline_create_info.setPVertexInputState(&vertexInputState);
+    pipeline_create_info.setPInputAssemblyState(&pipelineState->description.inputAssemblyState);
+    pipeline_create_info.setPViewportState(&viewportState);
+    pipeline_create_info.setPRasterizationState(&pipelineState->description.rasterizationState);
+    pipeline_create_info.setPMultisampleState(&pipelineState->description.multisampleState);
+    pipeline_create_info.setPDepthStencilState(&pipelineState->description.depthStencilState);
+    pipeline_create_info.setPColorBlendState(&colorBlendState);
+    pipeline_create_info.setPDynamicState(&dynamicState);
+    pipeline_create_info.setLayout(pipelineState->pipelineLayout);
+    pipeline_create_info.setRenderPass(renderPass);
+    pipeline_create_info.setSubpass(subpass);
+    pipeline_create_info.setBasePipelineHandle(nullptr);
+    pipeline_create_info.setBasePipelineIndex(0);
 
     vk::Pipeline pipeline{};
-    auto result = owner->context->logical_device.createGraphicsPipelines(
+    auto result = commandQueue->context->logical_device.createGraphicsPipelines(
         {},
         1,
         &pipeline_create_info,
@@ -78,12 +76,13 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
     if (result != vk::Result::eSuccess) {
         throw std::runtime_error(vk::to_string(result));
     }
-    spdlog::debug("Created pipeline (state = {}, pass = {}, subpass = {})", (void*)pipelineState.get(), (void*)renderPass, subpass);
+    spdlog::info("Created pipeline (state = {}, pass = {}, subpass = {})", (void*)pipelineState.get(), (void*)renderPass, subpass);
     pipelines.emplace(key, pipeline);
     return pipeline;
 }
 
 void vfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
+    pipelineState = {};
     handle.begin(info);
 }
 
@@ -96,7 +95,7 @@ void vfx::CommandBuffer::submit() {
     submit_info.setCommandBuffers(handle);
     submit_info.setSignalSemaphores(semaphore);
 
-    owner->queue.submit(submit_info, fence);
+    commandQueue->queue.submit(submit_info, fence);
 }
 
 void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
@@ -109,9 +108,9 @@ void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
     vk::Result result = drawable->layer->context->present_queue.presentKHR(present_info);
 
     if (result == vk::Result::eErrorOutOfDateKHR) {
-        spdlog::debug("Swapchain is out of date");
+        spdlog::info("Swapchain is out of date");
     } else if (result == vk::Result::eSuboptimalKHR) {
-        spdlog::debug("Swapchain is suboptimal");
+        spdlog::info("Swapchain is suboptimal");
     } else if (result != vk::Result::eSuccess) {
         throw std::runtime_error(vk::to_string(result));
     }
@@ -129,6 +128,13 @@ void vfx::CommandBuffer::beginRenderPass(const vk::RenderPassBeginInfo& info, vk
 void vfx::CommandBuffer::endRenderPass() {
     renderPass = VK_NULL_HANDLE;
     handle.endRenderPass();
+}
+
+void vfx::CommandBuffer::beginRendering(const RenderingInfo& info) {
+
+}
+
+void vfx::CommandBuffer::endRendering() {
 }
 
 void vfx::CommandBuffer::setScissor(u32 firstScissor, const vk::Rect2D& rect) {
@@ -150,27 +156,27 @@ void vfx::CommandBuffer::drawIndexed(u32 indexCount, u32 instanceCount, u32 firs
 }
 
 void vfx::CommandBuffer::waitUntilCompleted() {
-    std::ignore = owner->context->logical_device.waitForFences(fence, VK_TRUE, std::numeric_limits<u64>::max());
+    std::ignore = commandQueue->context->logical_device.waitForFences(fence, VK_TRUE, std::numeric_limits<u64>::max());
+}
+
+vfx::CommandQueue::CommandQueue() {}
+
+vfx::CommandQueue::~CommandQueue() {
+    context->freeCommandQueue(this);
 }
 
 auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
     std::ignore = context->logical_device.waitForFences(fences, VK_FALSE, std::numeric_limits<u64>::max());
 
-    for (u64 i = 0; i < list.size(); ++i) {
-        vk::Result result = context->logical_device.getFenceStatus(list[i].fence);
+    for (auto& commandBuffer : commandBuffers) {
+        vk::Result result = context->logical_device.getFenceStatus(commandBuffer.fence);
         if (result == vk::Result::eSuccess) {
-            std::ignore = context->logical_device.resetFences(1, &list[i].fence);
-            return &list[i];
+            std::ignore = context->logical_device.resetFences(1, &commandBuffer.fence);
+            return &commandBuffer;
         }
         if (result == vk::Result::eErrorDeviceLost) {
             throw std::runtime_error(vk::to_string(result));
         }
     }
     return nullptr;
-}
-
-void vfx::CommandQueue::clearCommandBuffers() {
-    for (u64 i = 0; i < list.size(); ++i) {
-        list[i].clear();
-    }
 }

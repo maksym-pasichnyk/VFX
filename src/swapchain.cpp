@@ -55,55 +55,50 @@ namespace vfx {
     }
 }
 
-vfx::Swapchain::Swapchain(const Arc<Context>& context, const Arc<Window>& window) : context(context), window(window) {
-    surface = window->createSurface(context);
+vfx::Swapchain::Swapchain(const vfx::SwapchainDescription& description) {
+    context = description.context;
+    surface = description.surface;
 
-    const auto formats = context->physical_device.getSurfaceFormatsKHR(surface);
-    const auto request_formats = std::array {
-        vk::Format::eB8G8R8A8Unorm,
-        vk::Format::eR8G8B8A8Unorm,
-        vk::Format::eB8G8R8Unorm,
-        vk::Format::eR8G8B8Unorm
-    };
-    auto surface_format = select_surface_format(formats, request_formats, vk::ColorSpaceKHR::eSrgbNonlinear);
+    colorSpace = description.colorSpace;
+    pixelFormat = description.pixelFormat;
+    presentMode = description.presentMode;
 
-    colorSpace = surface_format.colorSpace;
-    pixelFormat = surface_format.format;
-    presentMode = vk::PresentModeKHR::eFifo;
-
-    create_render_pass();
     makeGpuObjects();
 }
 
 vfx::Swapchain::~Swapchain() {
     freeGpuObjects();
-    context->freeRenderPass(renderPass);
-    context->instance.destroySurfaceKHR(surface);
 }
 
-void vfx::Swapchain::create_render_pass() {
-    vfx::RenderPassDescription pass_description{};
-    pass_description.definitions = {
+void vfx::Swapchain::makeGpuObjects() {
+    vfx::RenderPassDescription description{};
+    description.definitions = {
         vfx::SubpassDescription{
             .colorAttachments = {
                 vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
             }
         }
     };
-    pass_description.attachments[0].format = pixelFormat;
-    pass_description.attachments[0].samples = vk::SampleCountFlagBits::e1;
-    pass_description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
-    pass_description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
-    pass_description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-    pass_description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-    pass_description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
-    pass_description.attachments[0].finalLayout = vk::ImageLayout::ePresentSrcKHR;
+    description.attachments[0].format = pixelFormat;
+    description.attachments[0].samples = vk::SampleCountFlagBits::e1;
+    description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+    description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+    description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+    description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+    description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
+    description.attachments[0].finalLayout = vk::ImageLayout::ePresentSrcKHR;
 
-    renderPass = context->makeRenderPass(pass_description);
+    renderPass = context->makeRenderPass(description);
+
+    makeDrawables();
 }
 
-void vfx::Swapchain::makeGpuObjects() {
-    const auto capabilities = context->physical_device.getSurfaceCapabilitiesKHR(surface);
+void vfx::Swapchain::freeGpuObjects() {
+    freeDrawables();
+}
+
+void vfx::Swapchain::makeDrawables() {
+    const auto capabilities = context->physical_device.getSurfaceCapabilitiesKHR(surface->handle);
     drawableSize = select_surface_extent(vk::Extent2D{0, 0}, capabilities);
 
     u32 min_image_count = capabilities.minImageCount + 1;
@@ -119,7 +114,7 @@ void vfx::Swapchain::makeGpuObjects() {
     const auto flag = context->graphics_family != context->present_family;
 
     const auto swapchain_create_info = vk::SwapchainCreateInfoKHR {
-        .surface = surface,
+        .surface = surface->handle,
         .minImageCount = min_image_count,
         .imageFormat = pixelFormat,
         .imageColorSpace = colorSpace,
@@ -158,7 +153,7 @@ void vfx::Swapchain::makeGpuObjects() {
         drawables[i]->index = u32(i);
         drawables[i]->layer = this;
         drawables[i]->texture = Box<Texture>::alloc();
-        drawables[i]->texture->context = context.get();
+        drawables[i]->texture->context = &*context;
         drawables[i]->texture->size = drawableSize;
         drawables[i]->texture->format = pixelFormat;
         drawables[i]->texture->image = images[i];
@@ -168,20 +163,19 @@ void vfx::Swapchain::makeGpuObjects() {
         auto attachments = std::array{
             drawables[i]->texture->view
         };
+
         vk::FramebufferCreateInfo fb_create_info{};
         fb_create_info.setRenderPass(renderPass->handle);
         fb_create_info.setAttachments(attachments);
         fb_create_info.setWidth(drawableSize.width);
         fb_create_info.setHeight(drawableSize.height);
         fb_create_info.setLayers(1);
-
         drawables[i]->framebuffer = context->logical_device.createFramebuffer(fb_create_info);
     }
 }
 
-void vfx::Swapchain::freeGpuObjects() {
+void vfx::Swapchain::freeDrawables() {
     for (auto& drawable : drawables) {
-        context->freeTexture(drawable->texture);
         context->logical_device.destroyFramebuffer(drawable->framebuffer);
     }
     context->logical_device.destroySwapchainKHR(handle);
@@ -195,7 +189,7 @@ auto vfx::Swapchain::nextDrawable() -> vfx::Drawable* {
     auto result = context->logical_device.acquireNextImageKHR(
         handle,
         std::numeric_limits<uint64_t>::max(),
-        nullptr, // image_available_semaphores[current_frame],
+        nullptr,
         fence,
         &index
     );
@@ -203,13 +197,13 @@ auto vfx::Swapchain::nextDrawable() -> vfx::Drawable* {
     context->logical_device.destroyFence(fence);
 
     if (result == vk::Result::eErrorOutOfDateKHR) {
-        spdlog::debug("Swapchain is out of date");
+        spdlog::info("Swapchain is out of date");
     } else if (result == vk::Result::eSuboptimalKHR) {
-        spdlog::debug("Swapchain is suboptimal");
+        spdlog::info("Swapchain is suboptimal");
     } else if (result != vk::Result::eSuccess) {
         throw std::runtime_error("failed to acquire swapchain image");
     }
-    return drawables[u64(index)].get();
+    return &*drawables[u64(index)];
 }
 
 auto vfx::Swapchain::getPixelFormat() -> vk::Format {
@@ -223,3 +217,4 @@ auto vfx::Swapchain::getDrawableSize() -> vk::Extent2D {
 auto vfx::Swapchain::getDefaultRenderPass() -> const Arc<RenderPass>& {
     return renderPass;
 }
+
