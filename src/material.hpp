@@ -12,7 +12,6 @@ namespace vfx {
     struct ShaderDescription {
         std::vector<char> bytes;
         std::string entry;
-        vk::ShaderStageFlagBits stage;
     };
 
     struct PipelineColorBlendAttachmentStateArray {
@@ -27,7 +26,8 @@ namespace vfx {
     };
 
     struct PipelineStateDescription {
-        std::vector<ShaderDescription> shaders = {};
+        std::optional<ShaderDescription> vertexShader = {};
+        std::optional<ShaderDescription> fragmentShader = {};
 
         vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState = {};
         vk::PipelineTessellationStateCreateInfo tessellationState = {};
@@ -48,7 +48,9 @@ namespace vfx {
     public:
         Context* context{};
         PipelineStateDescription description{};
-        std::vector<vk::ShaderModule> modules{};
+
+        vk::ShaderModule vertexModule = VK_NULL_HANDLE;
+        vk::ShaderModule fragmentModule = VK_NULL_HANDLE;
 
         vk::PipelineLayout pipelineLayout{};
         std::vector<vk::DescriptorSetLayout> descriptorSetLayouts{};

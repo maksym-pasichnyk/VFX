@@ -328,14 +328,6 @@ void vfx::Context::create_memory_allocator() {
     vmaCreateAllocator(&allocatorCreateInfo, &allocator);
 }
 
-auto vfx::Context::create_shader_module(std::span<const char> bytes) const -> vk::ShaderModule {
-    auto create_info = vk::ShaderModuleCreateInfo{
-        .codeSize = bytes.size(),
-        .pCode    = reinterpret_cast<const u32 *>(bytes.data())
-    };
-    return logical_device.createShaderModule(create_info);
-}
-
 auto vfx::Context::makeRenderPass(const vfx::RenderPassDescription& description) -> Arc<RenderPass> {
     std::vector<vk::SubpassDescription> subpasses{};
     subpasses.resize(description.definitions.size());
@@ -477,10 +469,7 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
     std::map<vk::DescriptorType, u32> descriptor_set_bindings_table{};
     std::vector<vk::PushConstantRange> constant_ranges{};
 
-    out->modules.reserve(description.shaders.size());
-    for (auto& stage : description.shaders) {
-        out->modules.emplace_back(create_shader_module(stage.bytes));
-
+    auto addShaderModule = [&](const vfx::ShaderDescription& stage) {
         SpvReflectShaderModule spv_module{};
         spvReflectCreateShaderModule(stage.bytes.size(), stage.bytes.data(), &spv_module);
 
@@ -527,6 +516,21 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
         }
 
         spvReflectDestroyShaderModule(&spv_module);
+
+        auto create_info = vk::ShaderModuleCreateInfo{
+            .codeSize = stage.bytes.size(),
+            .pCode    = reinterpret_cast<const u32 *>(stage.bytes.data())
+        };
+
+        return logical_device.createShaderModule(create_info);
+    };
+
+    if (description.vertexShader.has_value()) {
+        out->vertexModule = addShaderModule(*description.vertexShader);
+    }
+
+    if (description.fragmentShader.has_value()) {
+        out->fragmentModule = addShaderModule(*description.fragmentShader);
     }
 
     /*create descriptor set layouts*/ {
@@ -551,8 +555,12 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
 void vfx::Context::freePipelineState(PipelineState* pipelineState) {
     logical_device.destroyPipelineLayout(pipelineState->pipelineLayout);
 
-    for (auto& module : pipelineState->modules) {
-        logical_device.destroyShaderModule(module);
+    if (pipelineState->vertexModule) {
+        logical_device.destroyShaderModule(pipelineState->vertexModule);
+    }
+
+    if (pipelineState->fragmentModule) {
+        logical_device.destroyShaderModule(pipelineState->fragmentModule);
     }
 
     for (auto& layout : pipelineState->descriptorSetLayouts) {

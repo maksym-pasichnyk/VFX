@@ -142,16 +142,14 @@ struct Renderer {
 
         description.rasterizationState.lineWidth = 1.0f;
 
-        description.shaders.emplace_back(vfx::ShaderDescription{
+        description.vertexShader = vfx::ShaderDescription{
             .bytes = Assets::read_file("shaders/default.vert.spv"),
-            .entry = "main",
-            .stage  = vk::ShaderStageFlagBits::eVertex,
-        });
-        description.shaders.emplace_back(vfx::ShaderDescription{
+            .entry = "main"
+        };
+        description.fragmentShader = vfx::ShaderDescription{
             .bytes = Assets::read_file("shaders/default.frag.spv"),
-            .entry = "main",
-            .stage  = vk::ShaderStageFlagBits::eFragment,
-        });
+            .entry = "main"
+        };
         pipelineState = context->makePipelineState(description);
     }
 

@@ -35,11 +35,21 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
     dynamicState.setDynamicStates(dynamicStates);
 
     std::vector<vk::PipelineShaderStageCreateInfo> stages = {};
-    stages.resize(pipelineState->description.shaders.size());
-    for (u64 i = 0; i < pipelineState->description.shaders.size(); ++i) {
-        stages[i].setStage(pipelineState->description.shaders[i].stage);
-        stages[i].setModule(pipelineState->modules[i]);
-        stages[i].setPName(pipelineState->description.shaders[i].entry.c_str());
+
+    if (pipelineState->vertexModule) {
+        vk::PipelineShaderStageCreateInfo info{};
+        info.setStage(vk::ShaderStageFlagBits::eVertex);
+        info.setModule(pipelineState->vertexModule);
+        info.setPName(pipelineState->description.vertexShader.value().entry.c_str());
+        stages.emplace_back(info);
+    }
+
+    if (pipelineState->fragmentModule) {
+        vk::PipelineShaderStageCreateInfo info{};
+        info.setStage(vk::ShaderStageFlagBits::eFragment);
+        info.setModule(pipelineState->fragmentModule);
+        info.setPName(pipelineState->description.fragmentShader.value().entry.c_str());
+        stages.emplace_back(info);
     }
 
     vk::PipelineVertexInputStateCreateInfo vertexInputState = {};

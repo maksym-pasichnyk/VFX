@@ -54,7 +54,6 @@ namespace vfx {
         void select_physical_device();
         void create_logical_device();
         void create_memory_allocator();
-        auto create_shader_module(std::span<const char> bytes) const -> vk::ShaderModule;
 
     public:
         auto makeRenderPass(const RenderPassDescription& description) -> Arc<RenderPass>;
