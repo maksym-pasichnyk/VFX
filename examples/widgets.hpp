@@ -14,7 +14,7 @@
 #include "backends/imgui_impl_glfw.cpp"
 
 struct Widgets {
-    Widgets(vfx::Context& context, vfx::Window& window, Renderer& renderer) : context(context) {
+    Widgets(const Arc<vfx::Context>& context, const Arc<vfx::Window>& window) : context(context) {
         IMGUI_CHECKVERSION();
         ctx = ImGui::CreateContext();
 
@@ -25,7 +25,7 @@ struct Widgets {
         ctx->IO.BackendPlatformName = "imgui_impl_glfw";
         ctx->IO.BackendRendererName = "imgui_impl_vulkan";
 
-        ImGui_ImplGlfw_InitForVulkan(window.getHandle(), true);
+        ImGui_ImplGlfw_InitForVulkan(window->getHandle(), true);
 
         ImGui::StyleColorsDark(&ctx->Style);
 
@@ -40,20 +40,20 @@ struct Widgets {
         create_font_texture();
 
         for (auto& frame : frames) {
-            frame = context.makeMesh();
+            frame = context->makeMesh();
         }
     }
 
     ~Widgets() {
         ImGui::DestroyContext(ctx);
         
-        context.logical_device.destroyDescriptorPool(descriptor_pool);
-        context.logical_device.destroySampler(font_sampler);
-        context.freePipelineState(pipeline_state);
-        context.freeTexture(font_texture);
+        context->logical_device.destroyDescriptorPool(descriptor_pool);
+        context->logical_device.destroySampler(font_sampler);
+        context->freePipelineState(pipeline_state);
+        context->freeTexture(font_texture);
 
         for (auto& frame : frames) {
-            context.freeMesh(frame);
+            context->freeMesh(frame);
         }
     }
     
@@ -117,7 +117,7 @@ struct Widgets {
             .entry = "main",
             .stage = vk::ShaderStageFlagBits::eFragment
         });
-        pipeline_state = context.makePipelineState(description);
+        pipeline_state = context->makePipelineState(description);
 
         auto pool_sizes = std::array{
             vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1}
@@ -125,12 +125,12 @@ struct Widgets {
         auto pool_create_info = vk::DescriptorPoolCreateInfo{};
         pool_create_info.setMaxSets(1);
         pool_create_info.setPoolSizes(pool_sizes);
-        descriptor_pool = context.logical_device.createDescriptorPool(pool_create_info, nullptr);
+        descriptor_pool = context->logical_device.createDescriptorPool(pool_create_info, nullptr);
 
         auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
         ds_allocate_info.setDescriptorPool(descriptor_pool);
         ds_allocate_info.setSetLayouts(pipeline_state->descriptorSetLayouts);
-        descriptor_sets = context.logical_device.allocateDescriptorSets(ds_allocate_info);
+        descriptor_sets = context->logical_device.allocateDescriptorSets(ds_allocate_info);
     }
 
     void begin_frame() {
@@ -240,7 +240,7 @@ struct Widgets {
             .usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
             .aspect = vk::ImageAspectFlagBits::eColor
         };
-        font_texture = context.makeTexture(font_texture_description);
+        font_texture = context->makeTexture(font_texture_description);
 
         auto font_sampler_description = vk::SamplerCreateInfo{
             .magFilter = vk::Filter::eLinear,
@@ -250,7 +250,7 @@ struct Widgets {
             .addressModeV = vk::SamplerAddressMode::eRepeat,
             .addressModeW = vk::SamplerAddressMode::eRepeat
         };
-        font_sampler = context.logical_device.createSampler(font_sampler_description);
+        font_sampler = context->logical_device.createSampler(font_sampler_description);
         font_texture->setPixelData(std::span(reinterpret_cast<const glm::u8vec4 *>(pixels), width * height));
         ctx->IO.Fonts->SetTexID(font_texture.get());
 
@@ -267,7 +267,7 @@ struct Widgets {
             .descriptorType = vk::DescriptorType::eCombinedImageSampler,
             .pImageInfo = &image_info
         };
-        context.logical_device.updateDescriptorSets(write_descriptor_set, {});
+        context->logical_device.updateDescriptorSets(write_descriptor_set, {});
     }
 
     void setup_render_state(ImDrawData* draw_data, vfx::CommandBuffer* cmd, Arc<vfx::Mesh>& mesh, i32 fb_width, i32 fb_height) {
@@ -295,7 +295,7 @@ struct Widgets {
         );
     }
 
-    vfx::Context& context;
+    Arc<vfx::Context> context;
 
     ImGuiContext* ctx;
     u64 current_frame = 0;

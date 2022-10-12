@@ -17,7 +17,7 @@ namespace vfx {
         friend CommandBuffer;
 
     private:
-        Context& context;
+        Arc<Context> context;
 
         vk::SurfaceKHR surface;
         vk::SwapchainKHR handle{};
@@ -31,7 +31,7 @@ namespace vfx {
         vk::PresentModeKHR presentMode = {};
 
     public:
-        Swapchain(Context& context, vk::SurfaceKHR surface);
+        Swapchain(const Arc<Context>& context, const Arc<Window>& window);
         ~Swapchain();
 
     private:

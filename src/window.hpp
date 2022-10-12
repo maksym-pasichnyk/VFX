@@ -15,10 +15,10 @@ namespace vfx {
         bool resizable = false;
     };
 
-    struct WindowController final {
+    struct Application {
     public:
-        WindowController();
-        ~WindowController();
+        Application();
+        virtual ~Application();
 
     public:
         virtual void pollEvents() final;
@@ -28,19 +28,16 @@ namespace vfx {
     struct Swapchain;
     struct Window {
     private:
-        Context& context;
         GLFWwindow* handle;
-        vk::SurfaceKHR surface{};
-        Arc<Swapchain> swapchain{};
-        Arc<WindowController> controller;
 
     public:
-        Window(Arc<WindowController> _controller, Context& context, const WindowDescription& description);
+        explicit Window(const WindowDescription& description);
         ~Window();
 
     public:
+        auto createSurface(const Arc<Context>& context) -> vk::SurfaceKHR;
+
         auto getHandle() -> GLFWwindow*;
-        auto getSwapchain() -> Arc<Swapchain>;
         auto windowShouldClose() -> bool;
     };
 }

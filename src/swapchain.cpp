@@ -2,6 +2,7 @@
 #include "drawable.hpp"
 #include "context.hpp"
 #include "texture.hpp"
+#include "window.hpp"
 #include "pass.hpp"
 
 namespace vfx {
@@ -52,8 +53,10 @@ namespace vfx {
     }
 }
 
-vfx::Swapchain::Swapchain(Context& context, vk::SurfaceKHR surface) : context(context), surface(surface) {
-    const auto formats = context.physical_device.getSurfaceFormatsKHR(surface);
+vfx::Swapchain::Swapchain(const Arc<Context>& context, const Arc<Window>& window) : context(context) {
+    surface = window->createSurface(context);
+
+    const auto formats = context->physical_device.getSurfaceFormatsKHR(surface);
     const auto request_formats = std::array {
         vk::Format::eB8G8R8A8Unorm,
         vk::Format::eR8G8B8A8Unorm,
@@ -74,11 +77,12 @@ vfx::Swapchain::Swapchain(Context& context, vk::SurfaceKHR surface) : context(co
 vfx::Swapchain::~Swapchain() {
     destroy_drawables();
     destroy_swapchain();
-    context.freeRenderPass(renderPass);
+    context->freeRenderPass(renderPass);
+    context->instance.destroySurfaceKHR(surface);
 }
 
 void vfx::Swapchain::create_swapchain() {
-    const auto capabilities = context.physical_device.getSurfaceCapabilitiesKHR(surface);
+    const auto capabilities = context->physical_device.getSurfaceCapabilitiesKHR(surface);
     drawableSize = select_surface_extent(vk::Extent2D{0, 0}, capabilities);
 
     u32 min_image_count = capabilities.minImageCount + 1;
@@ -87,11 +91,11 @@ void vfx::Swapchain::create_swapchain() {
     }
 
     const auto queue_family_indices = std::array{
-        context.graphics_family,
-        context.present_family
+        context->graphics_family,
+        context->present_family
     };
 
-    const auto flag = context.graphics_family != context.present_family;
+    const auto flag = context->graphics_family != context->present_family;
 
     const auto swapchain_create_info = vk::SwapchainCreateInfoKHR {
         .surface = surface,
@@ -111,11 +115,11 @@ void vfx::Swapchain::create_swapchain() {
         .oldSwapchain = nullptr
     };
 
-    handle = context.logical_device.createSwapchainKHR(swapchain_create_info, nullptr);
+    handle = context->logical_device.createSwapchainKHR(swapchain_create_info, nullptr);
 }
 
 void vfx::Swapchain::destroy_swapchain() {
-    context.logical_device.destroySwapchainKHR(handle);
+    context->logical_device.destroySwapchainKHR(handle);
 }
 
 void vfx::Swapchain::create_render_pass() {
@@ -136,11 +140,11 @@ void vfx::Swapchain::create_render_pass() {
     pass_description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
     pass_description.attachments[0].finalLayout = vk::ImageLayout::ePresentSrcKHR;
 
-    renderPass = context.makeRenderPass(pass_description);
+    renderPass = context->makeRenderPass(pass_description);
 }
 
 void vfx::Swapchain::create_drawables() {
-    auto images = context.logical_device.getSwapchainImagesKHR(handle);
+    auto images = context->logical_device.getSwapchainImagesKHR(handle);
 
     drawables.resize(images.size());
     for (u64 i = 0; i < images.size(); ++i) {
@@ -154,13 +158,13 @@ void vfx::Swapchain::create_drawables() {
             }
         };
 
-        auto view = context.logical_device.createImageView(view_create_info);
+        auto view = context->logical_device.createImageView(view_create_info);
 
         drawables[i] = Arc<Drawable>::alloc();
         drawables[i]->index = u32(i);
         drawables[i]->layer = this;
         drawables[i]->texture = Box<Texture>::alloc();
-        drawables[i]->texture->context = &context;
+        drawables[i]->texture->context = context.get();
         drawables[i]->texture->size = drawableSize;
         drawables[i]->texture->format = pixelFormat;
         drawables[i]->texture->image = images[i];
@@ -177,19 +181,19 @@ void vfx::Swapchain::create_drawables() {
         fb_create_info.setHeight(drawableSize.height);
         fb_create_info.setLayers(1);
 
-        drawables[i]->framebuffer = context.logical_device.createFramebuffer(fb_create_info);
+        drawables[i]->framebuffer = context->logical_device.createFramebuffer(fb_create_info);
     }
 }
 
 void vfx::Swapchain::destroy_drawables() {
     for (auto& drawable : drawables) {
-        context.freeTexture(drawable->texture);
-        context.logical_device.destroyFramebuffer(drawable->framebuffer);
+        context->freeTexture(drawable->texture);
+        context->logical_device.destroyFramebuffer(drawable->framebuffer);
     }
 }
 
 void vfx::Swapchain::rebuild() {
-    context.logical_device.waitIdle();
+    context->logical_device.waitIdle();
 
     destroy_drawables();
     destroy_swapchain();
@@ -199,18 +203,18 @@ void vfx::Swapchain::rebuild() {
 
 auto vfx::Swapchain::nextDrawable() -> vfx::Drawable* {
     // todo: recycle fences
-    auto fence = context.logical_device.createFence({});
+    auto fence = context->logical_device.createFence({});
 
     u32 index;
-    auto result = context.logical_device.acquireNextImageKHR(
+    auto result = context->logical_device.acquireNextImageKHR(
         handle,
         std::numeric_limits<uint64_t>::max(),
         nullptr, // image_available_semaphores[current_frame],
         fence,
         &index
     );
-    std::ignore = context.logical_device.waitForFences(1, &fence, true, std::numeric_limits<uint64_t>::max());
-    context.logical_device.destroyFence(fence);
+    std::ignore = context->logical_device.waitForFences(1, &fence, true, std::numeric_limits<uint64_t>::max());
+    context->logical_device.destroyFence(fence);
 
     if (result == vk::Result::eErrorOutOfDateKHR) {
 //                rebuild();

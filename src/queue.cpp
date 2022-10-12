@@ -97,7 +97,7 @@ void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
     present_info.setPSwapchains(&drawable->layer->handle);
     present_info.setPImageIndices(&drawable->index);
 
-    vk::Result result = drawable->layer->context.present_queue.presentKHR(present_info);
+    vk::Result result = drawable->layer->context->present_queue.presentKHR(present_info);
 
     if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
         // todo: move to window

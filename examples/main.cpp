@@ -9,15 +9,13 @@
 #include "GLFW/glfw3.h"
 #include "spdlog/spdlog.h"
 
-struct Demo {
-    Arc<vfx::WindowController> controller{};
-
-    Arc<vfx::Context> context{};
+struct Demo : vfx::Application {
     Arc<vfx::Window> window{};
+    Arc<vfx::Context> context{};
     Arc<vfx::Swapchain> swapchain{};
 
-    Arc<Renderer> renderer{};
     Arc<Widgets> widgets{};
+    Arc<Renderer> renderer{};
 
     Arc<vfx::CommandQueue> graphics_command_queue{};
     Arc<vfx::PipelineState> present_pipeline_state{};
@@ -27,28 +25,28 @@ struct Demo {
     std::vector<vk::DescriptorSet> descriptor_sets{};
 
     Demo() {
-        controller = Arc<vfx::WindowController>::alloc();
-        context = vfx::createSystemDefaultContext();
-
-        window = Arc<vfx::Window>::alloc(controller, *context, vfx::WindowDescription{
+        window = Arc<vfx::Window>::alloc(vfx::WindowDescription{
             .title = "Demo",
             .width = 800,
             .height = 600,
             .resizable = true,
         });
-        swapchain = window->getSwapchain();
 
-        renderer = Box<Renderer>::alloc(*context, swapchain->getPixelFormat());
+        context = vfx::createSystemDefaultContext();
+        swapchain = Arc<vfx::Swapchain>::alloc(context, window);
+
+        renderer = Box<Renderer>::alloc(context, swapchain->getPixelFormat());
         renderer->setDrawableSize(swapchain->getDrawableSize());
 
-        widgets = Box<Widgets>::alloc(*context, *window, *renderer);
+        widgets = Box<Widgets>::alloc(context, window);
 
         graphics_command_queue = context->makeCommandQueue(16);
 
         create_present_pipeline_state();
     }
 
-    ~Demo() {
+    ~Demo() override {
+        context->logical_device.waitIdle();
         context->logical_device.destroyDescriptorPool(descriptor_pool);
         context->freePipelineState(present_pipeline_state);
         context->freeCommandQueue(graphics_command_queue);
@@ -61,7 +59,7 @@ struct Demo {
             f32 dt = f32(now - time);
             time = now;
 
-            controller->pollEvents();
+            pollEvents();
 
             draw();
 
@@ -73,7 +71,6 @@ struct Demo {
                 update_descriptors();
             }
         }
-        context->logical_device.waitIdle();
     }
 
     void draw() {
@@ -210,6 +207,7 @@ struct Demo {
         context->logical_device.updateDescriptorSets(write_descriptor_set, {});
     }
 };
+
 
 auto main() -> i32 {
     try {
