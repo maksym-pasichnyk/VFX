@@ -24,19 +24,31 @@ namespace vfx {
         virtual void pollEvents() final;
     };
 
+    struct WindowDelegate {
+        virtual void windowDidResize() = 0;
+    };
+
     struct Context;
     struct Swapchain;
     struct Window {
+        friend Context;
+        friend Swapchain;
+
     private:
         GLFWwindow* handle;
+
+    public:
+        WindowDelegate* delegate{};
 
     public:
         explicit Window(const WindowDescription& description);
         ~Window();
 
-    public:
+    private:
+        void windowDidResize();
         auto createSurface(const Arc<Context>& context) -> vk::SurfaceKHR;
 
+    public:
         auto getHandle() -> GLFWwindow*;
         auto windowShouldClose() -> bool;
     };

@@ -9,9 +9,9 @@
 #include "GLFW/glfw3.h"
 #include "spdlog/spdlog.h"
 
-struct Demo : vfx::Application {
-    Arc<vfx::Window> window{};
+struct Demo : vfx::Application, vfx::WindowDelegate {
     Arc<vfx::Context> context{};
+    Arc<vfx::Window> window{};
     Arc<vfx::Swapchain> swapchain{};
 
     Arc<Widgets> widgets{};
@@ -31,18 +31,19 @@ struct Demo : vfx::Application {
             .height = 600,
             .resizable = true,
         });
+        window->delegate = this;
 
         context = vfx::createSystemDefaultContext();
         swapchain = Arc<vfx::Swapchain>::alloc(context, window);
 
-        renderer = Box<Renderer>::alloc(context, swapchain->getPixelFormat());
+        renderer = Arc<Renderer>::alloc(context, swapchain->getPixelFormat());
         renderer->setDrawableSize(swapchain->getDrawableSize());
 
-        widgets = Box<Widgets>::alloc(context, window);
+        widgets = Arc<Widgets>::alloc(context, window);
 
         graphics_command_queue = context->makeCommandQueue(16);
 
-        create_present_pipeline_state();
+        createPresentPipelineState();
     }
 
     ~Demo() override {
@@ -60,16 +61,7 @@ struct Demo : vfx::Application {
             time = now;
 
             pollEvents();
-
             draw();
-
-            // todo: move to window resize event
-            if (swapchain->getDrawableSize() != renderer->drawableSize) {
-                context->logical_device.waitIdle();
-
-                renderer->setDrawableSize(swapchain->getDrawableSize());
-                update_descriptors();
-            }
         }
     }
 
@@ -92,13 +84,13 @@ struct Demo : vfx::Application {
         renderer->endRendering(cmd);
 
         auto drawable = swapchain->nextDrawable();
-        final_render_pass(cmd, drawable);
+        final_render_pass(swapchain->getDefaultRenderPass(), cmd, drawable);
         cmd->handle.end();
         cmd->submit();
         cmd->present(drawable);
     }
 
-    void final_render_pass(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
+    void final_render_pass(const Arc<vfx::RenderPass>& pass, vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
         auto clear_values = std::array{
             vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({0.0f, 0.0f, 0.0f, 0.0f})),
         };
@@ -107,7 +99,7 @@ struct Demo : vfx::Application {
         render_area.setExtent(drawable->texture->size);
 
         auto begin_info = vk::RenderPassBeginInfo{};
-        begin_info.setRenderPass(swapchain->getDefaultRenderPass()->handle);
+        begin_info.setRenderPass(pass->handle);
         begin_info.setFramebuffer(drawable->framebuffer);
         begin_info.setRenderArea(render_area);
         begin_info.setClearValues(clear_values);
@@ -128,7 +120,7 @@ struct Demo : vfx::Application {
         cmd->endRenderPass();
     }
 
-    void create_present_pipeline_state() {
+    void createPresentPipelineState() {
         vfx::PipelineStateDescription description{};
 
         description.attachments[0].blendEnable = false;
@@ -139,28 +131,8 @@ struct Demo : vfx::Application {
             vk::ColorComponentFlagBits::eA;
 
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
-        description.inputAssemblyState.primitiveRestartEnable = false;
 
-        description.rasterizationState.depthClampEnable        = false;
-        description.rasterizationState.rasterizerDiscardEnable = false;
-        description.rasterizationState.polygonMode             = vk::PolygonMode::eFill;
-        description.rasterizationState.cullMode                = vk::CullModeFlagBits::eNone;
-        description.rasterizationState.frontFace               = vk::FrontFace::eCounterClockwise;
-        description.rasterizationState.depthBiasEnable         = false;
-        description.rasterizationState.depthBiasConstantFactor = 0.0f;
-        description.rasterizationState.depthBiasClamp          = 0.0f;
-        description.rasterizationState.depthBiasSlopeFactor    = 0.0f;
-        description.rasterizationState.lineWidth               = 1.0f;
-
-        description.depthStencilState.depthTestEnable       = false;
-        description.depthStencilState.depthWriteEnable      = false;
-        description.depthStencilState.depthCompareOp        = vk::CompareOp::eNever;
-        description.depthStencilState.depthBoundsTestEnable = false;
-        description.depthStencilState.stencilTestEnable     = false;
-        description.depthStencilState.front                 = vk::StencilOpState{};
-        description.depthStencilState.back                  = vk::StencilOpState{};
-        description.depthStencilState.minDepthBounds        = 0.0f;
-        description.depthStencilState.maxDepthBounds        = 0.0f;
+        description.rasterizationState.lineWidth = 1.0f;
 
         description.shaders.emplace_back(vfx::ShaderDescription{
             .bytes = Assets::read_file("shaders/blit.vert.spv"),
@@ -187,10 +159,10 @@ struct Demo : vfx::Application {
         ds_allocate_info.setSetLayouts(present_pipeline_state->descriptorSetLayouts);
         descriptor_sets = context->logical_device.allocateDescriptorSets(ds_allocate_info);
 
-        update_descriptors();
+        updateAttachmentDescriptors();
     }
 
-    void update_descriptors() {
+    void updateAttachmentDescriptors() {
         const auto image_info = vk::DescriptorImageInfo{
             .sampler = renderer->sampler,
             .imageView = renderer->colorAttachmentTexture->view,
@@ -205,6 +177,18 @@ struct Demo : vfx::Application {
             .pImageInfo = &image_info
         };
         context->logical_device.updateDescriptorSets(write_descriptor_set, {});
+    }
+
+    void windowDidResize() override {
+        context->logical_device.waitIdle();
+
+        swapchain->freeGpuObjects();
+        swapchain->makeGpuObjects();
+
+        renderer->setDrawableSize(swapchain->getDrawableSize());
+
+        updateAttachmentDescriptors();
+        draw();
     }
 };
 

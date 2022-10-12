@@ -17,6 +17,7 @@ namespace vfx {
         friend CommandBuffer;
 
     private:
+        Arc<Window> window;
         Arc<Context> context;
 
         vk::SurfaceKHR surface;
@@ -35,14 +36,12 @@ namespace vfx {
         ~Swapchain();
 
     private:
-        void create_swapchain();
-        void destroy_swapchain();
         void create_render_pass();
-        void create_drawables();
-        void destroy_drawables();
 
     public:
-        void rebuild();
+        void makeGpuObjects();
+        void freeGpuObjects();
+
         auto nextDrawable() -> Drawable*;
 
         auto getPixelFormat() -> vk::Format;

@@ -1,5 +1,6 @@
 #include "queue.hpp"
 #include "pass.hpp"
+#include "window.hpp"
 #include "context.hpp"
 #include "material.hpp"
 #include "drawable.hpp"
@@ -99,11 +100,12 @@ void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
 
     vk::Result result = drawable->layer->context->present_queue.presentKHR(present_info);
 
-    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
-        // todo: move to window
-        drawable->layer->rebuild();
+    if (result == vk::Result::eErrorOutOfDateKHR) {
+        spdlog::debug("Swapchain is out of date");
+    } else if (result == vk::Result::eSuboptimalKHR) {
+        spdlog::debug("Swapchain is suboptimal");
     } else if (result != vk::Result::eSuccess) {
-        throw std::runtime_error("failed to present swapchain image");
+        throw std::runtime_error(vk::to_string(result));
     }
 }
 

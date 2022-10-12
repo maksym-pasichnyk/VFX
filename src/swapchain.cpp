@@ -5,6 +5,8 @@
 #include "window.hpp"
 #include "pass.hpp"
 
+#include "spdlog/spdlog.h"
+
 namespace vfx {
     inline auto select_surface_extent(const vk::Extent2D& extent, const vk::SurfaceCapabilitiesKHR &capabilities) -> vk::Extent2D {
         if (capabilities.currentExtent.width != std::numeric_limits<u32>::max()) {
@@ -53,7 +55,7 @@ namespace vfx {
     }
 }
 
-vfx::Swapchain::Swapchain(const Arc<Context>& context, const Arc<Window>& window) : context(context) {
+vfx::Swapchain::Swapchain(const Arc<Context>& context, const Arc<Window>& window) : context(context), window(window) {
     surface = window->createSurface(context);
 
     const auto formats = context->physical_device.getSurfaceFormatsKHR(surface);
@@ -70,18 +72,37 @@ vfx::Swapchain::Swapchain(const Arc<Context>& context, const Arc<Window>& window
     presentMode = vk::PresentModeKHR::eFifo;
 
     create_render_pass();
-    create_swapchain();
-    create_drawables();
+    makeGpuObjects();
 }
 
 vfx::Swapchain::~Swapchain() {
-    destroy_drawables();
-    destroy_swapchain();
+    freeGpuObjects();
     context->freeRenderPass(renderPass);
     context->instance.destroySurfaceKHR(surface);
 }
 
-void vfx::Swapchain::create_swapchain() {
+void vfx::Swapchain::create_render_pass() {
+    vfx::RenderPassDescription pass_description{};
+    pass_description.definitions = {
+        vfx::SubpassDescription{
+            .colorAttachments = {
+                vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
+            }
+        }
+    };
+    pass_description.attachments[0].format = pixelFormat;
+    pass_description.attachments[0].samples = vk::SampleCountFlagBits::e1;
+    pass_description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+    pass_description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+    pass_description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+    pass_description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+    pass_description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
+    pass_description.attachments[0].finalLayout = vk::ImageLayout::ePresentSrcKHR;
+
+    renderPass = context->makeRenderPass(pass_description);
+}
+
+void vfx::Swapchain::makeGpuObjects() {
     const auto capabilities = context->physical_device.getSurfaceCapabilitiesKHR(surface);
     drawableSize = select_surface_extent(vk::Extent2D{0, 0}, capabilities);
 
@@ -116,34 +137,7 @@ void vfx::Swapchain::create_swapchain() {
     };
 
     handle = context->logical_device.createSwapchainKHR(swapchain_create_info, nullptr);
-}
 
-void vfx::Swapchain::destroy_swapchain() {
-    context->logical_device.destroySwapchainKHR(handle);
-}
-
-void vfx::Swapchain::create_render_pass() {
-    vfx::RenderPassDescription pass_description{};
-    pass_description.definitions = {
-        vfx::SubpassDescription{
-            .colorAttachments = {
-                vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
-            }
-        }
-    };
-    pass_description.attachments[0].format = pixelFormat;
-    pass_description.attachments[0].samples = vk::SampleCountFlagBits::e1;
-    pass_description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
-    pass_description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
-    pass_description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-    pass_description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-    pass_description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
-    pass_description.attachments[0].finalLayout = vk::ImageLayout::ePresentSrcKHR;
-
-    renderPass = context->makeRenderPass(pass_description);
-}
-
-void vfx::Swapchain::create_drawables() {
     auto images = context->logical_device.getSwapchainImagesKHR(handle);
 
     drawables.resize(images.size());
@@ -185,20 +179,12 @@ void vfx::Swapchain::create_drawables() {
     }
 }
 
-void vfx::Swapchain::destroy_drawables() {
+void vfx::Swapchain::freeGpuObjects() {
     for (auto& drawable : drawables) {
         context->freeTexture(drawable->texture);
         context->logical_device.destroyFramebuffer(drawable->framebuffer);
     }
-}
-
-void vfx::Swapchain::rebuild() {
-    context->logical_device.waitIdle();
-
-    destroy_drawables();
-    destroy_swapchain();
-    create_swapchain();
-    create_drawables();
+    context->logical_device.destroySwapchainKHR(handle);
 }
 
 auto vfx::Swapchain::nextDrawable() -> vfx::Drawable* {
@@ -217,8 +203,10 @@ auto vfx::Swapchain::nextDrawable() -> vfx::Drawable* {
     context->logical_device.destroyFence(fence);
 
     if (result == vk::Result::eErrorOutOfDateKHR) {
-//                rebuild();
-    } else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+        spdlog::debug("Swapchain is out of date");
+    } else if (result == vk::Result::eSuboptimalKHR) {
+        spdlog::debug("Swapchain is suboptimal");
+    } else if (result != vk::Result::eSuccess) {
         throw std::runtime_error("failed to acquire swapchain image");
     }
     return drawables[u64(index)].get();

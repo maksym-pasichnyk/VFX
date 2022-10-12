@@ -22,6 +22,15 @@ vfx::Window::Window(const WindowDescription& description) {
     glfwWindowHint(GLFW_RESIZABLE, description.resizable ? GLFW_TRUE : GLFW_FALSE);
 
     handle = glfwCreateWindow(i32(description.width), i32(description.height), description.title.c_str(), nullptr, nullptr);
+
+    glfwSetWindowUserPointer(handle, this);
+    glfwSetFramebufferSizeCallback(handle, [](GLFWwindow* window, int width, int height) {
+        auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
+        if (self->handle != window) {
+            return;
+        }
+        self->windowDidResize();
+    });
 }
 
 vfx::Window::~Window() {
@@ -40,4 +49,10 @@ auto vfx::Window::getHandle() -> GLFWwindow* {
 
 auto vfx::Window::windowShouldClose() -> bool {
     return glfwWindowShouldClose(handle);
+}
+
+void vfx::Window::windowDidResize() {
+    if (delegate) {
+        delegate->windowDidResize();
+    }
 }

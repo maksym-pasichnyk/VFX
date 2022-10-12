@@ -154,28 +154,8 @@ struct Renderer {
             vk::ColorComponentFlagBits::eA;
 
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
-        description.inputAssemblyState.primitiveRestartEnable = false;
 
-        description.rasterizationState.depthClampEnable        = false;
-        description.rasterizationState.rasterizerDiscardEnable = false;
-        description.rasterizationState.polygonMode             = vk::PolygonMode::eFill;
-        description.rasterizationState.cullMode                = vk::CullModeFlagBits::eNone;
-        description.rasterizationState.frontFace               = vk::FrontFace::eCounterClockwise;
-        description.rasterizationState.depthBiasEnable         = false;
-        description.rasterizationState.depthBiasConstantFactor = 0.0f;
-        description.rasterizationState.depthBiasClamp          = 0.0f;
-        description.rasterizationState.depthBiasSlopeFactor    = 0.0f;
-        description.rasterizationState.lineWidth               = 1.0f;
-
-        description.depthStencilState.depthTestEnable       = false;
-        description.depthStencilState.depthWriteEnable      = false;
-        description.depthStencilState.depthCompareOp        = vk::CompareOp::eNever;
-        description.depthStencilState.depthBoundsTestEnable = false;
-        description.depthStencilState.stencilTestEnable     = false;
-        description.depthStencilState.front                 = vk::StencilOpState{};
-        description.depthStencilState.back                  = vk::StencilOpState{};
-        description.depthStencilState.minDepthBounds        = 0.0f;
-        description.depthStencilState.maxDepthBounds        = 0.0f;
+        description.rasterizationState.lineWidth = 1.0f;
 
         description.shaders.emplace_back(vfx::ShaderDescription{
             .bytes = Assets::read_file("shaders/default.vert.spv"),
