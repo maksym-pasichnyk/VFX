@@ -32,12 +32,12 @@ namespace vfx {
     };
 
     struct RenderingInfo {
-        vk::Rect2D                             renderArea        = {};
-        uint32_t                               layerCount        = {};
-        uint32_t                               viewMask          = {};
-        RenderingAttachmentInfoArray           colorAttachments  = {};
-        std::optional<RenderingAttachmentInfo> depthAttachment   = {};
-        std::optional<RenderingAttachmentInfo> stencilAttachment = {};
+        vk::Rect2D                   renderArea        = {};
+        u32                          layerCount        = {};
+        u32                          viewMask          = {};
+        RenderingAttachmentInfoArray colorAttachments  = {};
+        RenderingAttachmentInfo      depthAttachment   = {};
+        RenderingAttachmentInfo      stencilAttachment = {};
     };
 
     struct Context;
@@ -51,6 +51,9 @@ namespace vfx {
     private:
         vk::RenderPass renderPass = {};
         Arc<PipelineState> pipelineState = {};
+        vk::RenderingAttachmentInfo depthAttachment = {};
+        vk::RenderingAttachmentInfo stencilAttachment = {};
+        std::vector<vk::RenderingAttachmentInfo> colorAttachments = {};
 
     public:
         Context* context{};
@@ -63,6 +66,7 @@ namespace vfx {
     private:
         void reset();
         auto makePipeline(i32 subpass) -> vk::Pipeline;
+        void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingAttachmentInfo& in);
 
     public:
         void begin(const vk::CommandBufferBeginInfo& info);
@@ -72,7 +76,7 @@ namespace vfx {
         void setPipelineState(const Arc<PipelineState>& state);
         void beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents);
         void endRenderPass();
-        void beginRendering(const RenderingInfo& info);
+        void beginRendering(const RenderingInfo& description);
         void endRendering();
         void setScissor(u32 firstScissor, const vk::Rect2D& rect);
         void setViewport(u32 firstViewport, const vk::Viewport& viewport);

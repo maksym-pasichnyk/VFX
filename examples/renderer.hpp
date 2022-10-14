@@ -20,12 +20,10 @@ struct Renderer {
 
     vk::Sampler sampler{};
     vk::Extent2D drawableSize{};
-    vk::Framebuffer framebuffer{};
 
     Arc<vfx::Texture> colorAttachmentTexture{};
     Arc<vfx::Texture> depthAttachmentTexture{};
 
-    Arc<vfx::RenderPass> renderPass{};
     Arc<vfx::PipelineState> pipelineState{};
 
     Globals globals{};
@@ -44,25 +42,16 @@ struct Renderer {
         };
         sampler = context->logical_device.createSampler(sampler_description);
 
-        createRenderPass();
         createPipelineState();
     }
 
     ~Renderer() {
         context->logical_device.destroySampler(sampler);
-
-        if (framebuffer) {
-            context->logical_device.destroyFramebuffer(framebuffer);
-        }
     }
 
     void setDrawableSize(const vk::Extent2D& size) {
         drawableSize = size;
         globals.Resolution = drawableSize;
-
-        if (framebuffer) {
-            context->logical_device.destroyFramebuffer(framebuffer);
-        }
 
         auto color_texture_description = vfx::TextureDescription{
             .format = pixelFormat,
@@ -81,55 +70,45 @@ struct Renderer {
             .aspect = vk::ImageAspectFlagBits::eDepth
         };
         depthAttachmentTexture = context->makeTexture(depth_texture_description);
-
-        auto attachments = std::array{
-            colorAttachmentTexture->view,
-            depthAttachmentTexture->view
-        };
-
-        vk::FramebufferCreateInfo fb_create_info{};
-        fb_create_info.setRenderPass(renderPass->handle);
-        fb_create_info.setAttachments(attachments);
-        fb_create_info.setWidth(size.width);
-        fb_create_info.setHeight(size.height);
-        fb_create_info.setLayers(1);
-
-        framebuffer = context->logical_device.createFramebuffer(fb_create_info);
     }
 
-    void createRenderPass() {
-        vfx::RenderPassDescription description{};
-        description.definitions = {
-            vfx::SubpassDescription{
-                .colorAttachments = {
-                    vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
-                },
-                .depthStencilAttachment = vk::AttachmentReference{1, vk::ImageLayout::eDepthStencilAttachmentOptimal}
-            }
-        };
-        description.attachments[0].format = pixelFormat;
-        description.attachments[0].samples = vk::SampleCountFlagBits::e1;
-        description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
-        description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
-        description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-        description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-        description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
-        description.attachments[0].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-
-        description.attachments[1].format = depthStencilFormat;
-        description.attachments[1].samples = vk::SampleCountFlagBits::e1;
-        description.attachments[1].loadOp = vk::AttachmentLoadOp::eClear;
-        description.attachments[1].storeOp = vk::AttachmentStoreOp::eStore;
-        description.attachments[1].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-        description.attachments[1].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-        description.attachments[1].initialLayout = vk::ImageLayout::eUndefined;
-        description.attachments[1].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-
-        renderPass = context->makeRenderPass(description);
-    }
+//    void createRenderPass() {
+//        vfx::RenderPassDescription description{};
+//        description.definitions = {
+//            vfx::SubpassDescription{
+//                .colorAttachments = {
+//                    vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
+//                },
+//                .depthStencilAttachment = vk::AttachmentReference{1, vk::ImageLayout::eDepthStencilAttachmentOptimal}
+//            }
+//        };
+//        description.attachments[0].format = pixelFormat;
+//        description.attachments[0].samples = vk::SampleCountFlagBits::e1;
+//        description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+//        description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+//        description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+//        description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+//        description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
+//        description.attachments[0].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+//
+//        description.attachments[1].format = depthStencilFormat;
+//        description.attachments[1].samples = vk::SampleCountFlagBits::e1;
+//        description.attachments[1].loadOp = vk::AttachmentLoadOp::eClear;
+//        description.attachments[1].storeOp = vk::AttachmentStoreOp::eStore;
+//        description.attachments[1].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+//        description.attachments[1].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+//        description.attachments[1].initialLayout = vk::ImageLayout::eUndefined;
+//        description.attachments[1].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+//
+//        renderPass = context->makeRenderPass(description);
+//    }
 
     void createPipelineState() {
         vfx::PipelineStateDescription description{};
+
+        description.colorAttachmentFormats[0] = pixelFormat;
+//        description.rendering->depthAttachmentFormat = depthStencilFormat;
+//        description.rendering->stencilAttachmentFormat = depthStencilFormat;
 
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =
@@ -158,24 +137,79 @@ struct Renderer {
         area.setOffset(vk::Offset2D{0, 0});
         area.setExtent(drawableSize);
 
-        auto begin_info = vk::RenderPassBeginInfo{};
-        begin_info.setRenderPass(renderPass->handle);
-        begin_info.setFramebuffer(framebuffer);
-        begin_info.setRenderArea(area);
-        begin_info.setClearValues(clear_values);
+//        auto begin_info = vk::RenderPassBeginInfo{};
+//        begin_info.setRenderPass(renderPass->handle);
+//        begin_info.setFramebuffer(framebuffer);
+//        begin_info.setRenderArea(area);
+//        begin_info.setClearValues(clear_values);
+//        cmd->beginRenderPass(begin_info, vk::SubpassContents::eInline);
+
+        auto info = vfx::RenderingInfo{};
+        info.renderArea = area;
+        info.layerCount = 1;
+
+        info.colorAttachments[0].texture = colorAttachmentTexture;
+        info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+        info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+        info.colorAttachments[0].clearValue = clear_values[0];
+
+//        info.depthAttachment.texture = depthAttachmentTexture;
+//        info.depthAttachment.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+//        info.depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+//        info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
+//        info.depthAttachment.clearValue = clear_values[1];
+
+        auto image_memory_barrier = vk::ImageMemoryBarrier{};
+        image_memory_barrier.setSrcAccessMask(vk::AccessFlags{});
+        image_memory_barrier.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+        image_memory_barrier.setOldLayout(vk::ImageLayout::eUndefined);
+        image_memory_barrier.setNewLayout(vk::ImageLayout::eColorAttachmentOptimal);
+        image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+        image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+        image_memory_barrier.setImage(colorAttachmentTexture->image);
+        image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+        cmd->handle.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTopOfPipe,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            {},
+            0, nullptr,
+            0, nullptr,
+            1, &image_memory_barrier
+        );
+
+        cmd->beginRendering(info);
 
         auto viewport = vk::Viewport{};
         viewport.setWidth(f32(drawableSize.width));
         viewport.setHeight(f32(drawableSize.height));
         viewport.setMaxDepth(1.f);
 
-        cmd->beginRenderPass(begin_info, vk::SubpassContents::eInline);
         cmd->setViewport(0, viewport);
         cmd->setScissor(0, area);
     }
 
     void endRendering(vfx::CommandBuffer* cmd) {
-        cmd->endRenderPass();
+        cmd->endRendering();
+//        cmd->endRenderPass();
+
+        auto image_memory_barrier = vk::ImageMemoryBarrier{};
+        image_memory_barrier.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+        image_memory_barrier.setDstAccessMask(vk::AccessFlags{});
+        image_memory_barrier.setOldLayout(vk::ImageLayout::eColorAttachmentOptimal);
+        image_memory_barrier.setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+        image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+        image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+        image_memory_barrier.setImage(colorAttachmentTexture->image);
+        image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+        cmd->handle.pipelineBarrier(
+            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            vk::PipelineStageFlagBits::eBottomOfPipe,
+            {},
+            0, nullptr,
+            0, nullptr,
+            1, &image_memory_barrier
+        );
     }
 
     void draw(vfx::CommandBuffer* cmd) {

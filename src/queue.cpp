@@ -55,7 +55,14 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
     vk::PipelineColorBlendStateCreateInfo colorBlendState = {};
     colorBlendState.setAttachments(pipelineState->description.attachments.elements);
 
+    vk::PipelineRenderingCreateInfo rendering = {};
+    rendering.setViewMask(pipelineState->description.viewMask);
+    rendering.setColorAttachmentFormats(pipelineState->description.colorAttachmentFormats.elements);
+    rendering.setDepthAttachmentFormat(pipelineState->description.depthAttachmentFormat);
+    rendering.setStencilAttachmentFormat(pipelineState->description.stencilAttachmentFormat);
+
     auto pipeline_create_info = vk::GraphicsPipelineCreateInfo{};
+    pipeline_create_info.setPNext(&rendering);
     pipeline_create_info.setStages(stages);
     pipeline_create_info.setPVertexInputState(&vertexInputState);
     pipeline_create_info.setPInputAssemblyState(&pipelineState->description.inputAssemblyState);
@@ -87,6 +94,17 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
     return pipeline;
 }
 
+void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingAttachmentInfo& in) {
+    out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
+    out.imageLayout = in.imageLayout;
+    out.resolveMode = in.resolveMode;
+    out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
+    out.resolveImageLayout = in.resolveImageLayout;
+    out.loadOp = in.loadOp;
+    out.storeOp = in.storeOp;
+    out.clearValue = in.clearValue;
+}
+
 void vfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
     pipelineState = {};
     handle.begin(info);
@@ -98,8 +116,10 @@ void vfx::CommandBuffer::end() {
 
 void vfx::CommandBuffer::submit() {
     auto submit_info = vk::SubmitInfo{};
-    submit_info.setCommandBuffers(handle);
-    submit_info.setSignalSemaphores(semaphore);
+    submit_info.setCommandBufferCount(1);
+    submit_info.setPCommandBuffers(&handle);
+    submit_info.setSignalSemaphoreCount(1);
+    submit_info.setPSignalSemaphores(&semaphore);
 
     commandQueue->handle.submit(submit_info, fence);
 }
@@ -136,11 +156,37 @@ void vfx::CommandBuffer::endRenderPass() {
     handle.endRenderPass();
 }
 
-void vfx::CommandBuffer::beginRendering(const RenderingInfo& info) {
+void vfx::CommandBuffer::beginRendering(const RenderingInfo& description) {
+    auto colorAttachmentCount = description.colorAttachments.elements.size();
+    if (colorAttachmentCount > colorAttachments.size()) {
+        colorAttachments.resize(colorAttachmentCount);
+    }
 
+    for (u64 i = 0; i < colorAttachmentCount; ++i) {
+        fillAttachmentInfo(colorAttachments[i], description.colorAttachments.elements[i]);
+    }
+
+    vk::RenderingInfo info{};
+//    vk_rendering_info.setPNext(info.pNext);
+//    vk_rendering_info.setFlags(info.flags);
+    info.setRenderArea(description.renderArea);
+    info.setLayerCount(description.layerCount);
+    info.setViewMask(description.viewMask);
+    info.setColorAttachmentCount(u32(colorAttachmentCount));
+    info.setPColorAttachments(colorAttachments.data());
+    if (description.depthAttachment.texture) {
+        fillAttachmentInfo(depthAttachment, description.depthAttachment);
+        info.setPDepthAttachment(&depthAttachment);
+    }
+    if (description.stencilAttachment.texture) {
+        fillAttachmentInfo(stencilAttachment, description.stencilAttachment);
+        info.setPStencilAttachment(&stencilAttachment);
+    }
+    handle.beginRendering(info);
 }
 
 void vfx::CommandBuffer::endRendering() {
+    handle.endRendering();
 }
 
 void vfx::CommandBuffer::setScissor(u32 firstScissor, const vk::Rect2D& rect) {

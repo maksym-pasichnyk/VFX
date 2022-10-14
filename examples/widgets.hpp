@@ -13,7 +13,9 @@
 #include "imgui_internal.h"
 #include "backends/imgui_impl_glfw.cpp"
 
+// todo: get rid of current frame
 struct Widgets {
+public:
     Widgets(const Arc<vfx::Context>& context, const Arc<vfx::Window>& window) : context(context) {
         IMGUI_CHECKVERSION();
         ctx = ImGui::CreateContext();
@@ -36,8 +38,8 @@ struct Widgets {
         ctx->Style.PopupRounding = 0.0f;
         ctx->Style.ScrollbarRounding = 0.0f;
 
-        create_pipeline_state();
-        create_font_texture();
+        createPipelineState();
+        createFontTexture();
 
         for (auto& frame : frames) {
             frame = Arc<vfx::Mesh>::alloc(context);
@@ -48,64 +50,16 @@ struct Widgets {
         ImGui::DestroyContext(ctx);
         
         context->logical_device.destroyDescriptorPool(descriptor_pool);
-        context->logical_device.destroySampler(font_sampler);
-    }
-    
-    void create_pipeline_state() {
-        vfx::PipelineStateDescription description{};
-
-        description.bindings = {
-            {0, sizeof(ImDrawVert), vk::VertexInputRate::eVertex}
-        };
-
-        description.attributes = {
-            {0, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, pos) },
-            {1, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, uv) },
-            {2, 0, vk::Format::eR8G8B8A8Unorm, offsetof(ImDrawVert, col) }
-        };
-
-        description.attachments[0].blendEnable = true;
-        description.attachments[0].srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
-        description.attachments[0].dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
-        description.attachments[0].colorBlendOp = vk::BlendOp::eAdd;
-        description.attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
-        description.attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eZero;
-        description.attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
-        description.attachments[0].colorWriteMask =
-            vk::ColorComponentFlagBits::eR |
-            vk::ColorComponentFlagBits::eG |
-            vk::ColorComponentFlagBits::eB |
-            vk::ColorComponentFlagBits::eA;
-
-        description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
-
-        description.rasterizationState.lineWidth = 1.0f;
-
-        description.vertexFunction = context->makeFunction(Assets::read_file("shaders/imgui.vert.spv"), "main");
-        description.fragmentFunction = context->makeFunction(Assets::read_file("shaders/imgui.frag.spv"), "main");
-
-        pipeline_state = context->makePipelineState(description);
-
-        auto pool_sizes = std::array{
-            vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1}
-        };
-        auto pool_create_info = vk::DescriptorPoolCreateInfo{};
-        pool_create_info.setMaxSets(1);
-        pool_create_info.setPoolSizes(pool_sizes);
-        descriptor_pool = context->logical_device.createDescriptorPool(pool_create_info, nullptr);
-
-        auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
-        ds_allocate_info.setDescriptorPool(descriptor_pool);
-        ds_allocate_info.setSetLayouts(pipeline_state->descriptorSetLayouts);
-        descriptor_sets = context->logical_device.allocateDescriptorSets(ds_allocate_info);
+        context->logical_device.destroySampler(fontSampler);
     }
 
-    void begin_frame() {
+public:
+    void beginFrame() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
     }
 
-    void end_frame() {
+    void endFrame() {
         ImGui::Render();
         current_frame = (current_frame + 1) % frames.size();
     }
@@ -147,10 +101,10 @@ struct Widgets {
             }
         }
 
-        cmd->setPipelineState(pipeline_state);
-        cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_state->pipelineLayout, 0, descriptor_sets, {});
+        cmd->setPipelineState(pipelineState);
+        cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineState->pipelineLayout, 0, descriptor_sets, {});
 
-        setup_render_state(draw_data, cmd, frame, fb_width, fb_height);
+        setupRenderState(draw_data, cmd, frame, fb_width, fb_height);
 
         u32 global_vtx_offset = 0;
         u32 global_idx_offset = 0;
@@ -160,7 +114,7 @@ struct Widgets {
                 auto pcmd = &cmd_list->CmdBuffer[cmd_i];
                 if (pcmd->UserCallback != nullptr) {
                     if (pcmd->UserCallback == ImDrawCallback_ResetRenderState) {
-                        setup_render_state(draw_data, cmd, frame, fb_width, fb_height);
+                        setupRenderState(draw_data, cmd, frame, fb_width, fb_height);
                     } else {
                         pcmd->UserCallback(cmd_list, pcmd);
                     }
@@ -195,7 +149,8 @@ struct Widgets {
         }
     }
 
-    void create_font_texture() {
+private:
+    void createFontTexture() {
         uint8_t *pixels;
         i32 width, height;
         ctx->IO.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
@@ -207,7 +162,7 @@ struct Widgets {
             .usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
             .aspect = vk::ImageAspectFlagBits::eColor
         };
-        font_texture = context->makeTexture(font_texture_description);
+        fontTexture = context->makeTexture(font_texture_description);
 
         auto font_sampler_description = vk::SamplerCreateInfo{
             .magFilter = vk::Filter::eLinear,
@@ -217,13 +172,13 @@ struct Widgets {
             .addressModeV = vk::SamplerAddressMode::eRepeat,
             .addressModeW = vk::SamplerAddressMode::eRepeat
         };
-        font_sampler = context->logical_device.createSampler(font_sampler_description);
-        font_texture->setPixelData(std::span(reinterpret_cast<const glm::u8vec4 *>(pixels), width * height));
-        ctx->IO.Fonts->SetTexID(font_texture.get());
+        fontSampler = context->logical_device.createSampler(font_sampler_description);
+        fontTexture->setPixelData(std::span(reinterpret_cast<const glm::u8vec4 *>(pixels), width * height));
+        ctx->IO.Fonts->SetTexID(fontTexture.get());
 
         const auto image_info = vk::DescriptorImageInfo{
-            .sampler = font_sampler,
-            .imageView = font_texture->view,
+            .sampler = fontSampler,
+            .imageView = fontTexture->view,
             .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         };
         const auto write_descriptor_set = vk::WriteDescriptorSet{
@@ -237,7 +192,60 @@ struct Widgets {
         context->logical_device.updateDescriptorSets(write_descriptor_set, {});
     }
 
-    void setup_render_state(ImDrawData* draw_data, vfx::CommandBuffer* cmd, Arc<vfx::Mesh>& mesh, i32 fb_width, i32 fb_height) {
+    void createPipelineState() {
+        vfx::PipelineStateDescription description{};
+
+        description.bindings = {
+            {0, sizeof(ImDrawVert), vk::VertexInputRate::eVertex}
+        };
+
+        description.attributes = {
+            {0, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, pos) },
+            {1, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, uv) },
+            {2, 0, vk::Format::eR8G8B8A8Unorm, offsetof(ImDrawVert, col) }
+        };
+
+        description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
+//        description.rendering->depthAttachmentFormat = depthStencilFormat;
+//        description.rendering->stencilAttachmentFormat = depthStencilFormat;
+
+        description.attachments[0].blendEnable = true;
+        description.attachments[0].srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+        description.attachments[0].dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+        description.attachments[0].colorBlendOp = vk::BlendOp::eAdd;
+        description.attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+        description.attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eZero;
+        description.attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
+        description.attachments[0].colorWriteMask =
+            vk::ColorComponentFlagBits::eR |
+                vk::ColorComponentFlagBits::eG |
+                vk::ColorComponentFlagBits::eB |
+                vk::ColorComponentFlagBits::eA;
+
+        description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
+
+        description.rasterizationState.lineWidth = 1.0f;
+
+        description.vertexFunction = context->makeFunction(Assets::read_file("shaders/imgui.vert.spv"), "main");
+        description.fragmentFunction = context->makeFunction(Assets::read_file("shaders/imgui.frag.spv"), "main");
+
+        pipelineState = context->makePipelineState(description);
+
+        auto pool_sizes = std::array{
+            vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1}
+        };
+        auto pool_create_info = vk::DescriptorPoolCreateInfo{};
+        pool_create_info.setMaxSets(1);
+        pool_create_info.setPoolSizes(pool_sizes);
+        descriptor_pool = context->logical_device.createDescriptorPool(pool_create_info, nullptr);
+
+        auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
+        ds_allocate_info.setDescriptorPool(descriptor_pool);
+        ds_allocate_info.setSetLayouts(pipelineState->descriptorSetLayouts);
+        descriptor_sets = context->logical_device.allocateDescriptorSets(ds_allocate_info);
+    }
+
+    void setupRenderState(ImDrawData* draw_data, vfx::CommandBuffer* cmd, Arc<vfx::Mesh>& mesh, i32 fb_width, i32 fb_height) {
         if (draw_data->TotalVtxCount > 0) {
             cmd->handle.bindVertexBuffers(0, mesh->vertexBuffer->handle, vk::DeviceSize{0});
             cmd->handle.bindIndexBuffer(mesh->indexBuffer->handle, 0, vk::IndexType::eUint16);
@@ -254,7 +262,7 @@ struct Widgets {
         };
 
         cmd->handle.pushConstants(
-            pipeline_state->pipelineLayout,
+            pipelineState->pipelineLayout,
             vk::ShaderStageFlagBits::eVertex,
             0,
             std::span(transform).size_bytes(),
@@ -262,13 +270,15 @@ struct Widgets {
         );
     }
 
+private:
     Arc<vfx::Context> context;
 
     ImGuiContext* ctx;
+    vk::Sampler fontSampler{};
+    Arc<vfx::Texture> fontTexture{};
+    Arc<vfx::PipelineState> pipelineState{};
+
     u64 current_frame = 0;
-    vk::Sampler font_sampler{};
-    Arc<vfx::Texture> font_texture{};
-    Arc<vfx::PipelineState> pipeline_state{};
     std::array<Arc<vfx::Mesh>, vfx::Context::MAX_FRAMES_IN_FLIGHT> frames{};
 
     // todo: bindless

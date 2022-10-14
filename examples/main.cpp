@@ -77,13 +77,13 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
         renderer->beginRendering(cmd);
         renderer->draw(cmd);
 
-        widgets->begin_frame();
+        widgets->beginFrame();
         ImGui::SetNextWindowPos(ImVec2(0, 0));
         ImGui::SetNextWindowSize(ImVec2(0, 0));
         ImGui::Begin("Stats");
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
         ImGui::End();
-        widgets->end_frame();
+        widgets->endFrame();
 
         widgets->draw(cmd);
         renderer->endRendering(cmd);
@@ -127,6 +127,8 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
 
     void createPresentPipelineState() {
         vfx::PipelineStateDescription description{};
+
+        description.colorAttachmentFormats[0] = swapchain->getPixelFormat();
 
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =

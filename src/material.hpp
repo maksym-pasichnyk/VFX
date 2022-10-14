@@ -35,9 +35,25 @@ namespace vfx {
         }
     };
 
+    struct PipelineColorAttachmentFormatArray {
+        std::vector<vk::Format> elements = {};
+
+        auto operator[](size_t i) -> vk::Format& {
+            if (elements.size() >= i) {
+                elements.resize(i + 1, vk::Format::eUndefined);
+            }
+            return elements[i];
+        }
+    };
+
     struct PipelineStateDescription {
         Arc<Function> vertexFunction = {};
         Arc<Function> fragmentFunction = {};
+
+        u32 viewMask = {};
+        PipelineColorAttachmentFormatArray colorAttachmentFormats = {};
+        vk::Format depthAttachmentFormat   = vk::Format::eUndefined;
+        vk::Format stencilAttachmentFormat = vk::Format::eUndefined;
 
         vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState = {};
         vk::PipelineTessellationStateCreateInfo tessellationState = {};
