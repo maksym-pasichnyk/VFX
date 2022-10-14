@@ -52,9 +52,6 @@ namespace vfx {
         vk::RenderPass renderPass = {};
         Arc<PipelineState> pipelineState = {};
 
-        // todo: move to global cache?
-        std::map<std::tuple<Arc<PipelineState>, vk::RenderPass, i32>, vk::Pipeline> pipelines{};
-
     public:
         Context* context{};
         CommandQueue* commandQueue{};
@@ -99,7 +96,7 @@ namespace vfx {
     private:
         Context* context{};
 
-        vk::Queue queue{};
+        vk::Queue handle{};
         vk::CommandPool pool{};
 
         std::vector<vk::Fence> fences{};
@@ -107,5 +104,8 @@ namespace vfx {
         std::vector<vk::CommandBuffer> rawCommandBuffers{};
 
         std::vector<CommandBuffer> commandBuffers{};
+
+        // todo: move to global cache?
+        std::map<std::tuple<Arc<PipelineState>, vk::RenderPass, i32>, vk::Pipeline> pipelines{};
     };
 }

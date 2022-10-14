@@ -136,16 +136,11 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
             vk::ColorComponentFlagBits::eA;
 
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
-
         description.rasterizationState.lineWidth = 1.0f;
-        description.vertexShader = vfx::ShaderDescription{
-            .bytes = Assets::read_file("shaders/blit.vert.spv"),
-            .entry = "main"
-        };
-        description.fragmentShader = vfx::ShaderDescription{
-            .bytes = Assets::read_file("shaders/blit.frag.spv"),
-            .entry = "main"
-        };
+
+        description.vertexFunction = context->makeFunction(Assets::read_file("shaders/blit.vert.spv"), "main");
+        description.fragmentFunction = context->makeFunction(Assets::read_file("shaders/blit.frag.spv"), "main");
+
         present_pipeline_state = context->makePipelineState(description);
 
         auto pool_sizes = std::array{
@@ -193,7 +188,6 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
         draw();
     }
 };
-
 
 auto main() -> i32 {
     try {

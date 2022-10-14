@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.hpp"
+#include "spirv_reflect.h"
 
 #include <map>
 #include <string>
@@ -9,9 +10,18 @@
 #include <vulkan/vulkan.hpp>
 
 namespace vfx {
-    struct ShaderDescription {
-        std::vector<char> bytes;
-        std::string entry;
+    struct Context;
+    struct Function {
+    public:
+        Context*         context = {};
+        vk::ShaderModule module = {};
+        std::string      name = {};
+
+        SpvReflectShaderModule reflect = {};
+
+    public:
+        Function();
+        ~Function();
     };
 
     struct PipelineColorBlendAttachmentStateArray {
@@ -26,8 +36,8 @@ namespace vfx {
     };
 
     struct PipelineStateDescription {
-        std::optional<ShaderDescription> vertexShader = {};
-        std::optional<ShaderDescription> fragmentShader = {};
+        Arc<Function> vertexFunction = {};
+        Arc<Function> fragmentFunction = {};
 
         vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState = {};
         vk::PipelineTessellationStateCreateInfo tessellationState = {};
@@ -43,14 +53,10 @@ namespace vfx {
         PipelineColorBlendAttachmentStateArray attachments = {};
     };
 
-    struct Context;
     struct PipelineState {
     public:
         Context* context{};
         PipelineStateDescription description{};
-
-        vk::ShaderModule vertexModule = VK_NULL_HANDLE;
-        vk::ShaderModule fragmentModule = VK_NULL_HANDLE;
 
         vk::PipelineLayout pipelineLayout{};
         std::vector<vk::DescriptorSetLayout> descriptorSetLayouts{};

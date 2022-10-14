@@ -81,14 +81,9 @@ struct Widgets {
 
         description.rasterizationState.lineWidth = 1.0f;
 
-        description.vertexShader = vfx::ShaderDescription{
-            .bytes = Assets::read_file("shaders/imgui.vert.spv"),
-            .entry = "main"
-        };
-        description.fragmentShader = vfx::ShaderDescription{
-            .bytes = Assets::read_file("shaders/imgui.frag.spv"),
-            .entry = "main"
-        };
+        description.vertexFunction = context->makeFunction(Assets::read_file("shaders/imgui.vert.spv"), "main");
+        description.fragmentFunction = context->makeFunction(Assets::read_file("shaders/imgui.frag.spv"), "main");
+
         pipeline_state = context->makePipelineState(description);
 
         auto pool_sizes = std::array{

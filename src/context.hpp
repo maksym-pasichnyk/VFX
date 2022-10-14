@@ -21,6 +21,7 @@ namespace vfx {
     struct Mesh;
     struct Buffer;
     struct Texture;
+    struct Function;
     struct RenderPass;
     struct CommandQueue;
     struct PipelineState;
@@ -38,12 +39,13 @@ namespace vfx {
 
         u32 present_family{};
         u32 graphics_family{};
-        vk::Queue present_queue{};
-        vk::Queue graphics_queue{};
         vk::PhysicalDevice physical_device{};
 
         vk::Device logical_device{};
-        vk::Format depth_format{};
+        vk::Queue present_queue{};
+        vk::Queue graphics_queue{};
+
+        vk::Format depthStencilFormat{};
 
     public:
         explicit Context(const ContextDescription& description);
@@ -64,6 +66,9 @@ namespace vfx {
 
         auto makeBuffer(BufferUsage target, u64 size) -> Arc<Buffer>;
         void freeBuffer(Buffer* buffer);
+
+        auto makeFunction(const std::vector<char>& bytes, std::string name) -> Arc<Function>;
+        void freeFunction(Function* function);
 
         auto makePipelineState(const PipelineStateDescription& description) -> Arc<PipelineState>;
         void freePipelineState(PipelineState* pipelineState);

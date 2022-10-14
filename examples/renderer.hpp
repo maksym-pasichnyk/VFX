@@ -15,8 +15,8 @@ struct Globals {
 struct Renderer {
     Arc<vfx::Context> context;
 
-    vk::Format pixel_format;
-    vk::Format depth_format;
+    vk::Format pixelFormat;
+    vk::Format depthStencilFormat;
 
     vk::Sampler sampler{};
     vk::Extent2D drawableSize{};
@@ -32,8 +32,8 @@ struct Renderer {
 
     explicit Renderer(const Arc<vfx::Context>& context, vk::Format pixel_format)
     : context(context)
-    , pixel_format(pixel_format)
-    , depth_format(context->depth_format) {
+    , pixelFormat(pixel_format)
+    , depthStencilFormat(context->depthStencilFormat) {
         auto sampler_description = vk::SamplerCreateInfo{
             .magFilter = vk::Filter::eNearest,
             .minFilter = vk::Filter::eNearest,
@@ -65,7 +65,7 @@ struct Renderer {
         }
 
         auto color_texture_description = vfx::TextureDescription{
-            .format = pixel_format,
+            .format = pixelFormat,
             .width = size.width,
             .height = size.height,
             .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
@@ -74,7 +74,7 @@ struct Renderer {
         colorAttachmentTexture = context->makeTexture(color_texture_description);
 
         auto depth_texture_description = vfx::TextureDescription{
-            .format = depth_format,
+            .format = depthStencilFormat,
             .width = size.width,
             .height = size.height,
             .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
@@ -98,8 +98,8 @@ struct Renderer {
     }
 
     void createRenderPass() {
-        vfx::RenderPassDescription pass_description{};
-        pass_description.definitions = {
+        vfx::RenderPassDescription description{};
+        description.definitions = {
             vfx::SubpassDescription{
                 .colorAttachments = {
                     vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
@@ -107,25 +107,25 @@ struct Renderer {
                 .depthStencilAttachment = vk::AttachmentReference{1, vk::ImageLayout::eDepthStencilAttachmentOptimal}
             }
         };
-        pass_description.attachments[0].format = pixel_format;
-        pass_description.attachments[0].samples = vk::SampleCountFlagBits::e1;
-        pass_description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
-        pass_description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
-        pass_description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-        pass_description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-        pass_description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
-        pass_description.attachments[0].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        description.attachments[0].format = pixelFormat;
+        description.attachments[0].samples = vk::SampleCountFlagBits::e1;
+        description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+        description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+        description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+        description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+        description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
+        description.attachments[0].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-        pass_description.attachments[1].format = depth_format;
-        pass_description.attachments[1].samples = vk::SampleCountFlagBits::e1;
-        pass_description.attachments[1].loadOp = vk::AttachmentLoadOp::eClear;
-        pass_description.attachments[1].storeOp = vk::AttachmentStoreOp::eStore;
-        pass_description.attachments[1].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-        pass_description.attachments[1].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-        pass_description.attachments[1].initialLayout = vk::ImageLayout::eUndefined;
-        pass_description.attachments[1].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        description.attachments[1].format = depthStencilFormat;
+        description.attachments[1].samples = vk::SampleCountFlagBits::e1;
+        description.attachments[1].loadOp = vk::AttachmentLoadOp::eClear;
+        description.attachments[1].storeOp = vk::AttachmentStoreOp::eStore;
+        description.attachments[1].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+        description.attachments[1].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+        description.attachments[1].initialLayout = vk::ImageLayout::eUndefined;
+        description.attachments[1].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-        renderPass = context->makeRenderPass(pass_description);
+        renderPass = context->makeRenderPass(description);
     }
 
     void createPipelineState() {
@@ -142,14 +142,9 @@ struct Renderer {
 
         description.rasterizationState.lineWidth = 1.0f;
 
-        description.vertexShader = vfx::ShaderDescription{
-            .bytes = Assets::read_file("shaders/default.vert.spv"),
-            .entry = "main"
-        };
-        description.fragmentShader = vfx::ShaderDescription{
-            .bytes = Assets::read_file("shaders/default.frag.spv"),
-            .entry = "main"
-        };
+        description.vertexFunction = context->makeFunction(Assets::read_file("shaders/default.vert.spv"), "main");
+        description.fragmentFunction = context->makeFunction(Assets::read_file("shaders/default.frag.spv"), "main");
+
         pipelineState = context->makePipelineState(description);
     }
 

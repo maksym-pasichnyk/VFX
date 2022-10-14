@@ -10,15 +10,11 @@
 #include "spdlog/spdlog.h"
 
 void vfx::CommandBuffer::reset() {
-    for (auto& [_, pipeline] : pipelines) {
-        commandQueue->context->logical_device.destroyPipeline(pipeline);
-    }
-    pipelines.clear();
 }
 
 auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
     auto key = std::make_tuple(pipelineState, renderPass, subpass);
-    if (auto it = pipelines.find(key); it != pipelines.end()) {
+    if (auto it = commandQueue->pipelines.find(key); it != commandQueue->pipelines.end()) {
         return it->second;
     }
 
@@ -36,19 +32,19 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
 
     std::vector<vk::PipelineShaderStageCreateInfo> stages = {};
 
-    if (pipelineState->vertexModule) {
+    if (pipelineState->description.vertexFunction) {
         vk::PipelineShaderStageCreateInfo info{};
         info.setStage(vk::ShaderStageFlagBits::eVertex);
-        info.setModule(pipelineState->vertexModule);
-        info.setPName(pipelineState->description.vertexShader.value().entry.c_str());
+        info.setModule(pipelineState->description.vertexFunction->module);
+        info.setPName(pipelineState->description.vertexFunction->name.c_str());
         stages.emplace_back(info);
     }
 
-    if (pipelineState->fragmentModule) {
+    if (pipelineState->description.fragmentFunction) {
         vk::PipelineShaderStageCreateInfo info{};
         info.setStage(vk::ShaderStageFlagBits::eFragment);
-        info.setModule(pipelineState->fragmentModule);
-        info.setPName(pipelineState->description.fragmentShader.value().entry.c_str());
+        info.setModule(pipelineState->description.fragmentFunction->module);
+        info.setPName(pipelineState->description.fragmentFunction->name.c_str());
         stages.emplace_back(info);
     }
 
@@ -87,7 +83,7 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
         throw std::runtime_error(vk::to_string(result));
     }
     spdlog::info("Created pipeline (state = {}, pass = {}, subpass = {})", (void*)pipelineState.get(), (void*)renderPass, subpass);
-    pipelines.emplace(key, pipeline);
+    commandQueue->pipelines.emplace(key, pipeline);
     return pipeline;
 }
 
@@ -105,7 +101,7 @@ void vfx::CommandBuffer::submit() {
     submit_info.setCommandBuffers(handle);
     submit_info.setSignalSemaphores(semaphore);
 
-    commandQueue->queue.submit(submit_info, fence);
+    commandQueue->handle.submit(submit_info, fence);
 }
 
 void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
@@ -172,21 +168,27 @@ void vfx::CommandBuffer::waitUntilCompleted() {
 vfx::CommandQueue::CommandQueue() {}
 
 vfx::CommandQueue::~CommandQueue() {
+    for (auto& [_, pipeline] : pipelines) {
+        context->logical_device.destroyPipeline(pipeline);
+    }
     context->freeCommandQueue(this);
 }
 
 auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
-    std::ignore = context->logical_device.waitForFences(fences, VK_FALSE, std::numeric_limits<u64>::max());
+//    std::ignore = context->logical_device.waitForFences(fences, VK_FALSE, std::numeric_limits<u64>::max());
 
-    for (auto& commandBuffer : commandBuffers) {
-        vk::Result result = context->logical_device.getFenceStatus(commandBuffer.fence);
-        if (result == vk::Result::eSuccess) {
-            std::ignore = context->logical_device.resetFences(1, &commandBuffer.fence);
-            return &commandBuffer;
-        }
-        if (result == vk::Result::eErrorDeviceLost) {
-            throw std::runtime_error(vk::to_string(result));
+    while (true) {
+        for (auto& commandBuffer : commandBuffers) {
+            vk::Result result = context->logical_device.getFenceStatus(commandBuffer.fence);
+            if (result == vk::Result::eSuccess) {
+                std::ignore = context->logical_device.resetFences(1, &commandBuffer.fence);
+                return &commandBuffer;
+            }
+            if (result == vk::Result::eErrorDeviceLost) {
+                throw std::runtime_error(vk::to_string(result));
+            }
         }
     }
+
     return nullptr;
 }

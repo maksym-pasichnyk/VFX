@@ -210,7 +210,7 @@ void vfx::Context::select_physical_device() {
         present_family = families->second;
         break;
     }
-    depth_format = select_depth_format(physical_device);
+    depthStencilFormat = select_depth_format(physical_device);
 }
 
 void vfx::Context::create_logical_device() {
@@ -454,30 +454,50 @@ void vfx::Context::freeBuffer(Buffer* buffer) {
     vmaDestroyBuffer(allocator, buffer->handle, buffer->allocation);
 }
 
+auto vfx::Context::makeFunction(const std::vector<char>& bytes, std::string name) -> Arc<Function> {
+    auto create_info = vk::ShaderModuleCreateInfo{
+        .codeSize = bytes.size(),
+        .pCode    = reinterpret_cast<const u32 *>(bytes.data())
+    };
+    auto module = logical_device.createShaderModule(create_info);
+
+    auto out = Arc<Function>::alloc();
+    out->context = this;
+    out->module = module;
+    out->name = std::move(name);
+
+    spvReflectCreateShaderModule(
+        bytes.size(),
+        bytes.data(),
+        &out->reflect
+    );
+
+    return out;
+}
+
+void vfx::Context::freeFunction(Function* function) {
+    logical_device.destroyShaderModule(function->module);
+    spvReflectDestroyShaderModule(&function->reflect);
+}
+
 auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& description) -> Arc<PipelineState> {
     auto out = Box<PipelineState>::alloc();
     out->context = this;
     out->description = description;
 
-    struct DescriptorSetLayoutDescription {
+    struct DescriptorSetDescription {
         std::vector<vk::DescriptorSetLayoutBinding> bindings{};
     };
 
-    std::map<u32, DescriptorSetLayoutDescription> descriptor_set_layouts_table{};
-
-    i32 maxSet = -1;
-    std::map<vk::DescriptorType, u32> descriptor_set_bindings_table{};
     std::vector<vk::PushConstantRange> constant_ranges{};
+    std::vector<DescriptorSetDescription> descriptor_set_descriptions{};
 
-    auto addShaderModule = [&](const vfx::ShaderDescription& stage) {
-        SpvReflectShaderModule spv_module{};
-        spvReflectCreateShaderModule(stage.bytes.size(), stage.bytes.data(), &spv_module);
-
-        auto stage_flags = vk::ShaderStageFlagBits(spv_module.shader_stage);
+    auto addShaderModule = [&](const Arc<Function>& function) {
+        auto stage_flags = vk::ShaderStageFlagBits(function->reflect.shader_stage);
 
         auto refl_constant_blocks = std::span(
-            spv_module.push_constant_blocks,
-            spv_module.push_constant_block_count
+            function->reflect.push_constant_blocks,
+            function->reflect.push_constant_block_count
         );
 
         constant_ranges.reserve(refl_constant_blocks.size());
@@ -490,12 +510,14 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
         }
 
         auto refl_descriptor_sets = std::span(
-            spv_module.descriptor_sets,
-            spv_module.descriptor_set_count
+            function->reflect.descriptor_sets,
+            function->reflect.descriptor_set_count
         );
 
         for (auto& refl_set : refl_descriptor_sets) {
-            maxSet = std::max(maxSet, i32(refl_set.set));
+            if (refl_set.set >= descriptor_set_descriptions.size()) {
+                descriptor_set_descriptions.resize(refl_set.set + 1);
+            }
 
             auto refl_descriptor_bindings = std::span(
                 refl_set.bindings,
@@ -510,58 +532,36 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
                     .stageFlags = stage_flags,
                     .pImmutableSamplers = nullptr
                 };
-                descriptor_set_layouts_table[refl_set.set].bindings.emplace_back(binding);
-                descriptor_set_bindings_table[binding.descriptorType] += Context::MAX_FRAMES_IN_FLIGHT;
+                descriptor_set_descriptions.at(refl_set.set).bindings.emplace_back(binding);
             }
         }
-
-        spvReflectDestroyShaderModule(&spv_module);
-
-        auto create_info = vk::ShaderModuleCreateInfo{
-            .codeSize = stage.bytes.size(),
-            .pCode    = reinterpret_cast<const u32 *>(stage.bytes.data())
-        };
-
-        return logical_device.createShaderModule(create_info);
     };
 
-    if (description.vertexShader.has_value()) {
-        out->vertexModule = addShaderModule(*description.vertexShader);
+    if (description.vertexFunction) {
+        addShaderModule(description.vertexFunction);
     }
 
-    if (description.fragmentShader.has_value()) {
-        out->fragmentModule = addShaderModule(*description.fragmentShader);
+    if (description.fragmentFunction) {
+        addShaderModule(description.fragmentFunction);
     }
 
-    /*create descriptor set layouts*/ {
-        out->descriptorSetLayouts.resize(maxSet + 1);
-        for (u32 i = 0; i < out->descriptorSetLayouts.size(); ++i) {
-            auto dsl_create_info = vk::DescriptorSetLayoutCreateInfo{};
-            dsl_create_info.setBindings(descriptor_set_layouts_table[i].bindings);
-            out->descriptorSetLayouts[i] = logical_device.createDescriptorSetLayout(dsl_create_info);
-        }
+    out->descriptorSetLayouts.resize(descriptor_set_descriptions.size());
+    for (u32 i = 0; i < out->descriptorSetLayouts.size(); ++i) {
+        auto dsl_create_info = vk::DescriptorSetLayoutCreateInfo{};
+        dsl_create_info.setBindings(descriptor_set_descriptions[i].bindings);
+        out->descriptorSetLayouts[i] = logical_device.createDescriptorSetLayout(dsl_create_info);
     }
 
-    /*create pipeline layout*/ {
-        auto pipeline_layout_create_info = vk::PipelineLayoutCreateInfo{};
-        pipeline_layout_create_info.setSetLayouts(out->descriptorSetLayouts);
-        pipeline_layout_create_info.setPushConstantRanges(constant_ranges);
-        out->pipelineLayout = logical_device.createPipelineLayout(pipeline_layout_create_info);
-    }
+    auto pipeline_layout_create_info = vk::PipelineLayoutCreateInfo{};
+    pipeline_layout_create_info.setSetLayouts(out->descriptorSetLayouts);
+    pipeline_layout_create_info.setPushConstantRanges(constant_ranges);
+    out->pipelineLayout = logical_device.createPipelineLayout(pipeline_layout_create_info);
 
     return out;
 }
 
 void vfx::Context::freePipelineState(PipelineState* pipelineState) {
     logical_device.destroyPipelineLayout(pipelineState->pipelineLayout);
-
-    if (pipelineState->vertexModule) {
-        logical_device.destroyShaderModule(pipelineState->vertexModule);
-    }
-
-    if (pipelineState->fragmentModule) {
-        logical_device.destroyShaderModule(pipelineState->fragmentModule);
-    }
 
     for (auto& layout : pipelineState->descriptorSetLayouts) {
         logical_device.destroyDescriptorSetLayout(layout);
@@ -571,7 +571,7 @@ void vfx::Context::freePipelineState(PipelineState* pipelineState) {
 auto vfx::Context::makeCommandQueue(u32 count) -> Arc<CommandQueue> {
     auto out = Box<CommandQueue>::alloc();
     out->context = this;
-    out->queue = logical_device.getQueue(graphics_family, 0);
+    out->handle = logical_device.getQueue(graphics_family, 0);
 
     const auto pool_create_info = vk::CommandPoolCreateInfo {
         .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
