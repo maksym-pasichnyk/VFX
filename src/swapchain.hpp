@@ -36,12 +36,9 @@ namespace vfx {
         vk::ColorSpaceKHR colorSpace = {};
         vk::PresentModeKHR presentMode = {};
 
+        vk::Fence fence{};
         vk::SwapchainKHR handle{};
         std::vector<Arc<Drawable>> drawables{};
-
-    private:
-        void makeGpuObjects();
-        void freeGpuObjects();
 
     public:
         void makeDrawables();

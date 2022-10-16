@@ -31,7 +31,7 @@ function(target_compile_shaders TARGET)
         add_custom_command(
             OUTPUT ${SPIRV}
 #            COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/shaders"
-            COMMAND glslc ${SOURCE_FILE} -o ${SPIRV}
+            COMMAND glslc ${SOURCE_FILE} -o ${SPIRV} -O
             DEPENDS ${SOURCE_FILE}
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         )

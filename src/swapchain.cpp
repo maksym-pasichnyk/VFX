@@ -63,19 +63,14 @@ vfx::Swapchain::Swapchain(const vfx::SwapchainDescription& description) {
     pixelFormat = description.pixelFormat;
     presentMode = description.presentMode;
 
-    makeGpuObjects();
-}
+    fence = context->logical_device.createFence({});
 
-vfx::Swapchain::~Swapchain() {
-    freeGpuObjects();
-}
-
-void vfx::Swapchain::makeGpuObjects() {
     makeDrawables();
 }
 
-void vfx::Swapchain::freeGpuObjects() {
+vfx::Swapchain::~Swapchain() {
     freeDrawables();
+    context->logical_device.destroyFence(fence);
 }
 
 void vfx::Swapchain::makeDrawables() {
@@ -149,9 +144,6 @@ void vfx::Swapchain::freeDrawables() {
 }
 
 auto vfx::Swapchain::nextDrawable() -> vfx::Drawable* {
-    // todo: recycle fences
-    auto fence = context->logical_device.createFence({});
-
     u32 index;
     auto result = context->logical_device.acquireNextImageKHR(
         handle,
@@ -161,7 +153,7 @@ auto vfx::Swapchain::nextDrawable() -> vfx::Drawable* {
         &index
     );
     std::ignore = context->logical_device.waitForFences(1, &fence, true, std::numeric_limits<uint64_t>::max());
-    context->logical_device.destroyFence(fence);
+    std::ignore = context->logical_device.resetFences(1, &fence);
 
     if (result == vk::Result::eErrorOutOfDateKHR) {
         spdlog::info("Swapchain is out of date");
