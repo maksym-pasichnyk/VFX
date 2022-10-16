@@ -163,7 +163,7 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
 
     void updateAttachmentDescriptors() {
         const auto image_info = vk::DescriptorImageInfo{
-            .sampler = renderer->sampler,
+            .sampler = renderer->sampler->handle,
             .imageView = renderer->colorAttachmentTexture->view,
             .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         };

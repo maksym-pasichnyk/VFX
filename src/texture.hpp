@@ -16,6 +16,16 @@ namespace vfx {
         vk::ImageAspectFlags aspect = {};
     };
 
+    struct Sampler {
+    public:
+        Context* context{};
+        vk::Sampler handle{};
+
+    public:
+        Sampler();
+        ~Sampler();
+    };
+
     struct Texture {
     public:
         Context* context{};

@@ -50,7 +50,6 @@ public:
         ImGui::DestroyContext(ctx);
         
         context->logical_device.destroyDescriptorPool(descriptor_pool);
-        context->logical_device.destroySampler(fontSampler);
     }
 
 public:
@@ -172,12 +171,12 @@ private:
             .addressModeV = vk::SamplerAddressMode::eRepeat,
             .addressModeW = vk::SamplerAddressMode::eRepeat
         };
-        fontSampler = context->logical_device.createSampler(font_sampler_description);
+        fontSampler = context->makeSampler(font_sampler_description);
         fontTexture->setPixelData(std::span(reinterpret_cast<const glm::u8vec4 *>(pixels), width * height));
         ctx->IO.Fonts->SetTexID(fontTexture.get());
 
         const auto image_info = vk::DescriptorImageInfo{
-            .sampler = fontSampler,
+            .sampler = fontSampler->handle,
             .imageView = fontTexture->view,
             .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         };
@@ -218,9 +217,9 @@ private:
         description.attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
         description.attachments[0].colorWriteMask =
             vk::ColorComponentFlagBits::eR |
-                vk::ColorComponentFlagBits::eG |
-                vk::ColorComponentFlagBits::eB |
-                vk::ColorComponentFlagBits::eA;
+            vk::ColorComponentFlagBits::eG |
+            vk::ColorComponentFlagBits::eB |
+            vk::ColorComponentFlagBits::eA;
 
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
 
@@ -274,7 +273,7 @@ private:
     Arc<vfx::Context> context;
 
     ImGuiContext* ctx;
-    vk::Sampler fontSampler{};
+    Arc<vfx::Sampler> fontSampler{};
     Arc<vfx::Texture> fontTexture{};
     Arc<vfx::PipelineState> pipelineState{};
 

@@ -3,9 +3,13 @@
 #include "buffer.hpp"
 #include "queue.hpp"
 
-vfx::Texture::Texture() {
+vfx::Sampler::Sampler() {}
 
+vfx::Sampler::~Sampler() {
+    context->freeSampler(this);
 }
+
+vfx::Texture::Texture() {}
 
 vfx::Texture::~Texture() {
     context->freeTexture(this);

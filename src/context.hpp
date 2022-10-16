@@ -21,6 +21,7 @@ namespace vfx {
     struct Mesh;
     struct Buffer;
     struct Texture;
+    struct Sampler;
     struct Function;
     struct RenderPass;
     struct CommandQueue;
@@ -63,6 +64,9 @@ namespace vfx {
 
         auto makeTexture(const TextureDescription& description) -> Arc<Texture>;
         void freeTexture(Texture* texture);
+
+        auto makeSampler(const vk::SamplerCreateInfo& info) -> Arc<Sampler>;
+        void freeSampler(Sampler* sampler);
 
         auto makeBuffer(BufferUsage target, u64 size) -> Arc<Buffer>;
         void freeBuffer(Buffer* buffer);

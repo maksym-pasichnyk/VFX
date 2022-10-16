@@ -16,11 +16,9 @@ struct Renderer {
     Arc<vfx::Context> context;
 
     vk::Format pixelFormat;
-    vk::Format depthStencilFormat;
-
-    vk::Sampler sampler{};
     vk::Extent2D drawableSize{};
 
+    Arc<vfx::Sampler> sampler{};
     Arc<vfx::Texture> colorAttachmentTexture{};
     Arc<vfx::Texture> depthAttachmentTexture{};
 
@@ -30,8 +28,7 @@ struct Renderer {
 
     explicit Renderer(const Arc<vfx::Context>& context, vk::Format pixel_format)
     : context(context)
-    , pixelFormat(pixel_format)
-    , depthStencilFormat(context->depthStencilFormat) {
+    , pixelFormat(pixel_format) {
         auto sampler_description = vk::SamplerCreateInfo{
             .magFilter = vk::Filter::eNearest,
             .minFilter = vk::Filter::eNearest,
@@ -40,13 +37,12 @@ struct Renderer {
             .addressModeV = vk::SamplerAddressMode::eRepeat,
             .addressModeW = vk::SamplerAddressMode::eRepeat
         };
-        sampler = context->logical_device.createSampler(sampler_description);
+        sampler = context->makeSampler(sampler_description);
 
         createPipelineState();
     }
 
     ~Renderer() {
-        context->logical_device.destroySampler(sampler);
     }
 
     void setDrawableSize(const vk::Extent2D& size) {
@@ -63,7 +59,7 @@ struct Renderer {
         colorAttachmentTexture = context->makeTexture(color_texture_description);
 
         auto depth_texture_description = vfx::TextureDescription{
-            .format = depthStencilFormat,
+            .format = context->depthStencilFormat,
             .width = size.width,
             .height = size.height,
             .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,

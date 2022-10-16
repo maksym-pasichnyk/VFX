@@ -419,6 +419,17 @@ void vfx::Context::freeTexture(Texture* texture) {
     }
 }
 
+auto vfx::Context::makeSampler(const vk::SamplerCreateInfo& info) -> Arc<Sampler> {
+    auto out = Arc<Sampler>::alloc();
+    out->context = this;
+    out->handle = logical_device.createSampler(info);
+    return out;
+}
+
+void vfx::Context::freeSampler(Sampler* sampler) {
+    logical_device.destroySampler(sampler->handle);
+}
+
 auto vfx::Context::makeBuffer(vfx::BufferUsage target, u64 size) -> Arc<Buffer> {
     const auto buffer_create_info = static_cast<VkBufferCreateInfo>(vk::BufferCreateInfo {
         .size = static_cast<vk::DeviceSize>(size),
