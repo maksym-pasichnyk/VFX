@@ -71,25 +71,6 @@ vfx::Swapchain::~Swapchain() {
 }
 
 void vfx::Swapchain::makeGpuObjects() {
-    vfx::RenderPassDescription description{};
-    description.definitions = {
-        vfx::SubpassDescription{
-            .colorAttachments = {
-                vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal}
-            }
-        }
-    };
-    description.attachments[0].format = pixelFormat;
-    description.attachments[0].samples = vk::SampleCountFlagBits::e1;
-    description.attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
-    description.attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
-    description.attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-    description.attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-    description.attachments[0].initialLayout = vk::ImageLayout::eUndefined;
-    description.attachments[0].finalLayout = vk::ImageLayout::ePresentSrcKHR;
-
-    renderPass = context->makeRenderPass(description);
-
     makeDrawables();
 }
 
@@ -159,25 +140,14 @@ void vfx::Swapchain::makeDrawables() {
         drawables[i]->texture->image = images[i];
         drawables[i]->texture->view = view;
         drawables[i]->texture->allocation = {};
-
-        auto attachments = std::array{
-            drawables[i]->texture->view
-        };
-
-        vk::FramebufferCreateInfo fb_create_info{};
-        fb_create_info.setRenderPass(renderPass->handle);
-        fb_create_info.setAttachments(attachments);
-        fb_create_info.setWidth(drawableSize.width);
-        fb_create_info.setHeight(drawableSize.height);
-        fb_create_info.setLayers(1);
-        drawables[i]->framebuffer = context->logical_device.createFramebuffer(fb_create_info);
     }
 }
 
 void vfx::Swapchain::freeDrawables() {
-    for (auto& drawable : drawables) {
-        context->logical_device.destroyFramebuffer(drawable->framebuffer);
-    }
+    drawables.clear();
+//    for (auto& drawable : drawables) {
+//        context->logical_device.destroyFramebuffer(drawable->framebuffer);
+//    }
     context->logical_device.destroySwapchainKHR(handle);
 }
 
@@ -212,9 +182,5 @@ auto vfx::Swapchain::getPixelFormat() -> vk::Format {
 
 auto vfx::Swapchain::getDrawableSize() -> vk::Extent2D {
     return drawableSize;
-}
-
-auto vfx::Swapchain::getDefaultRenderPass() -> const Arc<RenderPass>& {
-    return renderPass;
 }
 

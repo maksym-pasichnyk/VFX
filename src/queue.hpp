@@ -8,8 +8,15 @@
 #include <vulkan/vulkan.hpp>
 
 namespace vfx {
+    struct ClearColor {
+        f32 red   = 0.0f;
+        f32 greed = 0.0f;
+        f32 blue  = 0.0f;
+        f32 alpha = 0.0f;
+    };
+
     struct Texture;
-    struct RenderingAttachmentInfo {
+    struct RenderingColorAttachmentInfo {
         Arc<Texture>            texture            = {};
         vk::ImageLayout         imageLayout        = vk::ImageLayout::eUndefined;
         vk::ResolveModeFlagBits resolveMode        = vk::ResolveModeFlagBits::eNone;
@@ -17,27 +24,49 @@ namespace vfx {
         vk::ImageLayout         resolveImageLayout = vk::ImageLayout::eUndefined;
         vk::AttachmentLoadOp    loadOp             = vk::AttachmentLoadOp::eLoad;
         vk::AttachmentStoreOp   storeOp            = vk::AttachmentStoreOp::eStore;
-        vk::ClearValue          clearValue         = {};
+        ClearColor              clearColor         = {};
     };
 
-    struct RenderingAttachmentInfoArray {
-        std::vector<RenderingAttachmentInfo> elements{};
+    struct RenderingDepthAttachmentInfo {
+        Arc<Texture>            texture            = {};
+        vk::ImageLayout         imageLayout        = vk::ImageLayout::eUndefined;
+        vk::ResolveModeFlagBits resolveMode        = vk::ResolveModeFlagBits::eNone;
+        Arc<Texture>            resolveTexture     = {};
+        vk::ImageLayout         resolveImageLayout = vk::ImageLayout::eUndefined;
+        vk::AttachmentLoadOp    loadOp             = vk::AttachmentLoadOp::eLoad;
+        vk::AttachmentStoreOp   storeOp            = vk::AttachmentStoreOp::eStore;
+        f32                     clearDepth         = {};
+    };
 
-        auto operator[](size_t i) -> RenderingAttachmentInfo& {
+    struct RenderingStencilAttachmentInfo {
+        Arc<Texture>            texture            = {};
+        vk::ImageLayout         imageLayout        = vk::ImageLayout::eUndefined;
+        vk::ResolveModeFlagBits resolveMode        = vk::ResolveModeFlagBits::eNone;
+        Arc<Texture>            resolveTexture     = {};
+        vk::ImageLayout         resolveImageLayout = vk::ImageLayout::eUndefined;
+        vk::AttachmentLoadOp    loadOp             = vk::AttachmentLoadOp::eLoad;
+        vk::AttachmentStoreOp   storeOp            = vk::AttachmentStoreOp::eStore;
+        u32                     clearStencil       = {};
+    };
+
+    struct RenderingColorAttachmentInfoArray {
+        std::vector<RenderingColorAttachmentInfo> elements{};
+
+        auto operator[](size_t i) -> RenderingColorAttachmentInfo& {
             if (elements.size() >= i) {
-                elements.resize(i + 1, RenderingAttachmentInfo{});
+                elements.resize(i + 1, RenderingColorAttachmentInfo{});
             }
             return elements[i];
         }
     };
 
     struct RenderingInfo {
-        vk::Rect2D                   renderArea        = {};
-        u32                          layerCount        = {};
-        u32                          viewMask          = {};
-        RenderingAttachmentInfoArray colorAttachments  = {};
-        RenderingAttachmentInfo      depthAttachment   = {};
-        RenderingAttachmentInfo      stencilAttachment = {};
+        vk::Rect2D                        renderArea        = {};
+        u32                               layerCount        = {};
+        u32                               viewMask          = {};
+        RenderingColorAttachmentInfoArray colorAttachments  = {};
+        RenderingDepthAttachmentInfo      depthAttachment   = {};
+        RenderingStencilAttachmentInfo    stencilAttachment = {};
     };
 
     struct Context;
@@ -66,7 +95,9 @@ namespace vfx {
     private:
         void reset();
         auto makePipeline(i32 subpass) -> vk::Pipeline;
-        void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingAttachmentInfo& in);
+        void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingColorAttachmentInfo& in);
+        void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingDepthAttachmentInfo& in);
+        void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingStencilAttachmentInfo& in);
 
     public:
         void begin(const vk::CommandBufferBeginInfo& info);

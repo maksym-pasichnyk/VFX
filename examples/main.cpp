@@ -66,6 +66,15 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
             time = now;
 
             pollEvents();
+
+            widgets->beginFrame();
+            ImGui::SetNextWindowPos(ImVec2(0, 0));
+            ImGui::SetNextWindowSize(ImVec2(0, 0));
+            ImGui::Begin("Stats");
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::End();
+            widgets->endFrame();
+
             draw();
         }
     }
@@ -74,55 +83,164 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
         auto cmd = graphics_command_queue->makeCommandBuffer();
         cmd->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
-        renderer->beginRendering(cmd);
+        // todo: move to a better place
+        {
+            auto image_memory_barrier = vk::ImageMemoryBarrier{};
+            image_memory_barrier.setSrcAccessMask(vk::AccessFlags{});
+            image_memory_barrier.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+            image_memory_barrier.setOldLayout(vk::ImageLayout::eUndefined);
+            image_memory_barrier.setNewLayout(vk::ImageLayout::eColorAttachmentOptimal);
+            image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+            image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+            image_memory_barrier.setImage(renderer->colorAttachmentTexture->image);
+            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+            cmd->handle.pipelineBarrier(
+                vk::PipelineStageFlagBits::eTopOfPipe,
+                vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                {},
+                0, nullptr,
+                0, nullptr,
+                1, &image_memory_barrier
+            );
+        }
+
+        auto area = vk::Rect2D{};
+        area.setOffset(vk::Offset2D{0, 0});
+        area.setExtent(renderer->drawableSize);
+
+        auto viewport = vk::Viewport{};
+        viewport.setWidth(f32(renderer->drawableSize.width));
+        viewport.setHeight(f32(renderer->drawableSize.height));
+        viewport.setMaxDepth(1.f);
+
+        cmd->setScissor(0, area);
+        cmd->setViewport(0, viewport);
+
+        auto renderer_rendering_info = vfx::RenderingInfo{};
+        renderer_rendering_info.renderArea = area;
+        renderer_rendering_info.layerCount = 1;
+        renderer_rendering_info.colorAttachments[0].texture = renderer->colorAttachmentTexture;
+        renderer_rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        renderer_rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+        renderer_rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+        renderer_rendering_info.colorAttachments[0].clearColor = vfx::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
+
+        cmd->beginRendering(renderer_rendering_info);
         renderer->draw(cmd);
+        cmd->endRendering();
 
-        widgets->beginFrame();
-        ImGui::SetNextWindowPos(ImVec2(0, 0));
-        ImGui::SetNextWindowSize(ImVec2(0, 0));
-        ImGui::Begin("Stats");
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        ImGui::End();
-        widgets->endFrame();
+        auto widgets_rendering_info = vfx::RenderingInfo{};
+        widgets_rendering_info.renderArea = area;
+        widgets_rendering_info.layerCount = 1;
 
+        widgets_rendering_info.colorAttachments[0].texture = renderer->colorAttachmentTexture;
+        widgets_rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        widgets_rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eLoad;
+        widgets_rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+
+        cmd->beginRendering(widgets_rendering_info);
         widgets->draw(cmd);
-        renderer->endRendering(cmd);
+        cmd->endRendering();
+
+        // todo: move to a better place
+        {
+            auto image_memory_barrier = vk::ImageMemoryBarrier{};
+            image_memory_barrier.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+            image_memory_barrier.setDstAccessMask(vk::AccessFlags{});
+            image_memory_barrier.setOldLayout(vk::ImageLayout::eColorAttachmentOptimal);
+            image_memory_barrier.setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+            image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+            image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+            image_memory_barrier.setImage(renderer->colorAttachmentTexture->image);
+            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+            cmd->handle.pipelineBarrier(
+                vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                vk::PipelineStageFlagBits::eBottomOfPipe,
+                {},
+                0, nullptr,
+                0, nullptr,
+                1, &image_memory_barrier
+            );
+        }
 
         auto drawable = swapchain->nextDrawable();
-        final_render_pass(swapchain->getDefaultRenderPass(), cmd, drawable);
+
+        // todo: move to a better place
+        {
+            auto image_memory_barrier = vk::ImageMemoryBarrier{};
+            image_memory_barrier.setSrcAccessMask(vk::AccessFlags{});
+            image_memory_barrier.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+            image_memory_barrier.setOldLayout(vk::ImageLayout::eUndefined);
+            image_memory_barrier.setNewLayout(vk::ImageLayout::eColorAttachmentOptimal);
+            image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+            image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+            image_memory_barrier.setImage(drawable->texture->image);
+            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+            cmd->handle.pipelineBarrier(
+                vk::PipelineStageFlagBits::eTopOfPipe,
+                vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                {},
+                0, nullptr,
+                0, nullptr,
+                1, &image_memory_barrier
+            );
+        }
+
+        final_render_pass(cmd, drawable);
+
+        // todo: move to a better place
+        {
+            auto image_memory_barrier = vk::ImageMemoryBarrier{};
+            image_memory_barrier.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+            image_memory_barrier.setDstAccessMask(vk::AccessFlags{});
+            image_memory_barrier.setOldLayout(vk::ImageLayout::eColorAttachmentOptimal);
+            image_memory_barrier.setNewLayout(vk::ImageLayout::ePresentSrcKHR);
+            image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+            image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+            image_memory_barrier.setImage(drawable->texture->image);
+            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+            cmd->handle.pipelineBarrier(
+                vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                vk::PipelineStageFlagBits::eBottomOfPipe,
+                {},
+                0, nullptr,
+                0, nullptr,
+                1, &image_memory_barrier
+            );
+        }
+
         cmd->end();
         cmd->submit();
         cmd->present(drawable);
     }
 
-    void final_render_pass(const Arc<vfx::RenderPass>& pass, vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
-        auto clear_values = std::array{
-            vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({0.0f, 0.0f, 0.0f, 0.0f})),
-        };
-
-        auto render_area = vk::Rect2D{};
-        render_area.setExtent(drawable->texture->size);
-
-        auto begin_info = vk::RenderPassBeginInfo{};
-        begin_info.setRenderPass(pass->handle);
-        begin_info.setFramebuffer(drawable->framebuffer);
-        begin_info.setRenderArea(render_area);
-        begin_info.setClearValues(clear_values);
-
-        cmd->beginRenderPass(begin_info, vk::SubpassContents::eInline);
+    void final_render_pass(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
+        auto area = vk::Rect2D{};
+        area.setOffset(vk::Offset2D{0, 0});
+        area.setExtent(drawable->texture->size);
 
         auto viewport = vk::Viewport{};
         viewport.setWidth(f32(drawable->texture->size.width));
         viewport.setHeight(f32(drawable->texture->size.height));
 
+        cmd->setScissor(0, area);
         cmd->setViewport(0, viewport);
-        cmd->setScissor(0, render_area);
 
         cmd->setPipelineState(present_pipeline_state);
         cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, present_pipeline_state->pipelineLayout, 0, descriptor_sets, {});
 
+        auto present_rendering_info = vfx::RenderingInfo{};
+        present_rendering_info.renderArea = area;
+        present_rendering_info.layerCount = 1;
+        present_rendering_info.colorAttachments[0].texture = drawable->texture;
+        present_rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        present_rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+        present_rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+        present_rendering_info.colorAttachments[0].clearColor = vfx::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
+
+        cmd->beginRendering(present_rendering_info);
         cmd->draw(6, 1, 0, 0);
-        cmd->endRenderPass();
+        cmd->endRendering();
     }
 
     void createPresentPipelineState() {

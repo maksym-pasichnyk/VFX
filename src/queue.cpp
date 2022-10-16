@@ -94,7 +94,16 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
     return pipeline;
 }
 
-void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingAttachmentInfo& in) {
+void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingColorAttachmentInfo& in) {
+    auto clearValue = vk::ClearColorValue{
+        .float32 = std::array{
+            in.clearColor.red,
+            in.clearColor.greed,
+            in.clearColor.blue,
+            in.clearColor.alpha
+        }
+    };
+
     out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
     out.imageLayout = in.imageLayout;
     out.resolveMode = in.resolveMode;
@@ -102,7 +111,37 @@ void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, co
     out.resolveImageLayout = in.resolveImageLayout;
     out.loadOp = in.loadOp;
     out.storeOp = in.storeOp;
-    out.clearValue = in.clearValue;
+    out.clearValue.setColor(clearValue);
+}
+
+void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingDepthAttachmentInfo& in) {
+    auto clear_value = vk::ClearDepthStencilValue {
+        .depth = in.clearDepth
+    };
+
+    out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
+    out.imageLayout = in.imageLayout;
+    out.resolveMode = in.resolveMode;
+    out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
+    out.resolveImageLayout = in.resolveImageLayout;
+    out.loadOp = in.loadOp;
+    out.storeOp = in.storeOp;
+    out.clearValue.setDepthStencil(clear_value);
+}
+
+void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingStencilAttachmentInfo& in) {
+    auto clearValue = vk::ClearDepthStencilValue {
+        .stencil = in.clearStencil
+    };
+
+    out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
+    out.imageLayout = in.imageLayout;
+    out.resolveMode = in.resolveMode;
+    out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
+    out.resolveImageLayout = in.resolveImageLayout;
+    out.loadOp = in.loadOp;
+    out.storeOp = in.storeOp;
+    out.clearValue.setDepthStencil(clearValue);
 }
 
 void vfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {

@@ -11,6 +11,5 @@ namespace vfx {
         u32 index{};
         Swapchain* layer{};
         Arc<Texture> texture{};
-        vk::Framebuffer framebuffer{};
     };
 }

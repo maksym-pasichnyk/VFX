@@ -39,8 +39,6 @@ namespace vfx {
         vk::SwapchainKHR handle{};
         std::vector<Arc<Drawable>> drawables{};
 
-        Arc<RenderPass> renderPass{};
-
     private:
         void makeGpuObjects();
         void freeGpuObjects();
@@ -53,6 +51,5 @@ namespace vfx {
         auto nextDrawable() -> Drawable*;
         auto getPixelFormat() -> vk::Format;
         auto getDrawableSize() -> vk::Extent2D;
-        auto getDefaultRenderPass() -> const Arc<RenderPass>&;
     };
 }
