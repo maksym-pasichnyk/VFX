@@ -493,7 +493,7 @@ void vfx::Context::freeLibrary(Library* library) {
 auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& description) -> Arc<PipelineState> {
     auto out = Box<PipelineState>::alloc();
     out->context = this;
-    out->description = description;
+//    out->description = description;
 
     struct DescriptorSetDescription {
         std::vector<vk::DescriptorSetLayoutBinding> bindings{};
@@ -567,15 +567,89 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
     pipeline_layout_create_info.setPushConstantRanges(constant_ranges);
     out->pipelineLayout = logical_device.createPipelineLayout(pipeline_layout_create_info);
 
+    {
+        vk::PipelineViewportStateCreateInfo viewportState = {};
+        viewportState.setViewportCount(1);
+        viewportState.setScissorCount(1);
+
+        std::array dynamicStates = {
+            vk::DynamicState::eViewport,
+            vk::DynamicState::eScissor
+        };
+
+        vk::PipelineDynamicStateCreateInfo dynamicState = {};
+        dynamicState.setDynamicStates(dynamicStates);
+
+        std::vector<vk::PipelineShaderStageCreateInfo> stages = {};
+
+        if (description.vertexFunction) {
+            vk::PipelineShaderStageCreateInfo info{};
+            info.setStage(vk::ShaderStageFlagBits::eVertex);
+            info.setModule(description.vertexFunction->library->module);
+            info.setPName(description.vertexFunction->name.c_str());
+            stages.emplace_back(info);
+        }
+
+        if (description.fragmentFunction) {
+            vk::PipelineShaderStageCreateInfo info{};
+            info.setStage(vk::ShaderStageFlagBits::eFragment);
+            info.setModule(description.fragmentFunction->library->module);
+            info.setPName(description.fragmentFunction->name.c_str());
+            stages.emplace_back(info);
+        }
+
+        vk::PipelineVertexInputStateCreateInfo vertexInputState = {};
+        vertexInputState.setVertexBindingDescriptions(description.bindings);
+        vertexInputState.setVertexAttributeDescriptions(description.attributes);
+
+        vk::PipelineColorBlendStateCreateInfo colorBlendState = {};
+        colorBlendState.setAttachments(description.attachments.elements);
+
+        vk::PipelineRenderingCreateInfo rendering = {};
+        rendering.setViewMask(description.viewMask);
+        rendering.setColorAttachmentFormats(description.colorAttachmentFormats.elements);
+        rendering.setDepthAttachmentFormat(description.depthAttachmentFormat);
+        rendering.setStencilAttachmentFormat(description.stencilAttachmentFormat);
+
+        auto pipeline_create_info = vk::GraphicsPipelineCreateInfo{};
+        pipeline_create_info.setPNext(&rendering);
+        pipeline_create_info.setStages(stages);
+        pipeline_create_info.setPVertexInputState(&vertexInputState);
+        pipeline_create_info.setPInputAssemblyState(&description.inputAssemblyState);
+        pipeline_create_info.setPViewportState(&viewportState);
+        pipeline_create_info.setPRasterizationState(&description.rasterizationState);
+        pipeline_create_info.setPMultisampleState(&description.multisampleState);
+        pipeline_create_info.setPDepthStencilState(&description.depthStencilState);
+        pipeline_create_info.setPColorBlendState(&colorBlendState);
+        pipeline_create_info.setPDynamicState(&dynamicState);
+        pipeline_create_info.setLayout(out->pipelineLayout);
+        pipeline_create_info.setRenderPass(VK_NULL_HANDLE);
+        pipeline_create_info.setSubpass(0);
+        pipeline_create_info.setBasePipelineHandle(nullptr);
+        pipeline_create_info.setBasePipelineIndex(0);
+
+        vk::Pipeline pipeline{};
+        std::ignore = logical_device.createGraphicsPipelines(
+            {},
+            1,
+            &pipeline_create_info,
+            nullptr,
+            &pipeline
+        );
+
+        out->pipeline = pipeline;
+    }
+
     return out;
 }
 
 void vfx::Context::freePipelineState(PipelineState* pipelineState) {
-    logical_device.destroyPipelineLayout(pipelineState->pipelineLayout);
-
     for (auto& layout : pipelineState->descriptorSetLayouts) {
         logical_device.destroyDescriptorSetLayout(layout);
     }
+
+    logical_device.destroyPipelineLayout(pipelineState->pipelineLayout);
+    logical_device.destroyPipeline(pipelineState->pipeline);
 }
 
 auto vfx::Context::makeCommandQueue(u32 count) -> Arc<CommandQueue> {

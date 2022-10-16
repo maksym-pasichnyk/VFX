@@ -6,8 +6,9 @@
 #include "assets.hpp"
 #include "window.hpp"
 #include "context.hpp"
-#include "renderer.hpp"
 #include "material.hpp"
+
+#include "glm/vec2.hpp"
 
 #include "imgui.h"
 #include "imgui_internal.h"

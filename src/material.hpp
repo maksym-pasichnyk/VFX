@@ -80,8 +80,9 @@ namespace vfx {
     struct PipelineState {
     public:
         Context* context{};
-        PipelineStateDescription description{};
+//        PipelineStateDescription description{};
 
+        vk::Pipeline pipeline{};
         vk::PipelineLayout pipelineLayout{};
         std::vector<vk::DescriptorSetLayout> descriptorSetLayouts{};
 

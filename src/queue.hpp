@@ -78,7 +78,7 @@ namespace vfx {
         friend CommandQueue;
 
     private:
-        vk::RenderPass renderPass = {};
+//        vk::RenderPass renderPass = {};
         Arc<PipelineState> pipelineState = {};
         vk::RenderingAttachmentInfo depthAttachment = {};
         vk::RenderingAttachmentInfo stencilAttachment = {};
@@ -94,7 +94,7 @@ namespace vfx {
 
     private:
         void reset();
-        auto makePipeline(i32 subpass) -> vk::Pipeline;
+//        auto makePipeline(i32 subpass) -> vk::Pipeline;
         void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingColorAttachmentInfo& in);
         void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingDepthAttachmentInfo& in);
         void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingStencilAttachmentInfo& in);
@@ -105,8 +105,8 @@ namespace vfx {
         void submit();
         void present(Drawable* drawable);
         void setPipelineState(const Arc<PipelineState>& state);
-        void beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents);
-        void endRenderPass();
+//        void beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents);
+//        void endRenderPass();
         void beginRendering(const RenderingInfo& description);
         void endRendering();
         void setScissor(u32 firstScissor, const vk::Rect2D& rect);
@@ -140,7 +140,7 @@ namespace vfx {
 
         std::vector<CommandBuffer> commandBuffers{};
 
-        // todo: move to global cache?
-        std::map<std::tuple<Arc<PipelineState>, vk::RenderPass, i32>, vk::Pipeline> pipelines{};
+//        // todo: move to global cache?
+//        std::map<std::tuple<Arc<PipelineState>, vk::RenderPass, i32>, vk::Pipeline> pipelines{};
     };
 }

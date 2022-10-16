@@ -12,87 +12,87 @@
 void vfx::CommandBuffer::reset() {
 }
 
-auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
-    auto key = std::make_tuple(pipelineState, renderPass, subpass);
-    if (auto it = commandQueue->pipelines.find(key); it != commandQueue->pipelines.end()) {
-        return it->second;
-    }
-
-    vk::PipelineViewportStateCreateInfo viewportState = {};
-    viewportState.setViewportCount(1);
-    viewportState.setScissorCount(1);
-
-    std::array dynamicStates = {
-        vk::DynamicState::eViewport,
-        vk::DynamicState::eScissor
-    };
-
-    vk::PipelineDynamicStateCreateInfo dynamicState = {};
-    dynamicState.setDynamicStates(dynamicStates);
-
-    std::vector<vk::PipelineShaderStageCreateInfo> stages = {};
-
-    if (pipelineState->description.vertexFunction) {
-        vk::PipelineShaderStageCreateInfo info{};
-        info.setStage(vk::ShaderStageFlagBits::eVertex);
-        info.setModule(pipelineState->description.vertexFunction->library->module);
-        info.setPName(pipelineState->description.vertexFunction->name.c_str());
-        stages.emplace_back(info);
-    }
-
-    if (pipelineState->description.fragmentFunction) {
-        vk::PipelineShaderStageCreateInfo info{};
-        info.setStage(vk::ShaderStageFlagBits::eFragment);
-        info.setModule(pipelineState->description.fragmentFunction->library->module);
-        info.setPName(pipelineState->description.fragmentFunction->name.c_str());
-        stages.emplace_back(info);
-    }
-
-    vk::PipelineVertexInputStateCreateInfo vertexInputState = {};
-    vertexInputState.setVertexBindingDescriptions(pipelineState->description.bindings);
-    vertexInputState.setVertexAttributeDescriptions(pipelineState->description.attributes);
-
-    vk::PipelineColorBlendStateCreateInfo colorBlendState = {};
-    colorBlendState.setAttachments(pipelineState->description.attachments.elements);
-
-    vk::PipelineRenderingCreateInfo rendering = {};
-    rendering.setViewMask(pipelineState->description.viewMask);
-    rendering.setColorAttachmentFormats(pipelineState->description.colorAttachmentFormats.elements);
-    rendering.setDepthAttachmentFormat(pipelineState->description.depthAttachmentFormat);
-    rendering.setStencilAttachmentFormat(pipelineState->description.stencilAttachmentFormat);
-
-    auto pipeline_create_info = vk::GraphicsPipelineCreateInfo{};
-    pipeline_create_info.setPNext(&rendering);
-    pipeline_create_info.setStages(stages);
-    pipeline_create_info.setPVertexInputState(&vertexInputState);
-    pipeline_create_info.setPInputAssemblyState(&pipelineState->description.inputAssemblyState);
-    pipeline_create_info.setPViewportState(&viewportState);
-    pipeline_create_info.setPRasterizationState(&pipelineState->description.rasterizationState);
-    pipeline_create_info.setPMultisampleState(&pipelineState->description.multisampleState);
-    pipeline_create_info.setPDepthStencilState(&pipelineState->description.depthStencilState);
-    pipeline_create_info.setPColorBlendState(&colorBlendState);
-    pipeline_create_info.setPDynamicState(&dynamicState);
-    pipeline_create_info.setLayout(pipelineState->pipelineLayout);
-    pipeline_create_info.setRenderPass(renderPass);
-    pipeline_create_info.setSubpass(subpass);
-    pipeline_create_info.setBasePipelineHandle(nullptr);
-    pipeline_create_info.setBasePipelineIndex(0);
-
-    vk::Pipeline pipeline{};
-    auto result = commandQueue->context->logical_device.createGraphicsPipelines(
-        {},
-        1,
-        &pipeline_create_info,
-        nullptr,
-        &pipeline
-    );
-    if (result != vk::Result::eSuccess) {
-        throw std::runtime_error(vk::to_string(result));
-    }
-    spdlog::info("Created pipeline (state = {}, pass = {}, subpass = {})", (void*)pipelineState.get(), (void*)renderPass, subpass);
-    commandQueue->pipelines.emplace(key, pipeline);
-    return pipeline;
-}
+//auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
+//    auto key = std::make_tuple(pipelineState, renderPass, subpass);
+//    if (auto it = commandQueue->pipelines.find(key); it != commandQueue->pipelines.end()) {
+//        return it->second;
+//    }
+//
+//    vk::PipelineViewportStateCreateInfo viewportState = {};
+//    viewportState.setViewportCount(1);
+//    viewportState.setScissorCount(1);
+//
+//    std::array dynamicStates = {
+//        vk::DynamicState::eViewport,
+//        vk::DynamicState::eScissor
+//    };
+//
+//    vk::PipelineDynamicStateCreateInfo dynamicState = {};
+//    dynamicState.setDynamicStates(dynamicStates);
+//
+//    std::vector<vk::PipelineShaderStageCreateInfo> stages = {};
+//
+//    if (pipelineState->description.vertexFunction) {
+//        vk::PipelineShaderStageCreateInfo info{};
+//        info.setStage(vk::ShaderStageFlagBits::eVertex);
+//        info.setModule(pipelineState->description.vertexFunction->library->module);
+//        info.setPName(pipelineState->description.vertexFunction->name.c_str());
+//        stages.emplace_back(info);
+//    }
+//
+//    if (pipelineState->description.fragmentFunction) {
+//        vk::PipelineShaderStageCreateInfo info{};
+//        info.setStage(vk::ShaderStageFlagBits::eFragment);
+//        info.setModule(pipelineState->description.fragmentFunction->library->module);
+//        info.setPName(pipelineState->description.fragmentFunction->name.c_str());
+//        stages.emplace_back(info);
+//    }
+//
+//    vk::PipelineVertexInputStateCreateInfo vertexInputState = {};
+//    vertexInputState.setVertexBindingDescriptions(pipelineState->description.bindings);
+//    vertexInputState.setVertexAttributeDescriptions(pipelineState->description.attributes);
+//
+//    vk::PipelineColorBlendStateCreateInfo colorBlendState = {};
+//    colorBlendState.setAttachments(pipelineState->description.attachments.elements);
+//
+//    vk::PipelineRenderingCreateInfo rendering = {};
+//    rendering.setViewMask(pipelineState->description.viewMask);
+//    rendering.setColorAttachmentFormats(pipelineState->description.colorAttachmentFormats.elements);
+//    rendering.setDepthAttachmentFormat(pipelineState->description.depthAttachmentFormat);
+//    rendering.setStencilAttachmentFormat(pipelineState->description.stencilAttachmentFormat);
+//
+//    auto pipeline_create_info = vk::GraphicsPipelineCreateInfo{};
+//    pipeline_create_info.setPNext(&rendering);
+//    pipeline_create_info.setStages(stages);
+//    pipeline_create_info.setPVertexInputState(&vertexInputState);
+//    pipeline_create_info.setPInputAssemblyState(&pipelineState->description.inputAssemblyState);
+//    pipeline_create_info.setPViewportState(&viewportState);
+//    pipeline_create_info.setPRasterizationState(&pipelineState->description.rasterizationState);
+//    pipeline_create_info.setPMultisampleState(&pipelineState->description.multisampleState);
+//    pipeline_create_info.setPDepthStencilState(&pipelineState->description.depthStencilState);
+//    pipeline_create_info.setPColorBlendState(&colorBlendState);
+//    pipeline_create_info.setPDynamicState(&dynamicState);
+//    pipeline_create_info.setLayout(pipelineState->pipelineLayout);
+//    pipeline_create_info.setRenderPass(renderPass);
+//    pipeline_create_info.setSubpass(subpass);
+//    pipeline_create_info.setBasePipelineHandle(nullptr);
+//    pipeline_create_info.setBasePipelineIndex(0);
+//
+//    vk::Pipeline pipeline{};
+//    auto result = commandQueue->context->logical_device.createGraphicsPipelines(
+//        {},
+//        1,
+//        &pipeline_create_info,
+//        nullptr,
+//        &pipeline
+//    );
+//    if (result != vk::Result::eSuccess) {
+//        throw std::runtime_error(vk::to_string(result));
+//    }
+//    spdlog::info("Created pipeline (state = {}, pass = {}, subpass = {})", (void*)pipelineState.get(), (void*)renderPass, subpass);
+//    commandQueue->pipelines.emplace(key, pipeline);
+//    return pipeline;
+//}
 
 void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingColorAttachmentInfo& in) {
     auto clearValue = vk::ClearColorValue{
@@ -185,15 +185,15 @@ void vfx::CommandBuffer::setPipelineState(const Arc<PipelineState>& state) {
     pipelineState = state;
 }
 
-void vfx::CommandBuffer::beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents) {
-    handle.beginRenderPass(info, contents);
-    renderPass = info.renderPass;
-}
-
-void vfx::CommandBuffer::endRenderPass() {
-    renderPass = VK_NULL_HANDLE;
-    handle.endRenderPass();
-}
+//void vfx::CommandBuffer::beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents) {
+//    handle.beginRenderPass(info, contents);
+//    renderPass = info.renderPass;
+//}
+//
+//void vfx::CommandBuffer::endRenderPass() {
+//    renderPass = VK_NULL_HANDLE;
+//    handle.endRenderPass();
+//}
 
 void vfx::CommandBuffer::beginRendering(const RenderingInfo& description) {
     auto colorAttachmentCount = description.colorAttachments.elements.size();
@@ -237,12 +237,12 @@ void vfx::CommandBuffer::setViewport(u32 firstViewport, const vk::Viewport& view
 }
 
 void vfx::CommandBuffer::draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) {
-    handle.bindPipeline(vk::PipelineBindPoint::eGraphics, makePipeline(0));
+    handle.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelineState->pipeline);
     handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
 void vfx::CommandBuffer::drawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance) {
-    handle.bindPipeline(vk::PipelineBindPoint::eGraphics, makePipeline(0));
+    handle.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelineState->pipeline);
     handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 }
 
@@ -253,9 +253,9 @@ void vfx::CommandBuffer::waitUntilCompleted() {
 vfx::CommandQueue::CommandQueue() {}
 
 vfx::CommandQueue::~CommandQueue() {
-    for (auto& [_, pipeline] : pipelines) {
-        context->logical_device.destroyPipeline(pipeline);
-    }
+//    for (auto& [_, pipeline] : pipelines) {
+//        context->logical_device.destroyPipeline(pipeline);
+//    }
     context->freeCommandQueue(this);
 }
 
