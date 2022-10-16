@@ -258,8 +258,11 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
         description.rasterizationState.lineWidth = 1.0f;
 
-        description.vertexFunction = context->makeFunction(Assets::read_file("shaders/blit.vert.spv"), "main");
-        description.fragmentFunction = context->makeFunction(Assets::read_file("shaders/blit.frag.spv"), "main");
+        auto vertexLibrary = context->makeLibrary(Assets::read_file("shaders/blit.vert.spv"));
+        auto fragmentLibrary = context->makeLibrary(Assets::read_file("shaders/blit.frag.spv"));
+
+        description.vertexFunction = vertexLibrary->makeFunction("main");
+        description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
         present_pipeline_state = context->makePipelineState(description);
 

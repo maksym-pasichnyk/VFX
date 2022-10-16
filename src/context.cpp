@@ -465,17 +465,16 @@ void vfx::Context::freeBuffer(Buffer* buffer) {
     vmaDestroyBuffer(allocator, buffer->handle, buffer->allocation);
 }
 
-auto vfx::Context::makeFunction(const std::vector<char>& bytes, std::string name) -> Arc<Function> {
-    auto create_info = vk::ShaderModuleCreateInfo{
+auto vfx::Context::makeLibrary(const std::vector<char>& bytes) -> Arc<Library> {
+    auto module_create_info = vk::ShaderModuleCreateInfo{
         .codeSize = bytes.size(),
         .pCode    = reinterpret_cast<const u32 *>(bytes.data())
     };
-    auto module = logical_device.createShaderModule(create_info);
+    auto module = logical_device.createShaderModule(module_create_info);
 
-    auto out = Arc<Function>::alloc();
+    auto out = Arc<Library>::alloc();
     out->context = this;
     out->module = module;
-    out->name = std::move(name);
 
     spvReflectCreateShaderModule(
         bytes.size(),
@@ -486,9 +485,9 @@ auto vfx::Context::makeFunction(const std::vector<char>& bytes, std::string name
     return out;
 }
 
-void vfx::Context::freeFunction(Function* function) {
-    logical_device.destroyShaderModule(function->module);
-    spvReflectDestroyShaderModule(&function->reflect);
+void vfx::Context::freeLibrary(Library* library) {
+    logical_device.destroyShaderModule(library->module);
+    spvReflectDestroyShaderModule(&library->reflect);
 }
 
 auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& description) -> Arc<PipelineState> {
@@ -504,11 +503,11 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
     std::vector<DescriptorSetDescription> descriptor_set_descriptions{};
 
     auto addShaderModule = [&](const Arc<Function>& function) {
-        auto stage_flags = vk::ShaderStageFlagBits(function->reflect.shader_stage);
+        auto stage_flags = vk::ShaderStageFlagBits(function->library->reflect.shader_stage);
 
         auto refl_constant_blocks = std::span(
-            function->reflect.push_constant_blocks,
-            function->reflect.push_constant_block_count
+            function->library->reflect.push_constant_blocks,
+            function->library->reflect.push_constant_block_count
         );
 
         constant_ranges.reserve(refl_constant_blocks.size());
@@ -521,8 +520,8 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
         }
 
         auto refl_descriptor_sets = std::span(
-            function->reflect.descriptor_sets,
-            function->reflect.descriptor_set_count
+            function->library->reflect.descriptor_sets,
+            function->library->reflect.descriptor_set_count
         );
 
         for (auto& refl_set : refl_descriptor_sets) {

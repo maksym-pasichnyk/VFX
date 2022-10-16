@@ -145,9 +145,6 @@ void vfx::Swapchain::makeDrawables() {
 
 void vfx::Swapchain::freeDrawables() {
     drawables.clear();
-//    for (auto& drawable : drawables) {
-//        context->logical_device.destroyFramebuffer(drawable->framebuffer);
-//    }
     context->logical_device.destroySwapchainKHR(handle);
 }
 

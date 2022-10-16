@@ -22,6 +22,7 @@ namespace vfx {
     struct Buffer;
     struct Texture;
     struct Sampler;
+    struct Library;
     struct Function;
     struct RenderPass;
     struct CommandQueue;
@@ -71,8 +72,8 @@ namespace vfx {
         auto makeBuffer(BufferUsage target, u64 size) -> Arc<Buffer>;
         void freeBuffer(Buffer* buffer);
 
-        auto makeFunction(const std::vector<char>& bytes, std::string name) -> Arc<Function>;
-        void freeFunction(Function* function);
+        auto makeLibrary(const std::vector<char>& bytes) -> Arc<Library>;
+        void freeLibrary(Library* library);
 
         auto makePipelineState(const PipelineStateDescription& description) -> Arc<PipelineState>;
         void freePipelineState(PipelineState* pipelineState);

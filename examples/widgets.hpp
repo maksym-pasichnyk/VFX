@@ -225,8 +225,11 @@ private:
 
         description.rasterizationState.lineWidth = 1.0f;
 
-        description.vertexFunction = context->makeFunction(Assets::read_file("shaders/imgui.vert.spv"), "main");
-        description.fragmentFunction = context->makeFunction(Assets::read_file("shaders/imgui.frag.spv"), "main");
+        auto vertexLibrary = context->makeLibrary(Assets::read_file("shaders/imgui.vert.spv"));
+        auto fragmentLibrary = context->makeLibrary(Assets::read_file("shaders/imgui.frag.spv"));
+
+        description.vertexFunction = vertexLibrary->makeFunction("main");
+        description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
         pipelineState = context->makePipelineState(description);
 

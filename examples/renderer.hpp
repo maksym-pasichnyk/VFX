@@ -83,8 +83,11 @@ struct Renderer {
 
         description.rasterizationState.lineWidth = 1.0f;
 
-        description.vertexFunction = context->makeFunction(Assets::read_file("shaders/default.vert.spv"), "main");
-        description.fragmentFunction = context->makeFunction(Assets::read_file("shaders/default.frag.spv"), "main");
+        auto vertexLibrary = context->makeLibrary(Assets::read_file("shaders/default.vert.spv"));
+        auto fragmentLibrary = context->makeLibrary(Assets::read_file("shaders/default.frag.spv"));
+
+        description.vertexFunction = vertexLibrary->makeFunction("main");
+        description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
         pipelineState = context->makePipelineState(description);
     }

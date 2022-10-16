@@ -11,17 +11,25 @@
 
 namespace vfx {
     struct Context;
-    struct Function {
-    public:
-        Context*         context = {};
-        vk::ShaderModule module = {};
-        std::string      name = {};
+    struct Function;
 
+    struct Library : std::enable_shared_from_this<Library> {
+    public:
+        Context* context = {};
+        vk::ShaderModule module = {};
         SpvReflectShaderModule reflect = {};
 
     public:
-        Function();
-        ~Function();
+        Library();
+        ~Library();
+
+    public:
+        auto makeFunction(std::string name) -> Arc<Function>;
+    };
+
+    struct Function {
+        Arc<Library> library = {};
+        std::string  name = {};
     };
 
     struct PipelineColorBlendAttachmentStateArray {

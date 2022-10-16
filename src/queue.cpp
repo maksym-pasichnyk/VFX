@@ -35,7 +35,7 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
     if (pipelineState->description.vertexFunction) {
         vk::PipelineShaderStageCreateInfo info{};
         info.setStage(vk::ShaderStageFlagBits::eVertex);
-        info.setModule(pipelineState->description.vertexFunction->module);
+        info.setModule(pipelineState->description.vertexFunction->library->module);
         info.setPName(pipelineState->description.vertexFunction->name.c_str());
         stages.emplace_back(info);
     }
@@ -43,7 +43,7 @@ auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
     if (pipelineState->description.fragmentFunction) {
         vk::PipelineShaderStageCreateInfo info{};
         info.setStage(vk::ShaderStageFlagBits::eFragment);
-        info.setModule(pipelineState->description.fragmentFunction->module);
+        info.setModule(pipelineState->description.fragmentFunction->library->module);
         info.setPName(pipelineState->description.fragmentFunction->name.c_str());
         stages.emplace_back(info);
     }
