@@ -10,7 +10,7 @@
 namespace vfx {
     struct Vertex {
         glm::vec3 position{};
-        glm::u8vec4 color{};
+        u32 color{};
     };
 
     struct Buffer;

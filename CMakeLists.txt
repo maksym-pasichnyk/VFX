@@ -117,13 +117,15 @@ add_executable(VFX-example
     examples/main.cpp
     examples/camera.hpp
     examples/widgets.hpp
-        )
+)
 target_link_libraries(VFX-example PRIVATE VFX)
 target_compile_shaders(VFX-example
-    assets/shaders/default.frag
-    assets/shaders/default.vert
+    assets/shaders/sdf.frag
+    assets/shaders/sdf.vert
     assets/shaders/imgui.frag
     assets/shaders/imgui.vert
+    assets/shaders/cube.frag
+    assets/shaders/cube.vert
     assets/shaders/blit.vert
     assets/shaders/blit.frag
 )

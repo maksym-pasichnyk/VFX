@@ -206,7 +206,9 @@ private:
         };
 
         description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-//        description.rendering->depthAttachmentFormat = depthStencilFormat;
+
+        // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4235
+        description.depthAttachmentFormat = context->depthStencilFormat;
 //        description.rendering->stencilAttachmentFormat = depthStencilFormat;
 
         description.attachments[0].blendEnable = true;
