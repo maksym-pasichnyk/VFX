@@ -162,7 +162,7 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
             .surface = window->makeSurface(context),
             .colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
             .pixelFormat = vk::Format::eB8G8R8A8Unorm,
-            .presentMode = vk::PresentModeKHR::eFifo
+            .displaySyncEnabled = true
         });
         setDrawableSize(swapchain->getDrawableSize());
 
@@ -233,7 +233,7 @@ private:
             image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             image_memory_barrier.setImage(colorAttachmentTexture->image);
-            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{colorAttachmentTexture->aspect, 0, 1, 0, 1});
             cmd->handle.pipelineBarrier(
                 vk::PipelineStageFlagBits::eTopOfPipe,
                 vk::PipelineStageFlagBits::eColorAttachmentOutput,
@@ -253,13 +253,7 @@ private:
             image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             image_memory_barrier.setImage(depthAttachmentTexture->image);
-            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{
-                vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
-                0,
-                1,
-                0,
-                1
-            });
+            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{depthAttachmentTexture->aspect, 0, 1, 0, 1});
 
             cmd->handle.pipelineBarrier(
                 vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
@@ -354,7 +348,7 @@ private:
             image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             image_memory_barrier.setImage(colorAttachmentTexture->image);
-            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{colorAttachmentTexture->aspect, 0, 1, 0, 1});
             cmd->handle.pipelineBarrier(
                 vk::PipelineStageFlagBits::eColorAttachmentOutput,
                 vk::PipelineStageFlagBits::eBottomOfPipe,
@@ -377,7 +371,7 @@ private:
             image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             image_memory_barrier.setImage(drawable->texture->image);
-            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{drawable->texture->aspect, 0, 1, 0, 1});
             cmd->handle.pipelineBarrier(
                 vk::PipelineStageFlagBits::eTopOfPipe,
                 vk::PipelineStageFlagBits::eColorAttachmentOutput,
@@ -400,7 +394,7 @@ private:
             image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             image_memory_barrier.setImage(drawable->texture->image);
-            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{drawable->texture->aspect, 0, 1, 0, 1});
             cmd->handle.pipelineBarrier(
                 vk::PipelineStageFlagBits::eColorAttachmentOutput,
                 vk::PipelineStageFlagBits::eBottomOfPipe,
@@ -437,7 +431,7 @@ private:
         description.colorAttachmentFormats[0] = swapchain->getPixelFormat();
 
         // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4235
-        description.depthAttachmentFormat = context->depthStencilFormat;
+        description.depthAttachmentFormat = vk::Format::eD32Sfloat;
 
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =
@@ -471,7 +465,7 @@ private:
         };
 
         description.colorAttachmentFormats[0] = swapchain->getPixelFormat();
-        description.depthAttachmentFormat = context->depthStencilFormat;
+        description.depthAttachmentFormat = vk::Format::eD32Sfloat;
 
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =
@@ -503,7 +497,7 @@ private:
         description.colorAttachmentFormats[0] = swapchain->getPixelFormat();
 
         // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4235
-        description.depthAttachmentFormat = context->depthStencilFormat;
+        description.depthAttachmentFormat = vk::Format::eD32Sfloat;
 
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =
@@ -603,17 +597,15 @@ private:
             .format = swapchain->getPixelFormat(),
             .width = size.width,
             .height = size.height,
-            .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
-            .aspect = vk::ImageAspectFlagBits::eColor
+            .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled
         };
         colorAttachmentTexture = context->makeTexture(color_texture_description);
 
         auto depth_texture_description = vfx::TextureDescription{
-            .format = context->depthStencilFormat,
+            .format = vk::Format::eD32Sfloat,
             .width = size.width,
             .height = size.height,
-            .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
-            .aspect = vk::ImageAspectFlagBits::eDepth
+            .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled
         };
         depthAttachmentTexture = context->makeTexture(depth_texture_description);
     }

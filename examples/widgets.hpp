@@ -159,8 +159,7 @@ private:
             .format = vk::Format::eR8G8B8A8Unorm,
             .width = u32(width),
             .height = u32(height),
-            .usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-            .aspect = vk::ImageAspectFlagBits::eColor
+            .usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst
         };
         fontTexture = context->makeTexture(font_texture_description);
 
@@ -208,7 +207,7 @@ private:
         description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
 
         // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4235
-        description.depthAttachmentFormat = context->depthStencilFormat;
+        description.depthAttachmentFormat = vk::Format::eD32Sfloat;
 //        description.rendering->stencilAttachmentFormat = depthStencilFormat;
 
         description.attachments[0].blendEnable = true;

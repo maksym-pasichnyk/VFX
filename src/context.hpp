@@ -47,7 +47,7 @@ namespace vfx {
         vk::Queue present_queue{};
         vk::Queue graphics_queue{};
 
-        vk::Format depthStencilFormat{};
+//        vk::Format depthStencilFormat{};
 
     public:
         explicit Context(const ContextDescription& description);

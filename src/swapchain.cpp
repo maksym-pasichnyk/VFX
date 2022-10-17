@@ -61,7 +61,7 @@ vfx::Swapchain::Swapchain(const vfx::SwapchainDescription& description) {
 
     colorSpace = description.colorSpace;
     pixelFormat = description.pixelFormat;
-    presentMode = description.presentMode;
+    displaySyncEnabled = description.displaySyncEnabled;
 
     fence = context->logical_device.createFence({});
 
@@ -102,7 +102,7 @@ void vfx::Swapchain::makeDrawables() {
         .pQueueFamilyIndices = flag ? queue_family_indices.data() : nullptr,
         .preTransform = capabilities.currentTransform,
         .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
-        .presentMode = presentMode,
+        .presentMode = displaySyncEnabled ? vk::PresentModeKHR::eFifo : vk::PresentModeKHR::eImmediate,
         .clipped = true,
         .oldSwapchain = nullptr
     };
@@ -135,6 +135,7 @@ void vfx::Swapchain::makeDrawables() {
         drawables[i]->texture->image = images[i];
         drawables[i]->texture->view = view;
         drawables[i]->texture->allocation = {};
+        drawables[i]->texture->aspect = vk::ImageAspectFlagBits::eColor;
     }
 }
 

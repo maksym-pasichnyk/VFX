@@ -13,7 +13,6 @@ namespace vfx {
         u32 width = 0;
         u32 height = 0;
         vk::ImageUsageFlags usage = {};
-        vk::ImageAspectFlags aspect = {};
     };
 
     struct Sampler {
@@ -34,6 +33,7 @@ namespace vfx {
         vk::Image image{};
         vk::ImageView view{};
         VmaAllocation allocation{};
+        vk::ImageAspectFlags aspect = vk::ImageAspectFlagBits::eNone;
 
     public:
         Texture();

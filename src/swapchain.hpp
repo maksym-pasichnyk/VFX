@@ -8,12 +8,12 @@ namespace vfx {
     struct Context;
     struct Surface;
     struct SwapchainDescription {
-        Arc<Context> context{};
-        Arc<Surface> surface{};
+        Arc<Context> context = {};
+        Arc<Surface> surface = {};
 
-        vk::ColorSpaceKHR  colorSpace = {};
-        vk::Format         pixelFormat = {};
-        vk::PresentModeKHR presentMode = {};
+        vk::ColorSpaceKHR colorSpace = {};
+        vk::Format pixelFormat = {};
+        bool displaySyncEnabled = false;
     };
 
     struct Drawable;
@@ -34,7 +34,7 @@ namespace vfx {
         vk::Format pixelFormat = {};
         vk::Extent2D drawableSize = {};
         vk::ColorSpaceKHR colorSpace = {};
-        vk::PresentModeKHR presentMode = {};
+        bool displaySyncEnabled = false;
 
         vk::Fence fence{};
         vk::SwapchainKHR handle{};
