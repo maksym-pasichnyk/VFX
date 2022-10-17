@@ -5,7 +5,10 @@ out gl_PerVertex {
 };
 
 layout(push_constant) uniform Globals {
-	mat4 LocalToWorldMatrix;
+	mat4 ViewMatrix;
+	mat4 ProjectionMatrix;
+	mat4 ViewProjectionMatrix;
+	mat4 ModelMatrix;
 };
 
 layout(location = 0) in vec3 in_position;
@@ -18,5 +21,5 @@ layout(location = 0) out struct {
 void main() {
 	v_out.color = in_color;
 
-	gl_Position = LocalToWorldMatrix * vec4(in_position, 1);
+	gl_Position = ViewProjectionMatrix * ModelMatrix * vec4(in_position, 1);
 }

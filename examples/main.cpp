@@ -16,6 +16,7 @@
 #include "glm/glm.hpp"
 #include "glm/ext.hpp"
 #include "glm/gtx/euler_angles.hpp"
+#include "camera.hpp"
 
 enum class Example {
     SDF,
@@ -28,7 +29,12 @@ struct SDFGlobals {
 };
 
 struct CubeGlobals {
-    glm::mat4 LocalToWorldMatrix;
+    glm::mat4 ViewMatrix;
+    glm::mat4 ProjectionMatrix;
+    glm::mat4 ViewProjectionMatrix;
+
+    // todo: move to per-object data
+    glm::mat4 ModelMatrix;
 };
 
 struct DrawList {
@@ -279,44 +285,43 @@ private:
         cmd->setViewport(0, viewport);
 
         if (example == Example::SDF) {
-            auto renderer_rendering_info = vfx::RenderingInfo{};
-            renderer_rendering_info.renderArea = area;
-            renderer_rendering_info.layerCount = 1;
-            renderer_rendering_info.colorAttachments[0].texture = colorAttachmentTexture;
-            renderer_rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-            renderer_rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
-            renderer_rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
-            renderer_rendering_info.colorAttachments[0].clearColor = vfx::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
+            auto sdf_rendering_info = vfx::RenderingInfo{};
+            sdf_rendering_info.renderArea = area;
+            sdf_rendering_info.layerCount = 1;
+            sdf_rendering_info.colorAttachments[0].texture = colorAttachmentTexture;
+            sdf_rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+            sdf_rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+            sdf_rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+            sdf_rendering_info.colorAttachments[0].clearColor = vfx::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
 
-            cmd->beginRendering(renderer_rendering_info);
+            cmd->beginRendering(sdf_rendering_info);
             cmd->setPipelineState(sdfPipelineState);
             cmd->handle.pushConstants(sdfPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(SDFGlobals), &sdfGlobals);
             cmd->draw(6, 1, 0, 0);
             cmd->endRendering();
         } else if (example == Example::Cube) {
-            auto renderer_rendering_info = vfx::RenderingInfo{};
-            renderer_rendering_info.renderArea = area;
-            renderer_rendering_info.layerCount = 1;
-            renderer_rendering_info.colorAttachments[0].texture = colorAttachmentTexture;
-            renderer_rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-            renderer_rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
-            renderer_rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
-            renderer_rendering_info.colorAttachments[0].clearColor = vfx::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
+            auto cube_rendering_info = vfx::RenderingInfo{};
+            cube_rendering_info.renderArea = area;
+            cube_rendering_info.layerCount = 1;
+            cube_rendering_info.colorAttachments[0].texture = colorAttachmentTexture;
+            cube_rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+            cube_rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+            cube_rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+            cube_rendering_info.colorAttachments[0].clearColor = vfx::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
 
-            renderer_rendering_info.depthAttachment.texture = depthAttachmentTexture;
-            renderer_rendering_info.depthAttachment.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal;
-            renderer_rendering_info.depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
-            renderer_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-            renderer_rendering_info.depthAttachment.clearDepth = 1.0f;
+            cube_rendering_info.depthAttachment.texture = depthAttachmentTexture;
+            cube_rendering_info.depthAttachment.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+            cube_rendering_info.depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+            cube_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
+            cube_rendering_info.depthAttachment.clearDepth = 1.0f;
 
-            auto projection = glm::perspectiveLH_ZO(glm::radians(60.0f), f32(area.extent.width) / f32(area.extent.height), 0.01f, 1000.0f);
-            projection[1][1] = -projection[1][1];
+            cubeGlobals.ViewMatrix = glm::lookAtLH(glm::vec3(5, 5, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+            cubeGlobals.ProjectionMatrix = Camera::getInfinityProjectionMatrix(60.0f, f32(area.extent.width) / f32(area.extent.height), 0.01f);
+            cubeGlobals.ViewProjectionMatrix = cubeGlobals.ProjectionMatrix * cubeGlobals.ViewMatrix;
 
-            cubeGlobals.LocalToWorldMatrix = projection;
-            cubeGlobals.LocalToWorldMatrix *= glm::lookAtLH(glm::vec3(5, 5, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-            cubeGlobals.LocalToWorldMatrix *= glm::rotate(glm::mat4(1.0f), glm::radians(timeSinceStart) * 50.0f, glm::vec3(0, 1, 0));
+            cubeGlobals.ModelMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(timeSinceStart) * 50.0f, glm::vec3(0, 1, 0));
 
-            cmd->beginRendering(renderer_rendering_info);
+            cmd->beginRendering(cube_rendering_info);
             cmd->setPipelineState(cubePipelineState);
             cmd->handle.pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(CubeGlobals), &cubeGlobals);
 
