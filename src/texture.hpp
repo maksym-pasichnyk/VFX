@@ -13,6 +13,7 @@ namespace vfx {
         u32 width = 0;
         u32 height = 0;
         vk::ImageUsageFlags usage = {};
+        vk::ComponentMapping components = {};
     };
 
     struct Sampler {

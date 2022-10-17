@@ -555,7 +555,11 @@ void vfx::Context::create_logical_device() {
         VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME
     };
 
+    auto portability_subset_features = vk::PhysicalDevicePortabilitySubsetFeaturesKHR{};
+    portability_subset_features.imageViewFormatSwizzle = VK_TRUE;
+
     auto timeline_semaphore_features = vk::PhysicalDeviceTimelineSemaphoreFeatures{};
+    timeline_semaphore_features.setPNext(&portability_subset_features);
     timeline_semaphore_features.setTimelineSemaphore(VK_TRUE);
 
     auto dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures{};
@@ -698,6 +702,7 @@ auto vfx::Context::makeTexture(const vfx::TextureDescription& description) -> Ar
         .image = image,
         .viewType = vk::ImageViewType::e2D,
         .format = description.format,
+        .components = description.components,
         .subresourceRange = vk::ImageSubresourceRange{
             .aspectMask     = image_aspect_flags,
             .baseMipLevel   = 0,
