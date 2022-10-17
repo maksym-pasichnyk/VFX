@@ -9,8 +9,15 @@ layout(location = 0) out struct {
 } v_out;
 
 layout(push_constant) uniform Globals {
+	mat4 ViewMatrix;
+	mat4 ProjectionMatrix;
+	mat4 ViewProjectionMatrix;
+	vec3 CameraPosition;
+
 	ivec2 Resolution;
 	float Time;
+
+	mat4 ModelMatrix;
 };
 
 const vec2 vertices[6] = vec2[](

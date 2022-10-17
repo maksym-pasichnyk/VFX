@@ -1,8 +1,15 @@
 #version 450
 
 layout(push_constant) uniform Globals {
+    mat4 ViewMatrix;
+    mat4 ProjectionMatrix;
+    mat4 ViewProjectionMatrix;
+    vec3 CameraPosition;
+
     ivec2 Resolution;
     float Time;
+
+    mat4 ModelMatrix;
 };
 
 layout(location = 0) out vec4 out_color;

@@ -1,7 +1,9 @@
 #include <vector>
 
+#include "glsl.hpp"
 #include "queue.hpp"
 #include "window.hpp"
+#include "camera.hpp"
 #include "assets.hpp"
 #include "texture.hpp"
 #include "context.hpp"
@@ -13,28 +15,22 @@
 #include "GLFW/glfw3.h"
 #include "spdlog/spdlog.h"
 
-#include "glm/glm.hpp"
-#include "glm/ext.hpp"
-#include "glm/gtx/euler_angles.hpp"
-#include "camera.hpp"
-
 enum class Example {
     SDF,
     Cube
 };
 
-struct SDFGlobals {
-    vk::Extent2D Resolution;
-    f32 Time;
-};
+struct Globals {
+    vfx::float4x4 ViewMatrix;
+    vfx::float4x4 ProjectionMatrix;
+    vfx::float4x4 ViewProjectionMatrix;
+    vfx::float3   CameraPosition;
 
-struct CubeGlobals {
-    glm::mat4 ViewMatrix;
-    glm::mat4 ProjectionMatrix;
-    glm::mat4 ViewProjectionMatrix;
+    vfx::int2     Resolution;
+    vfx::float1   Time;
 
     // todo: move to per-object data
-    glm::mat4 ModelMatrix;
+    vfx::float4x4 ModelMatrix;
 };
 
 struct DrawList {
@@ -140,8 +136,7 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
     Arc<vfx::Mesh> cube{};
     Arc<Widgets> widgets{};
 
-    SDFGlobals sdfGlobals{};
-    CubeGlobals cubeGlobals{};
+    Globals globals{};
     f32 timeSinceStart = 0.0f;
 
     Example example = Example::SDF;
@@ -278,6 +273,12 @@ private:
         cmd->setScissor(0, area);
         cmd->setViewport(0, viewport);
 
+        globals.ViewMatrix = glm::lookAtLH(glm::vec3(2, 2, 2), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+        globals.ProjectionMatrix = Camera::getInfinityProjectionMatrix(60.0f, f32(area.extent.width) / f32(area.extent.height), 0.01f);
+        globals.ViewProjectionMatrix = globals.ProjectionMatrix * globals.ViewMatrix;
+        globals.ModelMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(timeSinceStart) * 50.0f, glm::vec3(0, 1, 0));
+        globals.Time = 0.0f;//timeSinceStart;
+
         if (example == Example::SDF) {
             auto sdf_rendering_info = vfx::RenderingInfo{};
             sdf_rendering_info.renderArea = area;
@@ -290,7 +291,7 @@ private:
 
             cmd->beginRendering(sdf_rendering_info);
             cmd->setPipelineState(sdfPipelineState);
-            cmd->handle.pushConstants(sdfPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(SDFGlobals), &sdfGlobals);
+            cmd->handle.pushConstants(sdfPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
             cmd->draw(6, 1, 0, 0);
             cmd->endRendering();
         } else if (example == Example::Cube) {
@@ -309,15 +310,9 @@ private:
             cube_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
             cube_rendering_info.depthAttachment.clearDepth = 1.0f;
 
-            cubeGlobals.ViewMatrix = glm::lookAtLH(glm::vec3(5, 5, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-            cubeGlobals.ProjectionMatrix = Camera::getInfinityProjectionMatrix(60.0f, f32(area.extent.width) / f32(area.extent.height), 0.01f);
-            cubeGlobals.ViewProjectionMatrix = cubeGlobals.ProjectionMatrix * cubeGlobals.ViewMatrix;
-
-            cubeGlobals.ModelMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(timeSinceStart) * 50.0f, glm::vec3(0, 1, 0));
-
             cmd->beginRendering(cube_rendering_info);
             cmd->setPipelineState(cubePipelineState);
-            cmd->handle.pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(CubeGlobals), &cubeGlobals);
+            cmd->handle.pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Globals), &globals);
 
             cmd->handle.bindVertexBuffers(0, cube->vertexBuffer->handle, vk::DeviceSize{0});
             cmd->handle.bindIndexBuffer(cube->indexBuffer->handle, 0, vk::IndexType::eUint32);
@@ -351,6 +346,26 @@ private:
             image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{colorAttachmentTexture->aspect, 0, 1, 0, 1});
             cmd->handle.pipelineBarrier(
                 vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                vk::PipelineStageFlagBits::eBottomOfPipe,
+                {},
+                0, nullptr,
+                0, nullptr,
+                1, &image_memory_barrier
+            );
+        }
+        // todo: move to a better place
+        {
+            auto image_memory_barrier = vk::ImageMemoryBarrier{};
+            image_memory_barrier.setSrcAccessMask(vk::AccessFlagBits::eDepthStencilAttachmentWrite);
+            image_memory_barrier.setDstAccessMask(vk::AccessFlags{});
+            image_memory_barrier.setOldLayout(vk::ImageLayout::eDepthAttachmentOptimal);
+            image_memory_barrier.setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+            image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+            image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+            image_memory_barrier.setImage(depthAttachmentTexture->image);
+            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{depthAttachmentTexture->aspect, 0, 1, 0, 1});
+            cmd->handle.pipelineBarrier(
+                vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
                 vk::PipelineStageFlagBits::eBottomOfPipe,
                 {},
                 0, nullptr,
@@ -518,34 +533,71 @@ private:
         presentPipelineState = context->makePipelineState(description);
 
         auto pool_sizes = std::array{
-            vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1}
+            vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 2},
+            vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 2}
         };
         auto pool_create_info = vk::DescriptorPoolCreateInfo{};
-        pool_create_info.setMaxSets(1);
+        pool_create_info.setMaxSets(2);
         pool_create_info.setPoolSizes(pool_sizes);
         descriptor_pool = context->logical_device.createDescriptorPool(pool_create_info, nullptr);
+
+        descriptor_sets.resize(2);
 
         auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
         ds_allocate_info.setDescriptorPool(descriptor_pool);
         ds_allocate_info.setSetLayouts(presentPipelineState->descriptorSetLayouts);
-        descriptor_sets = context->logical_device.allocateDescriptorSets(ds_allocate_info);
+        descriptor_sets[0] = context->logical_device.allocateDescriptorSets(ds_allocate_info)[0];
+
+        ds_allocate_info.setSetLayouts(presentPipelineState->descriptorSetLayouts);
+        descriptor_sets[1] = context->logical_device.allocateDescriptorSets(ds_allocate_info)[0];
     }
 
     void updateAttachmentDescriptors() {
-        const auto image_info = vk::DescriptorImageInfo{
-            .sampler = sampler->handle,
+        const auto sampler_image_info = vk::DescriptorImageInfo {
+            .sampler = sampler->handle
+        };
+        const auto color_image_info = vk::DescriptorImageInfo{
             .imageView = colorAttachmentTexture->view,
             .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         };
-        const auto write_descriptor_set = vk::WriteDescriptorSet{
-            .dstSet = descriptor_sets[0],
-            .dstBinding = 0,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-            .pImageInfo = &image_info
+        const auto depth_image_info = vk::DescriptorImageInfo{
+            .imageView = depthAttachmentTexture->view,
+            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         };
-        context->logical_device.updateDescriptorSets(write_descriptor_set, {});
+        context->logical_device.updateDescriptorSets({
+            vk::WriteDescriptorSet{
+                .dstSet = descriptor_sets[0],
+                .dstBinding = 0,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampledImage,
+                .pImageInfo = &color_image_info
+            },
+            vk::WriteDescriptorSet{
+                .dstSet = descriptor_sets[0],
+                .dstBinding = 1,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampler,
+                .pImageInfo = &sampler_image_info
+            },
+            vk::WriteDescriptorSet{
+                .dstSet = descriptor_sets[1],
+                .dstBinding = 0,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampledImage,
+                .pImageInfo = &depth_image_info
+            },
+            vk::WriteDescriptorSet{
+                .dstSet = descriptor_sets[1],
+                .dstBinding = 1,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampler,
+                .pImageInfo = &sampler_image_info
+            }
+        }, {});
     }
 
     void windowDidResize() override {
@@ -561,19 +613,12 @@ private:
     }
 
     void encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
-        auto area = vk::Rect2D{};
-        area.setOffset(vk::Offset2D{0, 0});
-        area.setExtent(drawable->texture->size);
+        auto size = drawable->texture->size;
+        auto area = vk::Rect2D{.extent = size};
 
         auto viewport = vk::Viewport{};
-        viewport.setWidth(f32(drawable->texture->size.width));
-        viewport.setHeight(f32(drawable->texture->size.height));
-
-        cmd->setScissor(0, area);
-        cmd->setViewport(0, viewport);
-
-        cmd->setPipelineState(presentPipelineState);
-        cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, descriptor_sets, {});
+        viewport.setWidth(f32(size.width));
+        viewport.setHeight(f32(size.height));
 
         auto present_rendering_info = vfx::RenderingInfo{};
         present_rendering_info.renderArea = area;
@@ -585,13 +630,37 @@ private:
         present_rendering_info.colorAttachments[0].clearColor = vfx::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
 
         cmd->beginRendering(present_rendering_info);
-        cmd->handle.bindPipeline(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipeline);
-        cmd->draw(6, 1, 0, 0);
+        cmd->setViewport(0, viewport);
+
+        if (example == Example::SDF) {
+            cmd->setScissor(0, area);
+            cmd->setPipelineState(presentPipelineState);
+            cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
+            cmd->draw(6, 1, 0, 0);
+        } else if (example == Example::Cube) {
+            auto colorArea = vk::Rect2D{};
+            colorArea.setOffset(vk::Offset2D{0, 0});
+            colorArea.setExtent(vk::Extent2D{u32(size.width) / 2, size.height});
+
+            auto depthArea = vk::Rect2D{};
+            depthArea.setOffset(vk::Offset2D{i32(size.width) / 2, 0});
+            depthArea.setExtent(vk::Extent2D{u32(size.width) / 2, size.height});
+
+            cmd->setScissor(0, colorArea);
+            cmd->setPipelineState(presentPipelineState);
+            cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
+            cmd->draw(6, 1, 0, 0);
+
+            cmd->setScissor(0, depthArea);
+            cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[1], 0, nullptr);
+            cmd->draw(6, 1, 0, 0);
+        }
+
         cmd->endRendering();
     }
 
     void setDrawableSize(const vk::Extent2D& size) {
-        sdfGlobals.Resolution = size;
+        globals.Resolution = {size.width, size.height};
 
         auto color_texture_description = vfx::TextureDescription{
             .format = swapchain->getPixelFormat(),
@@ -605,7 +674,13 @@ private:
             .format = vk::Format::eD32Sfloat,
             .width = size.width,
             .height = size.height,
-            .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled
+            .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
+            .components = {
+                .r = vk::ComponentSwizzle::eB,
+                .g = vk::ComponentSwizzle::eR,
+                .b = vk::ComponentSwizzle::eR,
+                .a = vk::ComponentSwizzle::eIdentity,
+            }
         };
         depthAttachmentTexture = context->makeTexture(depth_texture_description);
     }
