@@ -247,8 +247,8 @@ private:
 
     void setupRenderState(ImDrawData* draw_data, vfx::CommandBuffer* cmd, Arc<vfx::Mesh>& mesh, i32 fb_width, i32 fb_height) {
         if (draw_data->TotalVtxCount > 0) {
-            cmd->handle.bindVertexBuffers(0, mesh->vertexBuffer->handle, vk::DeviceSize{0});
-            cmd->handle.bindIndexBuffer(mesh->indexBuffer->handle, 0, vk::IndexType::eUint16);
+            cmd->bindVertexBuffer(0, mesh->vertexBuffer, 0);
+            cmd->bindIndexBuffer(mesh->indexBuffer, 0, vk::IndexType::eUint16);
         }
 
         cmd->setViewport(0, vk::Viewport{0, 0, f32(fb_width), f32(fb_height), 0, 1});

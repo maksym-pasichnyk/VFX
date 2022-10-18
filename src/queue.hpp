@@ -69,6 +69,7 @@ namespace vfx {
         RenderingStencilAttachmentInfo    stencilAttachment = {};
     };
 
+    struct Buffer;
     struct Context;
     struct Drawable;
     struct CommandQueue;
@@ -87,6 +88,9 @@ namespace vfx {
         std::vector<vk::ImageMemoryBarrier2> imageMemoryBarriers = {};
         std::vector<vk::BufferMemoryBarrier2> bufferMemoryBarriers = {};
 
+        std::vector<Arc<Buffer>> bufferReferences{};
+        std::vector<Arc<Texture>> textureReferences{};
+
     public:
         Context* context{};
         CommandQueue* commandQueue{};
@@ -97,6 +101,7 @@ namespace vfx {
 
     private:
         void reset();
+        void releaseReferences();
 //        auto makePipeline(i32 subpass) -> vk::Pipeline;
 
     public:
@@ -120,6 +125,9 @@ namespace vfx {
         void memoryBarrier(const vk::MemoryBarrier2& barrier);
         void imageMemoryBarrier(const vk::ImageMemoryBarrier2& barrier);
         void bufferMemoryBarrier(const vk::BufferMemoryBarrier2& barrier);
+
+        void bindIndexBuffer(const Arc<Buffer>& buffer, vk::DeviceSize offset, vk::IndexType indexType);
+        void bindVertexBuffer(int firstBinding, const Arc<Buffer>& buffer, vk::DeviceSize offset);
     };
 
     struct CommandQueue final {

@@ -1,6 +1,7 @@
-#include "queue.hpp"
 #include "pass.hpp"
+#include "queue.hpp"
 #include "window.hpp"
+#include "buffer.hpp"
 #include "context.hpp"
 #include "texture.hpp"
 #include "material.hpp"
@@ -62,6 +63,11 @@ namespace {
 }
 
 void vfx::CommandBuffer::reset() {
+}
+
+void vfx::CommandBuffer::releaseReferences() {
+    bufferReferences.clear();
+    textureReferences.clear();
 }
 
 //auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
@@ -203,7 +209,15 @@ void vfx::CommandBuffer::beginRendering(const RenderingInfo& description) {
     }
 
     for (u64 i = 0; i < colorAttachmentCount; ++i) {
-        fillAttachmentInfo(colorAttachments[i], description.colorAttachments.elements[i]);
+        if (description.colorAttachments.elements[i].texture) {
+            textureReferences.emplace_back(description.colorAttachments.elements[i].texture);
+        }
+        if (description.colorAttachments.elements[i].resolveTexture) {
+            textureReferences.emplace_back(description.colorAttachments.elements[i].resolveTexture);
+        }
+        if (description.colorAttachments.elements[i].texture || description.colorAttachments.elements[i].resolveTexture) {
+            fillAttachmentInfo(colorAttachments[i], description.colorAttachments.elements[i]);
+        }
     }
 
     vk::RenderingInfo info{};
@@ -215,10 +229,22 @@ void vfx::CommandBuffer::beginRendering(const RenderingInfo& description) {
     info.setColorAttachmentCount(u32(colorAttachmentCount));
     info.setPColorAttachments(colorAttachments.data());
     if (description.depthAttachment.texture) {
+        textureReferences.emplace_back(description.depthAttachment.texture);
+    }
+    if (description.depthAttachment.resolveTexture) {
+        textureReferences.emplace_back(description.depthAttachment.resolveTexture);
+    }
+    if (description.depthAttachment.texture || description.depthAttachment.resolveTexture) {
         fillAttachmentInfo(depthAttachment, description.depthAttachment);
         info.setPDepthAttachment(&depthAttachment);
     }
     if (description.stencilAttachment.texture) {
+        textureReferences.emplace_back(description.stencilAttachment.texture);
+    }
+    if (description.stencilAttachment.resolveTexture) {
+        textureReferences.emplace_back(description.stencilAttachment.resolveTexture);
+    }
+    if (description.stencilAttachment.texture || description.stencilAttachment.resolveTexture) {
         fillAttachmentInfo(stencilAttachment, description.stencilAttachment);
         info.setPStencilAttachment(&stencilAttachment);
     }
@@ -278,6 +304,16 @@ void vfx::CommandBuffer::bufferMemoryBarrier(const vk::BufferMemoryBarrier2& bar
     bufferMemoryBarriers.emplace_back(barrier);
 }
 
+void vfx::CommandBuffer::bindIndexBuffer(const Arc<Buffer>& buffer, vk::DeviceSize offset, vk::IndexType indexType) {
+    bufferReferences.emplace_back(buffer);
+    handle.bindIndexBuffer(buffer->handle, offset, indexType);
+}
+
+void vfx::CommandBuffer::bindVertexBuffer(int firstBinding, const Arc<Buffer>& buffer, vk::DeviceSize offset) {
+    bufferReferences.emplace_back(buffer);
+    handle.bindVertexBuffers(firstBinding, 1, &buffer->handle, &offset);
+}
+
 vfx::CommandQueue::CommandQueue() {}
 
 vfx::CommandQueue::~CommandQueue() {
@@ -292,6 +328,8 @@ auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
             vk::Result result = context->logical_device.getFenceStatus(commandBuffer.fence);
             if (result == vk::Result::eSuccess) {
                 std::ignore = context->logical_device.resetFences(1, &commandBuffer.fence);
+                // todo: release references to resources after execution completed
+                commandBuffer.releaseReferences();
                 return &commandBuffer;
             }
         }
