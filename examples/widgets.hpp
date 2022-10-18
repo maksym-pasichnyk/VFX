@@ -206,10 +206,6 @@ private:
 
         description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
 
-        // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4235
-        description.depthAttachmentFormat = vk::Format::eD32Sfloat;
-//        description.rendering->stencilAttachmentFormat = depthStencilFormat;
-
         description.attachments[0].blendEnable = true;
         description.attachments[0].srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
         description.attachments[0].dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;

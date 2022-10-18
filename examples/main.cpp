@@ -445,9 +445,6 @@ private:
 
         description.colorAttachmentFormats[0] = swapchain->getPixelFormat();
 
-        // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4235
-        description.depthAttachmentFormat = vk::Format::eD32Sfloat;
-
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =
             vk::ColorComponentFlagBits::eR |
@@ -510,9 +507,6 @@ private:
         vfx::PipelineStateDescription description{};
 
         description.colorAttachmentFormats[0] = swapchain->getPixelFormat();
-
-        // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4235
-        description.depthAttachmentFormat = vk::Format::eD32Sfloat;
 
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =

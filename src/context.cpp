@@ -409,8 +409,19 @@ namespace vfx {
         const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
         void *pUserData
     ) -> VkBool32 {
+        static constexpr const char* skip[] = {
+            "VUID-vkCmdPushConstants-offset-01796",
+            "VUID-vkCmdBindPipeline-pipeline-06197"
+        };
+
+        for (const char* msg : skip) {
+            if (strstr(pCallbackData->pMessage, msg) != nullptr) {
+                return VK_FALSE;
+            }
+        }
+
         if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-            spdlog::info("{}", pCallbackData->pMessage);
+            spdlog::debug("{}", pCallbackData->pMessage);
         } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
             spdlog::info("{}", pCallbackData->pMessage);
         } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
