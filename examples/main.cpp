@@ -24,6 +24,8 @@ struct Globals {
     vfx::float4x4 ViewMatrix;
     vfx::float4x4 ProjectionMatrix;
     vfx::float4x4 ViewProjectionMatrix;
+    vfx::float4x4 InverseViewProjectionMatrix;
+
     vfx::float3   CameraPosition;
 
     vfx::int2     Resolution;
@@ -268,11 +270,16 @@ private:
         cmd->setScissor(0, area);
         cmd->setViewport(0, viewport);
 
-        globals.ViewMatrix = glm::lookAtLH(glm::vec3(2, 2, 2), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-        globals.ProjectionMatrix = Camera::getInfinityProjectionMatrix(60.0f, f32(area.extent.width) / f32(area.extent.height), 0.01f);
-        globals.ViewProjectionMatrix = globals.ProjectionMatrix * globals.ViewMatrix;
-        globals.ModelMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(timeSinceStart) * 50.0f, glm::vec3(0, 1, 0));
+        f32 aspect = viewport.width / viewport.height;
+
         globals.Time = timeSinceStart;
+        globals.CameraPosition = glm::vec3(glm::sin(timeSinceStart) * 3.0f, 3.0f, glm::cos(timeSinceStart) * 3.0f);
+        globals.ViewMatrix = glm::lookAtLH(globals.CameraPosition, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+        globals.ProjectionMatrix = Camera::getInfinityProjectionMatrix(60.0f, aspect, 0.01f);
+        globals.ViewProjectionMatrix = globals.ProjectionMatrix * globals.ViewMatrix;
+        globals.InverseViewProjectionMatrix = glm::inverse(globals.ViewProjectionMatrix);
+
+        globals.ModelMatrix = glm::mat4(1.0f);
 
         if (example == Example::SDF) {
             auto sdf_rendering_info = vfx::RenderingInfo{};
@@ -307,7 +314,7 @@ private:
 
             cmd->beginRendering(cube_rendering_info);
             cmd->setPipelineState(cubePipelineState);
-            cmd->handle.pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Globals), &globals);
+            cmd->handle.pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
 
             cmd->handle.bindVertexBuffers(0, cube->vertexBuffer->handle, vk::DeviceSize{0});
             cmd->handle.bindIndexBuffer(cube->indexBuffer->handle, 0, vk::IndexType::eUint32);

@@ -1,19 +1,9 @@
 #version 450 core
 
+#include "globals.glsl"
+
 out gl_PerVertex {
 	vec4 gl_Position;
-};
-
-layout(push_constant) uniform Globals {
-	mat4 ViewMatrix;
-	mat4 ProjectionMatrix;
-	mat4 ViewProjectionMatrix;
-	vec3 CameraPosition;
-
-	ivec2 Resolution;
-	float Time;
-
-	mat4 ModelMatrix;
 };
 
 layout(location = 0) in vec3 in_position;

@@ -1,16 +1,6 @@
 #version 450
 
-layout(push_constant) uniform Globals {
-    mat4 ViewMatrix;
-    mat4 ProjectionMatrix;
-    mat4 ViewProjectionMatrix;
-    vec3 CameraPosition;
-
-    ivec2 Resolution;
-    float Time;
-
-    mat4 ModelMatrix;
-};
+#include "globals.glsl"
 
 layout(location = 0) out vec4 out_color;
 
@@ -81,7 +71,7 @@ struct RaycastHit {
 };
 
 Sphere[] spheres = Sphere[](
-    Sphere(vec3(0, 2, 0), 2.0f)
+    Sphere(vec3(0, 0, 0), 1.0f)
 );
 
 Capsule[] capsules = Capsule[] (
@@ -93,7 +83,7 @@ Torus[] toruses = Torus[] (
 );
 
 Box[] boxes = Box[] (
-    Box(vec3(0, 2, 0), vec3(3, 1, 1))
+    Box(vec3(0, 0, 0), vec3(1))
 );
 
 Cylinder[] cylinders = Cylinder[] (
@@ -105,8 +95,8 @@ Plane[] planes = Plane[](
 );
 
 Light[] lights = Light[](
-    Light(vec3(-20, 20, 0), 0.5f),
-    Light(vec3(0, 20, -20), 0.5f)
+    Light(vec3(5, 5, -5), 0.5f),
+    Light(vec3(5, 5, +5), 0.5f)
 );
 
 #define MAX_STEPS 100
@@ -167,9 +157,9 @@ float torusSDF(vec3 point, Torus obj) {
 }
 
 float boxSDF(vec3 point, Box obj) {
-    vec3 C = abs(obj.center - point) - obj.size;
-    float inside = min(max(C.x, max(C.y, C.z)), 0);
-    float outside = length(max(C, 0));
+    vec3 C = abs(point - obj.center) - obj.size;
+    float inside = min(max(C.x, max(C.y, C.z)),0.0);
+    float outside = length(max(C, 0.0));
     return inside + outside;
 }
 
@@ -190,23 +180,23 @@ float smax(float a, float b, float k) {
 
 float scene(vec3 point) {
     float d = 100000.0f;
-    for (int i = 0; i < spheres.length(); i++) {
-        d = smin(d, sphereSDF(point, spheres[i]), 0.5f);
-    }
+//    for (int i = 0; i < spheres.length(); i++) {
+//        d = min(d, sphereSDF(point, spheres[i]));
+//    }
 //    for (int i = 0; i < capsules.length(); i++) {
 //        d = smin(d, capsuleSDF(point, capsules[i]), 0.5f);
 //    }
 //    for (int i = 0; i < toruses.length(); i++) {
 //        d = smin(d, torusSDF(point, toruses[i]), 0.5f);
 //    }
-//    for (int i = 0; i < boxes.length(); i++) {
-//        d = max(d, -boxSDF(point, boxes[i]));
-//    }
+    for (int i = 0; i < boxes.length(); i++) {
+        d = min(d, boxSDF(point, boxes[i]));
+    }
 //    for (int i = 0; i < cylinders.length(); i++) {
 //        d = smin(d, cylinderSDF(point, cylinders[i]), 0.5f);
 //    }
 
-    return min(d, point.y);
+    return min(d, point.y + 10);
 }
 
 vec3 getNormal(vec3 point) {
@@ -261,22 +251,9 @@ vec2 getLight(vec3 point) {
     return vec2(diffuse, specular);
 }
 
-mat3 lookAt(vec3 origin, vec3 target, float roll) {
-    vec3 rr = vec3(sin(roll), cos(roll), 0.0);
-    vec3 ww = normalize(target - origin);
-    vec3 uu = normalize(cross(ww, rr));
-    vec3 vv = normalize(cross(uu, ww));
-
-    return mat3(uu, vv, ww);
-}
-
 vec4 render(vec2 uv) {
-    vec3 eye = vec3(-20, 20, -20);
-    vec3 target = vec3(0, 0, 0);
-    mat3 rot = lookAt(eye, target, 0.0f);
-
-    vec3 rd = normalize(rot * vec3(uv, 2.0f));
-    vec3 ro = eye;
+    vec3 rd = normalize(vec3(InverseViewProjectionMatrix * vec4(uv, 1.0f, 1.0f)));
+    vec3 ro = CameraPosition;
 
     float depth = render(Ray(ro, rd));
     vec3 p = ro + rd * depth;
@@ -288,7 +265,5 @@ vec4 render(vec2 uv) {
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    vec2 p0 = (fragCoord - vec2(Resolution.xy) * 0.5f) / vec2(Resolution.yy);
-
-    fragColor = render(p0);
+    fragColor = render(2.0f * fragCoord - 1.0f);
 }
