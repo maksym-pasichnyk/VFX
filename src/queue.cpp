@@ -152,6 +152,10 @@ void vfx::CommandBuffer::releaseReferences() {
 //    return pipeline;
 //}
 
+auto vfx::CommandBuffer::getRetainedReferences() const -> bool {
+    return retainedReferences;
+}
+
 void vfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
     handle.begin(info);
 }
@@ -209,11 +213,13 @@ void vfx::CommandBuffer::beginRendering(const RenderingInfo& description) {
     }
 
     for (u64 i = 0; i < colorAttachmentCount; ++i) {
-        if (description.colorAttachments.elements[i].texture) {
-            textureReferences.emplace_back(description.colorAttachments.elements[i].texture);
-        }
-        if (description.colorAttachments.elements[i].resolveTexture) {
-            textureReferences.emplace_back(description.colorAttachments.elements[i].resolveTexture);
+        if (retainedReferences) {
+            if (description.colorAttachments.elements[i].texture) {
+                textureReferences.emplace_back(description.colorAttachments.elements[i].texture);
+            }
+            if (description.colorAttachments.elements[i].resolveTexture) {
+                textureReferences.emplace_back(description.colorAttachments.elements[i].resolveTexture);
+            }
         }
         if (description.colorAttachments.elements[i].texture || description.colorAttachments.elements[i].resolveTexture) {
             fillAttachmentInfo(colorAttachments[i], description.colorAttachments.elements[i]);
@@ -228,21 +234,25 @@ void vfx::CommandBuffer::beginRendering(const RenderingInfo& description) {
     info.setViewMask(description.viewMask);
     info.setColorAttachmentCount(u32(colorAttachmentCount));
     info.setPColorAttachments(colorAttachments.data());
-    if (description.depthAttachment.texture) {
-        textureReferences.emplace_back(description.depthAttachment.texture);
-    }
-    if (description.depthAttachment.resolveTexture) {
-        textureReferences.emplace_back(description.depthAttachment.resolveTexture);
+    if (retainedReferences) {
+        if (description.depthAttachment.texture) {
+            textureReferences.emplace_back(description.depthAttachment.texture);
+        }
+        if (description.depthAttachment.resolveTexture) {
+            textureReferences.emplace_back(description.depthAttachment.resolveTexture);
+        }
     }
     if (description.depthAttachment.texture || description.depthAttachment.resolveTexture) {
         fillAttachmentInfo(depthAttachment, description.depthAttachment);
         info.setPDepthAttachment(&depthAttachment);
     }
-    if (description.stencilAttachment.texture) {
-        textureReferences.emplace_back(description.stencilAttachment.texture);
-    }
-    if (description.stencilAttachment.resolveTexture) {
-        textureReferences.emplace_back(description.stencilAttachment.resolveTexture);
+    if (retainedReferences) {
+        if (description.stencilAttachment.texture) {
+            textureReferences.emplace_back(description.stencilAttachment.texture);
+        }
+        if (description.stencilAttachment.resolveTexture) {
+            textureReferences.emplace_back(description.stencilAttachment.resolveTexture);
+        }
     }
     if (description.stencilAttachment.texture || description.stencilAttachment.resolveTexture) {
         fillAttachmentInfo(stencilAttachment, description.stencilAttachment);
@@ -305,12 +315,16 @@ void vfx::CommandBuffer::bufferMemoryBarrier(const vk::BufferMemoryBarrier2& bar
 }
 
 void vfx::CommandBuffer::bindIndexBuffer(const Arc<Buffer>& buffer, vk::DeviceSize offset, vk::IndexType indexType) {
-    bufferReferences.emplace_back(buffer);
+    if (retainedReferences) {
+        bufferReferences.emplace_back(buffer);
+    }
     handle.bindIndexBuffer(buffer->handle, offset, indexType);
 }
 
 void vfx::CommandBuffer::bindVertexBuffer(int firstBinding, const Arc<Buffer>& buffer, vk::DeviceSize offset) {
-    bufferReferences.emplace_back(buffer);
+    if (retainedReferences) {
+        bufferReferences.emplace_back(buffer);
+    }
     handle.bindVertexBuffers(firstBinding, 1, &buffer->handle, &offset);
 }
 
@@ -330,6 +344,26 @@ auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
                 std::ignore = context->logical_device.resetFences(1, &commandBuffer.fence);
                 // todo: release references to resources after execution completed
                 commandBuffer.releaseReferences();
+                commandBuffer.retainedReferences = true;
+                return &commandBuffer;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+auto vfx::CommandQueue::makeCommandBufferWithUnretainedReferences() -> vfx::CommandBuffer* {
+//    std::ignore = context->logical_device.waitForFences(fences, VK_FALSE, std::numeric_limits<u64>::max());
+
+    while (true) {
+        for (auto& commandBuffer : commandBuffers) {
+            vk::Result result = context->logical_device.getFenceStatus(commandBuffer.fence);
+            if (result == vk::Result::eSuccess) {
+                std::ignore = context->logical_device.resetFences(1, &commandBuffer.fence);
+                // todo: release references to resources after execution completed
+                commandBuffer.releaseReferences();
+                commandBuffer.retainedReferences = false;
                 return &commandBuffer;
             }
         }

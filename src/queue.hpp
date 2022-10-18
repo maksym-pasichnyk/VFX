@@ -79,6 +79,7 @@ namespace vfx {
         friend CommandQueue;
 
     private:
+        bool retainedReferences = false;
 //        vk::RenderPass renderPass = {};
         vk::RenderingAttachmentInfo depthAttachment = {};
         vk::RenderingAttachmentInfo stencilAttachment = {};
@@ -105,6 +106,7 @@ namespace vfx {
 //        auto makePipeline(i32 subpass) -> vk::Pipeline;
 
     public:
+        auto getRetainedReferences() const -> bool;
         void begin(const vk::CommandBufferBeginInfo& info);
         void end();
         void submit();
@@ -140,6 +142,7 @@ namespace vfx {
 
     public:
         auto makeCommandBuffer() -> CommandBuffer*;
+        auto makeCommandBufferWithUnretainedReferences() -> CommandBuffer*;
 
     private:
         Context* context{};
