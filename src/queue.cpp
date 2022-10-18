@@ -249,6 +249,35 @@ void vfx::CommandBuffer::waitUntilCompleted() {
     std::ignore = commandQueue->context->logical_device.waitForFences(fence, VK_TRUE, std::numeric_limits<u64>::max());
 }
 
+void vfx::CommandBuffer::flushBarriers() {
+    if (memoryBarriers.empty() && imageMemoryBarriers.empty() && bufferMemoryBarriers.empty()) {
+        return;
+    }
+
+    vk::DependencyInfo info{};
+    info.setMemoryBarriers(memoryBarriers);
+    info.setImageMemoryBarriers(imageMemoryBarriers);
+    info.setBufferMemoryBarriers(bufferMemoryBarriers);
+
+    handle.pipelineBarrier2(info);
+
+    memoryBarriers.clear();
+    imageMemoryBarriers.clear();
+    bufferMemoryBarriers.clear();
+}
+
+void vfx::CommandBuffer::memoryBarrier(const vk::MemoryBarrier2& barrier) {
+    memoryBarriers.emplace_back(barrier);
+}
+
+void vfx::CommandBuffer::imageMemoryBarrier(const vk::ImageMemoryBarrier2& barrier) {
+    imageMemoryBarriers.emplace_back(barrier);
+}
+
+void vfx::CommandBuffer::bufferMemoryBarrier(const vk::BufferMemoryBarrier2& barrier) {
+    bufferMemoryBarriers.emplace_back(barrier);
+}
+
 vfx::CommandQueue::CommandQueue() {}
 
 vfx::CommandQueue::~CommandQueue() {

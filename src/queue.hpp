@@ -83,6 +83,10 @@ namespace vfx {
         vk::RenderingAttachmentInfo stencilAttachment = {};
         std::vector<vk::RenderingAttachmentInfo> colorAttachments = {};
 
+        std::vector<vk::MemoryBarrier2> memoryBarriers = {};
+        std::vector<vk::ImageMemoryBarrier2> imageMemoryBarriers = {};
+        std::vector<vk::BufferMemoryBarrier2> bufferMemoryBarriers = {};
+
     public:
         Context* context{};
         CommandQueue* commandQueue{};
@@ -111,6 +115,11 @@ namespace vfx {
 
         void draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance);
         void drawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance);
+
+        void flushBarriers();
+        void memoryBarrier(const vk::MemoryBarrier2& barrier);
+        void imageMemoryBarrier(const vk::ImageMemoryBarrier2& barrier);
+        void bufferMemoryBarrier(const vk::BufferMemoryBarrier2& barrier);
     };
 
     struct CommandQueue final {

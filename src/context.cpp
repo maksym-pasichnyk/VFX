@@ -492,8 +492,8 @@ void vfx::Context::create_instance(const vfx::ContextDescription& description) {
         };
 
         auto enabled_validation_features = std::array{
-            vk::ValidationFeatureEnableEXT::eGpuAssisted,
-            vk::ValidationFeatureEnableEXT::eBestPractices,
+//            vk::ValidationFeatureEnableEXT::eGpuAssisted,
+//            vk::ValidationFeatureEnableEXT::eBestPractices,
             vk::ValidationFeatureEnableEXT::eSynchronizationValidation,
         };
         auto validation_features = vk::ValidationFeaturesEXT{};
@@ -592,8 +592,12 @@ void vfx::Context::create_logical_device() {
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
     };
 
+    auto synchronization_2_features = vk::PhysicalDeviceSynchronization2Features{};
+    synchronization_2_features.setSynchronization2(VK_TRUE);
+
     auto portability_subset_features = vk::PhysicalDevicePortabilitySubsetFeaturesKHR{};
-    portability_subset_features.imageViewFormatSwizzle = VK_TRUE;
+    portability_subset_features.setPNext(&synchronization_2_features);
+    portability_subset_features.setImageViewFormatSwizzle(VK_TRUE);
 
     auto timeline_semaphore_features = vk::PhysicalDeviceTimelineSemaphoreFeatures{};
     timeline_semaphore_features.setPNext(&portability_subset_features);
@@ -742,9 +746,7 @@ auto vfx::Context::makeTexture(const vfx::TextureDescription& description) -> Ar
         .components = description.components,
         .subresourceRange = vk::ImageSubresourceRange{
             .aspectMask     = image_aspect_flags,
-            .baseMipLevel   = 0,
             .levelCount     = 1,
-            .baseArrayLayer = 0,
             .layerCount     = 1
         }
     };

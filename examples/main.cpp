@@ -220,46 +220,40 @@ private:
         cmd->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
         // todo: move to a better place
-        {
-            auto image_memory_barrier = vk::ImageMemoryBarrier{};
-            image_memory_barrier.setSrcAccessMask(vk::AccessFlags{});
-            image_memory_barrier.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
-            image_memory_barrier.setOldLayout(vk::ImageLayout::eUndefined);
-            image_memory_barrier.setNewLayout(vk::ImageLayout::eColorAttachmentOptimal);
-            image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            image_memory_barrier.setImage(colorAttachmentTexture->image);
-            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{colorAttachmentTexture->aspect, 0, 1, 0, 1});
-            cmd->handle.pipelineBarrier(
-                vk::PipelineStageFlagBits::eTopOfPipe,
-                vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                {},
-                0, nullptr,
-                0, nullptr,
-                1, &image_memory_barrier
-            );
-        }
+        cmd->imageMemoryBarrier(vk::ImageMemoryBarrier2{
+            .srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+            .srcAccessMask = vk::AccessFlags2{},
+            .dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            .dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+            .oldLayout = vk::ImageLayout::eUndefined,
+            .newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = colorAttachmentTexture->image,
+            .subresourceRange = vk::ImageSubresourceRange{
+                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                .levelCount = 1,
+                .layerCount = 1
+            }
+        });
         // todo: move to a better place
-        {
-            auto image_memory_barrier = vk::ImageMemoryBarrier{};
-            image_memory_barrier.setSrcAccessMask(vk::AccessFlags{});
-            image_memory_barrier.setDstAccessMask(vk::AccessFlagBits::eDepthStencilAttachmentWrite);
-            image_memory_barrier.setOldLayout(vk::ImageLayout::eUndefined);
-            image_memory_barrier.setNewLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-            image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            image_memory_barrier.setImage(depthAttachmentTexture->image);
-            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{depthAttachmentTexture->aspect, 0, 1, 0, 1});
-
-            cmd->handle.pipelineBarrier(
-                vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
-                vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
-                {},
-                0, nullptr,
-                0, nullptr,
-                1, &image_memory_barrier
-            );
-        }
+        cmd->imageMemoryBarrier(vk::ImageMemoryBarrier2{
+            .srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+            .srcAccessMask = vk::AccessFlags2{},
+            .dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+            .dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+            .oldLayout = vk::ImageLayout::eUndefined,
+            .newLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = depthAttachmentTexture->image,
+            .subresourceRange = vk::ImageSubresourceRange{
+                .aspectMask = vk::ImageAspectFlagBits::eDepth,
+                .levelCount = 1,
+                .layerCount = 1
+            }
+        });
+        cmd->flushBarriers();
 
         auto area = vk::Rect2D{};
         area.setOffset(vk::Offset2D{0, 0});
@@ -278,7 +272,7 @@ private:
         globals.ProjectionMatrix = Camera::getInfinityProjectionMatrix(60.0f, f32(area.extent.width) / f32(area.extent.height), 0.01f);
         globals.ViewProjectionMatrix = globals.ProjectionMatrix * globals.ViewMatrix;
         globals.ModelMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(timeSinceStart) * 50.0f, glm::vec3(0, 1, 0));
-        globals.Time = 0.0f;//timeSinceStart;
+        globals.Time = timeSinceStart;
 
         if (example == Example::SDF) {
             auto sdf_rendering_info = vfx::RenderingInfo{};
@@ -334,92 +328,9 @@ private:
         widgets->draw(cmd);
         cmd->endRendering();
 
-        // todo: move to a better place
-        {
-            auto image_memory_barrier = vk::ImageMemoryBarrier{};
-            image_memory_barrier.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
-            image_memory_barrier.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
-            image_memory_barrier.setOldLayout(vk::ImageLayout::eColorAttachmentOptimal);
-            image_memory_barrier.setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-            image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            image_memory_barrier.setImage(colorAttachmentTexture->image);
-            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{colorAttachmentTexture->aspect, 0, 1, 0, 1});
-            cmd->handle.pipelineBarrier(
-                vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                vk::PipelineStageFlagBits::eFragmentShader,
-                {},
-                0, nullptr,
-                0, nullptr,
-                1, &image_memory_barrier
-            );
-        }
-        // todo: move to a better place
-        {
-            auto image_memory_barrier = vk::ImageMemoryBarrier{};
-            image_memory_barrier.setSrcAccessMask(vk::AccessFlagBits::eDepthStencilAttachmentWrite);
-            image_memory_barrier.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
-            image_memory_barrier.setOldLayout(vk::ImageLayout::eDepthAttachmentOptimal);
-            image_memory_barrier.setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-            image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            image_memory_barrier.setImage(depthAttachmentTexture->image);
-            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{depthAttachmentTexture->aspect, 0, 1, 0, 1});
-            cmd->handle.pipelineBarrier(
-                vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
-                vk::PipelineStageFlagBits::eFragmentShader,
-                {},
-                0, nullptr,
-                0, nullptr,
-                1, &image_memory_barrier
-            );
-        }
-
         auto drawable = swapchain->nextDrawable();
 
-        // todo: move to a better place
-        {
-            auto image_memory_barrier = vk::ImageMemoryBarrier{};
-            image_memory_barrier.setSrcAccessMask(vk::AccessFlags{});
-            image_memory_barrier.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
-            image_memory_barrier.setOldLayout(vk::ImageLayout::eUndefined);
-            image_memory_barrier.setNewLayout(vk::ImageLayout::eColorAttachmentOptimal);
-            image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            image_memory_barrier.setImage(drawable->texture->image);
-            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{drawable->texture->aspect, 0, 1, 0, 1});
-            cmd->handle.pipelineBarrier(
-                vk::PipelineStageFlagBits::eTopOfPipe,
-                vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                {},
-                0, nullptr,
-                0, nullptr,
-                1, &image_memory_barrier
-            );
-        }
-
         encodePresent(cmd, drawable);
-
-        // todo: move to a better place
-        {
-            auto image_memory_barrier = vk::ImageMemoryBarrier{};
-            image_memory_barrier.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
-            image_memory_barrier.setDstAccessMask(vk::AccessFlags{});
-            image_memory_barrier.setOldLayout(vk::ImageLayout::eColorAttachmentOptimal);
-            image_memory_barrier.setNewLayout(vk::ImageLayout::ePresentSrcKHR);
-            image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            image_memory_barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            image_memory_barrier.setImage(drawable->texture->image);
-            image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{drawable->texture->aspect, 0, 1, 0, 1});
-            cmd->handle.pipelineBarrier(
-                vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                vk::PipelineStageFlagBits::eBottomOfPipe,
-                {},
-                0, nullptr,
-                0, nullptr,
-                1, &image_memory_barrier
-            );
-        }
 
         cmd->end();
         cmd->submit();
@@ -608,6 +519,60 @@ private:
     }
 
     void encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
+        // todo: move to a better place
+        cmd->imageMemoryBarrier(vk::ImageMemoryBarrier2{
+            .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+            .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+            .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+            .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+            .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = colorAttachmentTexture->image,
+            .subresourceRange = vk::ImageSubresourceRange{
+                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                .levelCount = 1,
+                .layerCount = 1
+            }
+        });
+        // todo: move to a better place
+        cmd->imageMemoryBarrier(vk::ImageMemoryBarrier2{
+            .srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+            .srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+            .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+            .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+            .oldLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+            .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = depthAttachmentTexture->image,
+            .subresourceRange = vk::ImageSubresourceRange{
+                .aspectMask = vk::ImageAspectFlagBits::eDepth,
+                .levelCount = 1,
+                .layerCount = 1
+            }
+        });
+
+        // todo: move to a better place
+        cmd->imageMemoryBarrier(vk::ImageMemoryBarrier2{
+            .srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+            .srcAccessMask = vk::AccessFlags2{},
+            .dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            .dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+            .oldLayout = vk::ImageLayout::eUndefined,
+            .newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = drawable->texture->image,
+            .subresourceRange = vk::ImageSubresourceRange{
+                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                .levelCount = 1,
+                .layerCount = 1
+            }
+        });
+        cmd->flushBarriers();
+
         auto size = drawable->texture->size;
         auto area = vk::Rect2D{.extent = size};
 
@@ -652,6 +617,25 @@ private:
         }
 
         cmd->endRendering();
+
+        // todo: move to a better place
+        cmd->imageMemoryBarrier(vk::ImageMemoryBarrier2{
+            .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+            .dstStageMask = vk::PipelineStageFlagBits2::eBottomOfPipe,
+            .dstAccessMask = vk::AccessFlags2{},
+            .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+            .newLayout = vk::ImageLayout::ePresentSrcKHR,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = drawable->texture->image,
+            .subresourceRange = vk::ImageSubresourceRange{
+                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                .levelCount = 1,
+                .layerCount = 1
+            }
+        });
+        cmd->flushBarriers();
     }
 
     void setDrawableSize(const vk::Extent2D& size) {
