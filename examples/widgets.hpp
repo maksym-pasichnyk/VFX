@@ -14,7 +14,6 @@
 #include "imgui_internal.h"
 #include "backends/imgui_impl_glfw.cpp"
 
-// todo: get rid of current frame
 struct Widgets {
 public:
     Widgets(const Arc<vfx::Context>& context, const Arc<vfx::Window>& window) : context(context) {
@@ -41,10 +40,6 @@ public:
 
         createPipelineState();
         createFontTexture();
-
-        for (auto& frame : frames) {
-            frame = Arc<vfx::Mesh>::alloc(context);
-        }
     }
 
     ~Widgets() {
@@ -61,7 +56,6 @@ public:
 
     void endFrame() {
         ImGui::Render();
-        current_frame = (current_frame + 1) % frames.size();
     }
 
     void draw(vfx::CommandBuffer* cmd) {
@@ -71,6 +65,10 @@ public:
         }
 
         const auto draw_data = std::addressof(viewport->DrawDataP);
+
+        if (draw_data->TotalVtxCount <= 0) {
+            return;
+        }
 
         const auto display_pos = draw_data->DisplayPos;
         const auto display_size = draw_data->DisplaySize;
@@ -84,27 +82,24 @@ public:
             return;
         }
 
-        auto& frame = frames[current_frame];
+        auto mesh = Arc<vfx::Mesh>::alloc(context);
+        mesh->setIndexBufferParams(draw_data->TotalIdxCount, sizeof(ImDrawIdx));
+        mesh->setVertexBufferParams(draw_data->TotalVtxCount, sizeof(ImDrawVert));
 
-        if (draw_data->TotalVtxCount > 0) {
-            frame->setIndexBufferParams(draw_data->TotalIdxCount, sizeof(ImDrawIdx));
-            frame->setVertexBufferParams(draw_data->TotalVtxCount, sizeof(ImDrawVert));
-
-            auto vtx_dst_offset = 0;
-            auto idx_dst_offset = 0;
-            for (i32 n = 0; n < draw_data->CmdListsCount; n++) {
-                auto cmd_list = draw_data->CmdLists[n];
-                frame->setVertexBufferData(cmd_list->VtxBuffer.Data, cmd_list->VtxBuffer.Size, vtx_dst_offset);
-                frame->setIndexBufferData(cmd_list->IdxBuffer.Data, cmd_list->IdxBuffer.Size, idx_dst_offset);
-                vtx_dst_offset += cmd_list->VtxBuffer.Size;
-                idx_dst_offset += cmd_list->IdxBuffer.Size;
-            }
+        auto vtx_dst_offset = 0;
+        auto idx_dst_offset = 0;
+        for (i32 n = 0; n < draw_data->CmdListsCount; n++) {
+            auto cmd_list = draw_data->CmdLists[n];
+            mesh->setVertexBufferData(cmd_list->VtxBuffer.Data, cmd_list->VtxBuffer.Size, vtx_dst_offset);
+            mesh->setIndexBufferData(cmd_list->IdxBuffer.Data, cmd_list->IdxBuffer.Size, idx_dst_offset);
+            vtx_dst_offset += cmd_list->VtxBuffer.Size;
+            idx_dst_offset += cmd_list->IdxBuffer.Size;
         }
 
         cmd->setPipelineState(pipelineState);
         cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineState->pipelineLayout, 0, descriptor_sets, {});
 
-        setupRenderState(draw_data, cmd, frame, fb_width, fb_height);
+        setupRenderState(draw_data, cmd, mesh, fb_width, fb_height);
 
         u32 global_vtx_offset = 0;
         u32 global_idx_offset = 0;
@@ -114,7 +109,7 @@ public:
                 auto pcmd = &cmd_list->CmdBuffer[cmd_i];
                 if (pcmd->UserCallback != nullptr) {
                     if (pcmd->UserCallback == ImDrawCallback_ResetRenderState) {
-                        setupRenderState(draw_data, cmd, frame, fb_width, fb_height);
+                        setupRenderState(draw_data, cmd, mesh, fb_width, fb_height);
                     } else {
                         pcmd->UserCallback(cmd_list, pcmd);
                     }
@@ -245,7 +240,7 @@ private:
         descriptor_sets = context->logical_device.allocateDescriptorSets(ds_allocate_info);
     }
 
-    void setupRenderState(ImDrawData* draw_data, vfx::CommandBuffer* cmd, Arc<vfx::Mesh>& mesh, i32 fb_width, i32 fb_height) {
+    void setupRenderState(ImDrawData* draw_data, vfx::CommandBuffer* cmd, const Arc<vfx::Mesh>& mesh, i32 fb_width, i32 fb_height) {
         if (draw_data->TotalVtxCount > 0) {
             cmd->bindVertexBuffer(0, mesh->vertexBuffer, 0);
             cmd->bindIndexBuffer(mesh->indexBuffer, 0, vk::IndexType::eUint16);
@@ -277,9 +272,6 @@ private:
     Arc<vfx::Sampler> fontSampler{};
     Arc<vfx::Texture> fontTexture{};
     Arc<vfx::PipelineState> pipelineState{};
-
-    u64 current_frame = 0;
-    std::array<Arc<vfx::Mesh>, vfx::Context::MAX_FRAMES_IN_FLIGHT> frames{};
 
     // todo: bindless
     vk::DescriptorPool descriptor_pool{};
