@@ -9,6 +9,58 @@
 
 #include "spdlog/spdlog.h"
 
+namespace {
+    void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const vfx::RenderingColorAttachmentInfo& in) {
+        auto clearValue = vk::ClearColorValue{
+            .float32 = std::array{
+                in.clearColor.red,
+                in.clearColor.greed,
+                in.clearColor.blue,
+                in.clearColor.alpha
+            }
+        };
+
+        out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
+        out.imageLayout = in.imageLayout;
+        out.resolveMode = in.resolveMode;
+        out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
+        out.resolveImageLayout = in.resolveImageLayout;
+        out.loadOp = in.loadOp;
+        out.storeOp = in.storeOp;
+        out.clearValue.setColor(clearValue);
+    }
+
+    void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const vfx::RenderingDepthAttachmentInfo& in) {
+        auto clear_value = vk::ClearDepthStencilValue {
+            .depth = in.clearDepth
+        };
+
+        out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
+        out.imageLayout = in.imageLayout;
+        out.resolveMode = in.resolveMode;
+        out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
+        out.resolveImageLayout = in.resolveImageLayout;
+        out.loadOp = in.loadOp;
+        out.storeOp = in.storeOp;
+        out.clearValue.setDepthStencil(clear_value);
+    }
+
+    void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const vfx::RenderingStencilAttachmentInfo& in) {
+        auto clearValue = vk::ClearDepthStencilValue {
+            .stencil = in.clearStencil
+        };
+
+        out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
+        out.imageLayout = in.imageLayout;
+        out.resolveMode = in.resolveMode;
+        out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
+        out.resolveImageLayout = in.resolveImageLayout;
+        out.loadOp = in.loadOp;
+        out.storeOp = in.storeOp;
+        out.clearValue.setDepthStencil(clearValue);
+    }
+}
+
 void vfx::CommandBuffer::reset() {
 }
 
@@ -94,58 +146,7 @@ void vfx::CommandBuffer::reset() {
 //    return pipeline;
 //}
 
-void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingColorAttachmentInfo& in) {
-    auto clearValue = vk::ClearColorValue{
-        .float32 = std::array{
-            in.clearColor.red,
-            in.clearColor.greed,
-            in.clearColor.blue,
-            in.clearColor.alpha
-        }
-    };
-
-    out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
-    out.imageLayout = in.imageLayout;
-    out.resolveMode = in.resolveMode;
-    out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
-    out.resolveImageLayout = in.resolveImageLayout;
-    out.loadOp = in.loadOp;
-    out.storeOp = in.storeOp;
-    out.clearValue.setColor(clearValue);
-}
-
-void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingDepthAttachmentInfo& in) {
-    auto clear_value = vk::ClearDepthStencilValue {
-        .depth = in.clearDepth
-    };
-
-    out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
-    out.imageLayout = in.imageLayout;
-    out.resolveMode = in.resolveMode;
-    out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
-    out.resolveImageLayout = in.resolveImageLayout;
-    out.loadOp = in.loadOp;
-    out.storeOp = in.storeOp;
-    out.clearValue.setDepthStencil(clear_value);
-}
-
-void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingStencilAttachmentInfo& in) {
-    auto clearValue = vk::ClearDepthStencilValue {
-        .stencil = in.clearStencil
-    };
-
-    out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
-    out.imageLayout = in.imageLayout;
-    out.resolveMode = in.resolveMode;
-    out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
-    out.resolveImageLayout = in.resolveImageLayout;
-    out.loadOp = in.loadOp;
-    out.storeOp = in.storeOp;
-    out.clearValue.setDepthStencil(clearValue);
-}
-
 void vfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
-    pipelineState = {};
     handle.begin(info);
 }
 
@@ -182,7 +183,7 @@ void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
 }
 
 void vfx::CommandBuffer::setPipelineState(const Arc<PipelineState>& state) {
-    pipelineState = state;
+    handle.bindPipeline(vk::PipelineBindPoint::eGraphics, state->pipeline);
 }
 
 //void vfx::CommandBuffer::beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents) {
@@ -237,12 +238,10 @@ void vfx::CommandBuffer::setViewport(u32 firstViewport, const vk::Viewport& view
 }
 
 void vfx::CommandBuffer::draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) {
-    handle.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelineState->pipeline);
     handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
 void vfx::CommandBuffer::drawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance) {
-    handle.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelineState->pipeline);
     handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 }
 
@@ -253,9 +252,6 @@ void vfx::CommandBuffer::waitUntilCompleted() {
 vfx::CommandQueue::CommandQueue() {}
 
 vfx::CommandQueue::~CommandQueue() {
-//    for (auto& [_, pipeline] : pipelines) {
-//        context->logical_device.destroyPipeline(pipeline);
-//    }
     context->freeCommandQueue(this);
 }
 
@@ -268,9 +264,6 @@ auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
             if (result == vk::Result::eSuccess) {
                 std::ignore = context->logical_device.resetFences(1, &commandBuffer.fence);
                 return &commandBuffer;
-            }
-            if (result == vk::Result::eErrorDeviceLost) {
-                throw std::runtime_error(vk::to_string(result));
             }
         }
     }

@@ -79,7 +79,6 @@ namespace vfx {
 
     private:
 //        vk::RenderPass renderPass = {};
-        Arc<PipelineState> pipelineState = {};
         vk::RenderingAttachmentInfo depthAttachment = {};
         vk::RenderingAttachmentInfo stencilAttachment = {};
         std::vector<vk::RenderingAttachmentInfo> colorAttachments = {};
@@ -95,9 +94,6 @@ namespace vfx {
     private:
         void reset();
 //        auto makePipeline(i32 subpass) -> vk::Pipeline;
-        void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingColorAttachmentInfo& in);
-        void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingDepthAttachmentInfo& in);
-        void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const RenderingStencilAttachmentInfo& in);
 
     public:
         void begin(const vk::CommandBufferBeginInfo& info);
@@ -139,8 +135,5 @@ namespace vfx {
         std::vector<vk::CommandBuffer> rawCommandBuffers{};
 
         std::vector<CommandBuffer> commandBuffers{};
-
-//        // todo: move to global cache?
-//        std::map<std::tuple<Arc<PipelineState>, vk::RenderPass, i32>, vk::Pipeline> pipelines{};
     };
 }

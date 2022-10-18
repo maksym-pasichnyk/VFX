@@ -150,6 +150,7 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
         });
         window->delegate = this;
 
+        setenv("VFX_ENABLE_API_VALIDATION", "1", 1);
         context = vfx::createSystemDefaultContext();
 
         swapchain = Arc<vfx::Swapchain>::alloc(vfx::SwapchainDescription{
@@ -337,7 +338,7 @@ private:
         {
             auto image_memory_barrier = vk::ImageMemoryBarrier{};
             image_memory_barrier.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
-            image_memory_barrier.setDstAccessMask(vk::AccessFlags{});
+            image_memory_barrier.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
             image_memory_barrier.setOldLayout(vk::ImageLayout::eColorAttachmentOptimal);
             image_memory_barrier.setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
             image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
@@ -346,7 +347,7 @@ private:
             image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{colorAttachmentTexture->aspect, 0, 1, 0, 1});
             cmd->handle.pipelineBarrier(
                 vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                vk::PipelineStageFlagBits::eBottomOfPipe,
+                vk::PipelineStageFlagBits::eFragmentShader,
                 {},
                 0, nullptr,
                 0, nullptr,
@@ -357,7 +358,7 @@ private:
         {
             auto image_memory_barrier = vk::ImageMemoryBarrier{};
             image_memory_barrier.setSrcAccessMask(vk::AccessFlagBits::eDepthStencilAttachmentWrite);
-            image_memory_barrier.setDstAccessMask(vk::AccessFlags{});
+            image_memory_barrier.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
             image_memory_barrier.setOldLayout(vk::ImageLayout::eDepthAttachmentOptimal);
             image_memory_barrier.setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
             image_memory_barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
@@ -366,7 +367,7 @@ private:
             image_memory_barrier.setSubresourceRange(vk::ImageSubresourceRange{depthAttachmentTexture->aspect, 0, 1, 0, 1});
             cmd->handle.pipelineBarrier(
                 vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
-                vk::PipelineStageFlagBits::eBottomOfPipe,
+                vk::PipelineStageFlagBits::eFragmentShader,
                 {},
                 0, nullptr,
                 0, nullptr,

@@ -410,6 +410,7 @@ namespace vfx {
         void *pUserData
     ) -> VkBool32 {
         static constexpr const char* skip[] = {
+            "UNASSIGNED-BestPractices-NonSuccess-Result",
             "VUID-vkCmdPushConstants-offset-01796",
             "VUID-vkCmdBindPipeline-pipeline-06197"
         };
@@ -439,11 +440,6 @@ auto vfx::createSystemDefaultContext() -> Arc<Context> {
     return Arc<vfx::Context>::alloc(vfx::ContextDescription{
         .app_name = "Demo",
         .flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR,
-#ifndef NDEBUG
-        .layers = {
-            "VK_LAYER_KHRONOS_validation"
-        },
-#endif
         .extensions = {
             VK_KHR_SURFACE_EXTENSION_NAME,
             "VK_EXT_metal_surface",
@@ -452,7 +448,7 @@ auto vfx::createSystemDefaultContext() -> Arc<Context> {
             VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
         },
 #ifndef NDEBUG
-        .enable_debug = true
+        .enableDebugUtils = true
 #endif
     });
 }
@@ -485,15 +481,47 @@ void vfx::Context::create_instance(const vfx::ContextDescription& description) {
         .apiVersion = VK_API_VERSION_1_2
     };
 
-    auto instance_create_info = vk::InstanceCreateInfo {};
-    instance_create_info.setFlags(description.flags);
-    instance_create_info.setPApplicationInfo(&application_info);
-    instance_create_info.setPEnabledLayerNames(description.layers);
-    instance_create_info.setPEnabledExtensionNames(description.extensions);
-    instance = vk::createInstance(instance_create_info);
+    auto enableApiValidation = [s = getenv("VFX_ENABLE_API_VALIDATION")] {
+        return s && strcmp(s, "1") == 0;
+    }();
+
+    if (enableApiValidation) {
+        auto layers = std::vector<const char*>{
+            "VK_LAYER_KHRONOS_synchronization2",
+            "VK_LAYER_KHRONOS_validation"
+        };
+
+        auto enabled_validation_features = std::array{
+            vk::ValidationFeatureEnableEXT::eGpuAssisted,
+            vk::ValidationFeatureEnableEXT::eBestPractices,
+            vk::ValidationFeatureEnableEXT::eSynchronizationValidation,
+        };
+        auto validation_features = vk::ValidationFeaturesEXT{};
+        validation_features.setEnabledValidationFeatures(enabled_validation_features);
+
+        auto instance_create_info = vk::InstanceCreateInfo {};
+        instance_create_info.setPNext(&validation_features);
+        instance_create_info.setFlags(description.flags);
+        instance_create_info.setPApplicationInfo(&application_info);
+        instance_create_info.setPEnabledLayerNames(layers);
+        instance_create_info.setPEnabledExtensionNames(description.extensions);
+        instance = vk::createInstance(instance_create_info);
+    } else {
+        auto layers = std::vector<const char*>{
+            "VK_LAYER_KHRONOS_synchronization2"
+        };
+
+        auto instance_create_info = vk::InstanceCreateInfo {};
+        instance_create_info.setFlags(description.flags);
+        instance_create_info.setPApplicationInfo(&application_info);
+        instance_create_info.setPEnabledLayerNames(layers);
+        instance_create_info.setPEnabledExtensionNames(description.extensions);
+        instance = vk::createInstance(instance_create_info);
+    }
+
     vk::defaultDispatchLoaderDynamic.init(instance);
 
-    if (description.enable_debug) {
+    if (description.enableDebugUtils) {
         vk::DebugUtilsMessageSeverityFlagsEXT message_severity_flags{};
         message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
         message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo;
@@ -552,9 +580,6 @@ void vfx::Context::create_logical_device() {
 
     static constexpr auto device_extensions = std::array{
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
-        VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
-        VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
 #ifdef __APPLE__
         VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
 #endif
@@ -563,7 +588,8 @@ void vfx::Context::create_logical_device() {
         VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
         VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
         VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-        VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME
+        VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
+        VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
     };
 
     auto portability_subset_features = vk::PhysicalDevicePortabilitySubsetFeaturesKHR{};

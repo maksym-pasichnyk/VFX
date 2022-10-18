@@ -10,10 +10,9 @@ namespace vfx {
     struct ContextDescription {
         std::string app_name = {};
         vk::InstanceCreateFlags flags{};
-        std::vector<const char*> layers{};
         std::vector<const char*> extensions{};
 
-        bool enable_debug = false;
+        bool enableDebugUtils = false;
     };
 
     enum class BufferUsage;
