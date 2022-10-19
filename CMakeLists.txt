@@ -119,6 +119,8 @@ add_executable(VFX-example
     examples/main.cpp
     examples/camera.hpp
     examples/widgets.hpp
+    examples/Application.cpp
+    examples/Application.hpp
 )
 target_link_libraries(VFX-example PRIVATE VFX)
 target_compile_shaders(VFX-example

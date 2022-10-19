@@ -31,8 +31,6 @@ namespace vfx {
     struct PipelineStateDescription;
     struct Context {
     public:
-        static constexpr auto MAX_FRAMES_IN_FLIGHT = 3u;
-
         vk::DynamicLoader dl{};
         vk::Instance instance{};
         VmaAllocator allocator{};

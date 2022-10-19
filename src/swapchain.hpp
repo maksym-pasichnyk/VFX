@@ -17,7 +17,6 @@ namespace vfx {
     };
 
     struct Drawable;
-    struct RenderPass;
     struct CommandBuffer;
     struct Swapchain {
         friend Context;

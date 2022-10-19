@@ -14,9 +14,11 @@
 #include "imgui_internal.h"
 #include "backends/imgui_impl_glfw.cpp"
 
+#include "Application.hpp"
+
 struct Widgets {
 public:
-    Widgets(const Arc<vfx::Context>& context, const Arc<vfx::Window>& window) : context(context) {
+    Widgets(const Arc<vfx::Context>& context, const Arc<Window>& window) : context(context) {
         IMGUI_CHECKVERSION();
         ctx = ImGui::CreateContext();
 
@@ -27,7 +29,7 @@ public:
         ctx->IO.BackendPlatformName = "imgui_impl_glfw";
         ctx->IO.BackendRendererName = "imgui_impl_vulkan";
 
-        ImGui_ImplGlfw_InitForVulkan(window->getHandle(), true);
+        ImGui_ImplGlfw_InitForVulkan(window->handle, true);
 
         ImGui::StyleColorsDark(&ctx->Style);
 
@@ -82,7 +84,7 @@ public:
             return;
         }
 
-        auto mesh = Arc<vfx::Mesh>::alloc(context);
+        auto mesh = Arc<vfx::Mesh>::alloc(&*context);
         mesh->setIndexBufferParams(draw_data->TotalIdxCount, sizeof(ImDrawIdx));
         mesh->setVertexBufferParams(draw_data->TotalVtxCount, sizeof(ImDrawVert));
 
@@ -267,9 +269,8 @@ private:
     }
 
 private:
-    Arc<vfx::Context> context;
-
     ImGuiContext* ctx;
+    Arc<vfx::Context> context{};
     Arc<vfx::Sampler> fontSampler{};
     Arc<vfx::Texture> fontTexture{};
     Arc<vfx::PipelineState> pipelineState{};

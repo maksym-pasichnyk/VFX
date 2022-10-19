@@ -2,15 +2,14 @@
 
 #include "glsl.hpp"
 #include "queue.hpp"
-#include "window.hpp"
 #include "camera.hpp"
 #include "assets.hpp"
 #include "texture.hpp"
-#include "context.hpp"
 #include "widgets.hpp"
 #include "material.hpp"
 #include "drawable.hpp"
 #include "swapchain.hpp"
+#include "Application.hpp"
 
 #include "GLFW/glfw3.h"
 #include "spdlog/spdlog.h"
@@ -35,9 +34,14 @@ struct Globals {
     vfx::float4x4 ModelMatrix;
 };
 
+struct DrawVertex {
+    glm::vec3 position = {};
+    u32       color    = {};
+};
+
 struct DrawList {
     std::vector<u32> indices = {};
-    std::vector<vfx::Vertex> vertices = {};
+    std::vector<DrawVertex> vertices = {};
 
     void clear() {
         indices.clear();
@@ -51,10 +55,10 @@ struct DrawList {
         }
 
         vertices.reserve(4);
-        vertices.emplace_back(vfx::Vertex{.position = p0, .color = color});
-        vertices.emplace_back(vfx::Vertex{.position = p1, .color = color});
-        vertices.emplace_back(vfx::Vertex{.position = p2, .color = color});
-        vertices.emplace_back(vfx::Vertex{.position = p3, .color = color});
+        vertices.emplace_back(DrawVertex{.position = p0, .color = color});
+        vertices.emplace_back(DrawVertex{.position = p1, .color = color});
+        vertices.emplace_back(DrawVertex{.position = p2, .color = color});
+        vertices.emplace_back(DrawVertex{.position = p3, .color = color});
     }
 
     void drawBox(glm::vec3 const& from, glm::vec3 const& to, u32 color) {
@@ -117,12 +121,14 @@ struct DrawList {
     }
 };
 
-struct Demo : vfx::Application, vfx::WindowDelegate {
-    Arc<vfx::Window> window{};
+
+struct Demo : Application, WindowDelegate {
+private:
+    Arc<Window> window{};
     Arc<vfx::Context> context{};
     Arc<vfx::Swapchain> swapchain{};
-
     Arc<vfx::CommandQueue> commandQueue{};
+
     Arc<vfx::PipelineState> sdfPipelineState{};
     Arc<vfx::PipelineState> cubePipelineState{};
     Arc<vfx::PipelineState> presentPipelineState{};
@@ -135,7 +141,10 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
     vk::DescriptorPool descriptor_pool{};
     std::vector<vk::DescriptorSet> descriptor_sets{};
 
-    Arc<vfx::Mesh> cube{};
+    Arc<DrawList> cubeDrawList{};
+    Arc<vfx::Buffer> cubeIndexBuffer{};
+    Arc<vfx::Buffer> cubeVertexBuffer{};
+
     Arc<Widgets> widgets{};
 
     Globals globals{};
@@ -143,18 +152,14 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
 
     Example example = Example::Cube;
 
+public:
     Demo() {
-        window = Arc<vfx::Window>::alloc(vfx::WindowDescription{
-            .title = "Demo",
-            .width = 800,
-            .height = 600,
-            .resizable = true,
-        });
+        window = Arc<Window>::alloc(800, 600);
+        window->setTitle("Demo");
         window->delegate = this;
 
         setenv("VFX_ENABLE_API_VALIDATION", "1", 1);
         context = vfx::createSystemDefaultContext();
-
         swapchain = Arc<vfx::Swapchain>::alloc(vfx::SwapchainDescription{
             .context = context,
             .surface = window->makeSurface(context),
@@ -162,35 +167,26 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
             .pixelFormat = vk::Format::eB8G8R8A8Unorm,
             .displaySyncEnabled = true
         });
-        setDrawableSize(swapchain->getDrawableSize());
+        commandQueue = context->makeCommandQueue(16);
 
         widgets = Arc<Widgets>::alloc(context, window);
 
-        commandQueue = context->makeCommandQueue(16);
-
-        auto sampler_description = vk::SamplerCreateInfo{
-            .magFilter = vk::Filter::eNearest,
-            .minFilter = vk::Filter::eNearest,
-            .mipmapMode = vk::SamplerMipmapMode::eNearest,
-            .addressModeU = vk::SamplerAddressMode::eRepeat,
-            .addressModeV = vk::SamplerAddressMode::eRepeat,
-            .addressModeW = vk::SamplerAddressMode::eRepeat
-        };
-        sampler = context->makeSampler(sampler_description);
-
+        createSampler();
+        createAttachments();
         createSDFPipelineState();
         createCubePipelineState();
         createPresentPipelineState();
         updateAttachmentDescriptors();
 
-        DrawList drawList{};
-        drawList.drawBox(glm::vec3(-1), glm::vec3(1), 0xFF0000FF);
-        drawList.drawBox(glm::vec3(-10, -2, -10), glm::vec3(10, -2, 10), 0xFF0000FF);
+        cubeDrawList = Arc<DrawList>::alloc();
+        cubeDrawList->drawBox(glm::vec3(-1), glm::vec3(1), 0xFF0000FF);
+        cubeDrawList->drawBox(glm::vec3(-10, -2, -10), glm::vec3(10, -2, 10), 0xFF0000FF);
 
-        cube = Arc<vfx::Mesh>::alloc(context);
+        cubeIndexBuffer = context->makeBuffer(vfx::BufferUsage::Index, sizeof(u32) * cubeDrawList->indices.size());
+        cubeIndexBuffer->update(cubeDrawList->indices.data(), sizeof(u32) * cubeDrawList->indices.size(), 0);
 
-        cube->setIndices(drawList.indices);
-        cube->setVertices(drawList.vertices);
+        cubeVertexBuffer = context->makeBuffer(vfx::BufferUsage::Vertex, sizeof(DrawVertex) * cubeDrawList->vertices.size());
+        cubeVertexBuffer->update(cubeDrawList->vertices.data(), sizeof(DrawVertex) * cubeDrawList->vertices.size(), 0);
     }
 
     ~Demo() override {
@@ -200,7 +196,7 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
 
     void run() {
         f64 time = glfwGetTime();
-        while (!window->windowShouldClose()) {
+        while (!window->shouldClose()) {
             f64 now = glfwGetTime();
             f32 dt = f32(now - time);
             time = now;
@@ -212,7 +208,7 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
             widgets->beginFrame();
             drawGui();
             widgets->endFrame();
-            
+
             draw();
         }
     }
@@ -323,10 +319,10 @@ private:
             cmd->setPipelineState(cubePipelineState);
             cmd->handle.pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
 
-            cmd->handle.bindVertexBuffers(0, cube->vertexBuffer->handle, vk::DeviceSize{0});
-            cmd->handle.bindIndexBuffer(cube->indexBuffer->handle, 0, vk::IndexType::eUint32);
+            cmd->handle.bindVertexBuffers(0, cubeVertexBuffer->handle, vk::DeviceSize{0});
+            cmd->handle.bindIndexBuffer(cubeIndexBuffer->handle, 0, vk::IndexType::eUint32);
 
-            cmd->drawIndexed(cube->indexCount, 1, 0, 0, 0);
+            cmd->drawIndexed(cubeDrawList->indices.size(), 1, 0, 0, 0);
             cmd->endRendering();
         }
 
@@ -400,11 +396,11 @@ private:
 
         vfx::PipelineVertexDescription vertexDescription{};
         vertexDescription.layouts = {{
-            {0, sizeof(vfx::Vertex), vk::VertexInputRate::eVertex}
+            {0, sizeof(DrawVertex), vk::VertexInputRate::eVertex}
         }};
         vertexDescription.attributes = {{
-            {0, 0, vk::Format::eR32G32B32Sfloat, offsetof(vfx::Vertex, position) },
-            {1, 0, vk::Format::eR8G8B8A8Unorm, offsetof(vfx::Vertex, color) }
+            {0, 0, vk::Format::eR32G32B32Sfloat, offsetof(DrawVertex, position) },
+            {1, 0, vk::Format::eR8G8B8A8Unorm,   offsetof(DrawVertex, color) }
         }};
         description.vertexDescription = vertexDescription;
 
@@ -524,18 +520,6 @@ private:
                 .pImageInfo = &sampler_image_info
             }
         }, {});
-    }
-
-    void windowDidResize() override {
-        context->logical_device.waitIdle();
-
-        swapchain->freeDrawables();
-        swapchain->makeDrawables();
-
-        setDrawableSize(swapchain->getDrawableSize());
-
-        updateAttachmentDescriptors();
-        draw();
     }
 
     void encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
@@ -666,7 +650,21 @@ private:
         cmd->flushBarriers();
     }
 
-    void setDrawableSize(const vk::Extent2D& size) {
+    void createSampler() {
+        auto sampler_description = vk::SamplerCreateInfo{
+            .magFilter = vk::Filter::eNearest,
+            .minFilter = vk::Filter::eNearest,
+            .mipmapMode = vk::SamplerMipmapMode::eNearest,
+            .addressModeU = vk::SamplerAddressMode::eRepeat,
+            .addressModeV = vk::SamplerAddressMode::eRepeat,
+            .addressModeW = vk::SamplerAddressMode::eRepeat
+        };
+        sampler = context->makeSampler(sampler_description);
+    }
+
+    void createAttachments() {
+        auto size = swapchain->getDrawableSize();
+
         globals.Resolution = {size.width, size.height};
 
         auto color_texture_description = vfx::TextureDescription{
@@ -691,6 +689,21 @@ private:
         };
         depthAttachmentTexture = context->makeTexture(depth_texture_description);
     }
+
+public:
+    void windowDidResize() override {
+        context->logical_device.waitIdle();
+
+        swapchain->freeDrawables();
+        swapchain->makeDrawables();
+
+        createAttachments();
+
+        updateAttachmentDescriptors();
+        draw();
+    }
+
+    void windowShouldClose() override {}
 };
 
 auto main() -> i32 {
