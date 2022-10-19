@@ -196,7 +196,7 @@ float scene(vec3 point) {
 //        d = smin(d, cylinderSDF(point, cylinders[i]), 0.5f);
 //    }
 
-    return min(d, point.y + 10);
+    return min(d, point.y + 2);
 }
 
 vec3 getNormal(vec3 point) {
@@ -251,19 +251,21 @@ vec2 getLight(vec3 point) {
     return vec2(diffuse, specular);
 }
 
-vec4 render(vec2 uv) {
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = 2.0f * fragCoord - 1.0f;
     vec3 rd = normalize(vec3(InverseViewProjectionMatrix * vec4(uv, 1.0f, 1.0f)));
     vec3 ro = CameraPosition;
 
-    float depth = render(Ray(ro, rd));
-    vec3 p = ro + rd * depth;
+    vec3 p = ro + rd * render(Ray(ro, rd));
 
     vec2 light = getLight(p);
-    vec3 col = vec3(light.x) * vec3(1.0f, 0.0f, 0.0f);
 
-    return vec4(col, 1.);
-}
+    vec4 pos = ViewProjectionMatrix * vec4(p, 1.0f);
 
-void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    fragColor = render(2.0f * fragCoord - 1.0f);
+    float depth = (pos.z + pos.w - 0.01f * 2.0f) * 0.5f;
+
+    vec3 color = vec3(1.0f / depth) * vec3(1.0f, 0.0f, 0.0f);
+
+    fragColor = vec4(color, 1.0f);
+    gl_FragDepth = 1.0f - 0.01f / depth;
 }

@@ -57,7 +57,7 @@ struct DrawList {
         vertices.emplace_back(vfx::Vertex{.position = p3, .color = color});
     }
 
-    void drawBox(glm::vec3 const& from, glm::vec3 const& to) {
+    void drawBox(glm::vec3 const& from, glm::vec3 const& to, u32 color) {
         auto const min = glm::min(from, to);
         auto const max = glm::max(from, to);
 
@@ -67,7 +67,7 @@ struct DrawList {
             glm::vec3(max.x, min.y, max.z),
             glm::vec3(max.x, max.y, max.z),
             glm::vec3(min.x, max.y, max.z),
-            0xFF0000FF
+            color
         );
 
         // back
@@ -76,7 +76,7 @@ struct DrawList {
             glm::vec3(max.x, min.y, min.z),
             glm::vec3(max.x, max.y, min.z),
             glm::vec3(min.x, max.y, min.z),
-            0xFF00FF00
+            color
         );
 
         // right
@@ -85,7 +85,7 @@ struct DrawList {
             glm::vec3(max.x, min.y, max.z),
             glm::vec3(max.x, max.y, max.z),
             glm::vec3(max.x, max.y, min.z),
-            0xFFFF0000
+            color
         );
 
         // left
@@ -94,7 +94,7 @@ struct DrawList {
             glm::vec3(min.x, min.y, max.z),
             glm::vec3(min.x, max.y, max.z),
             glm::vec3(min.x, max.y, min.z),
-            0xFF00FFFF
+            color
         );
 
         // up
@@ -103,7 +103,7 @@ struct DrawList {
             glm::vec3(min.x, max.y, max.z),
             glm::vec3(max.x, max.y, max.z),
             glm::vec3(max.x, max.y, min.z),
-            0xFFFF00FF
+            color
         );
 
         // down
@@ -112,7 +112,7 @@ struct DrawList {
             glm::vec3(min.x, min.y, max.z),
             glm::vec3(max.x, min.y, max.z),
             glm::vec3(max.x, min.y, min.z),
-            0xFFFFFFFF
+            color
         );
     }
 };
@@ -141,7 +141,7 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
     Globals globals{};
     f32 timeSinceStart = 0.0f;
 
-    Example example = Example::SDF;
+    Example example = Example::Cube;
 
     Demo() {
         window = Arc<vfx::Window>::alloc(vfx::WindowDescription{
@@ -184,7 +184,8 @@ struct Demo : vfx::Application, vfx::WindowDelegate {
         updateAttachmentDescriptors();
 
         DrawList drawList{};
-        drawList.drawBox(glm::vec3(-1), glm::vec3(1));
+        drawList.drawBox(glm::vec3(-1), glm::vec3(1), 0xFF0000FF);
+        drawList.drawBox(glm::vec3(-10, -2, -10), glm::vec3(10, -2, 10), 0xFF0000FF);
 
         cube = Arc<vfx::Mesh>::alloc(context);
 
@@ -291,6 +292,12 @@ private:
             sdf_rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
             sdf_rendering_info.colorAttachments[0].clearColor = vfx::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
 
+            sdf_rendering_info.depthAttachment.texture = depthAttachmentTexture;
+            sdf_rendering_info.depthAttachment.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+            sdf_rendering_info.depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+            sdf_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
+            sdf_rendering_info.depthAttachment.clearDepth = 1.0f;
+
             cmd->beginRendering(sdf_rendering_info);
             cmd->setPipelineState(sdfPipelineState);
             cmd->handle.pushConstants(sdfPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
@@ -363,6 +370,7 @@ private:
         vfx::PipelineStateDescription description{};
 
         description.colorAttachmentFormats[0] = swapchain->getPixelFormat();
+        description.depthAttachmentFormat = vk::Format::eD32Sfloat;
 
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =
@@ -370,6 +378,10 @@ private:
             vk::ColorComponentFlagBits::eG |
             vk::ColorComponentFlagBits::eB |
             vk::ColorComponentFlagBits::eA;
+
+        description.depthStencilState.depthTestEnable = VK_TRUE;
+        description.depthStencilState.depthWriteEnable = VK_TRUE;
+        description.depthStencilState.depthCompareOp = vk::CompareOp::eLess;
 
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
         description.rasterizationState.lineWidth = 1.0f;
@@ -599,12 +611,14 @@ private:
         cmd->beginRendering(present_rendering_info);
         cmd->setViewport(0, viewport);
 
-        if (example == Example::SDF) {
-            cmd->setScissor(0, area);
-            cmd->setPipelineState(presentPipelineState);
-            cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
-            cmd->draw(6, 1, 0, 0);
-        } else if (example == Example::Cube) {
+        vfx::int1 isDepthAttachment = 0;
+//        if (example == Example::SDF) {
+//            cmd->setScissor(0, area);
+//            cmd->setPipelineState(presentPipelineState);
+//            cmd->handle.pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
+//            cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
+//            cmd->draw(6, 1, 0, 0);
+//        } else if (example == Example::Cube) {
             auto colorArea = vk::Rect2D{};
             colorArea.setOffset(vk::Offset2D{0, 0});
             colorArea.setExtent(vk::Extent2D{u32(size.width) / 2, size.height});
@@ -613,15 +627,21 @@ private:
             depthArea.setOffset(vk::Offset2D{i32(size.width) / 2, 0});
             depthArea.setExtent(vk::Extent2D{u32(size.width) / 2, size.height});
 
+            isDepthAttachment = 0;
+
             cmd->setScissor(0, colorArea);
             cmd->setPipelineState(presentPipelineState);
+            cmd->handle.pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
             cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
             cmd->draw(6, 1, 0, 0);
 
+            isDepthAttachment = 1;
+
             cmd->setScissor(0, depthArea);
+            cmd->handle.pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
             cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[1], 0, nullptr);
             cmd->draw(6, 1, 0, 0);
-        }
+//        }
 
         cmd->endRendering();
 
