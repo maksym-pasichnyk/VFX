@@ -7,16 +7,18 @@
 
 struct Camera {
 public:
-    static auto getInfinityProjectionMatrix(float fov, float aspect, float zNear) {
+    static auto getInfinityProjectionMatrix(float fov, float aspect, float zNear) -> glm::mat4 {
         f32 range = glm::tan(glm::radians(fov) / 2.0f);
+        f32 a = +1.0f / (range * aspect);
+        f32 b = -1.0f / (range);
+        f32 c = zNear;
 
-        glm::mat4 out(0.0f);
-        out[0][0] =  1.0f / (range * aspect);
-        out[1][1] = -1.0f / (range);
-        out[2][2] =  0.0f;
-        out[2][3] =  1.0f;
-        out[3][2] =  zNear;
-        return out;
+        return {
+            glm::vec4(a, 0, 0, 0),
+            glm::vec4(0, b, 0, 0),
+            glm::vec4(0, 0, 0, 1),
+            glm::vec4(0, 0, c, 0)
+        };
     }
 
 public:
