@@ -189,15 +189,16 @@ private:
     void createPipelineState() {
         vfx::PipelineStateDescription description{};
 
-        description.bindings = {
+        vfx::PipelineVertexDescription vertexDescription{};
+        vertexDescription.layouts = {{
             {0, sizeof(ImDrawVert), vk::VertexInputRate::eVertex}
-        };
-
-        description.attributes = {
+        }};
+        vertexDescription.attributes = {{
             {0, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, pos) },
             {1, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, uv) },
             {2, 0, vk::Format::eR8G8B8A8Unorm, offsetof(ImDrawVert, col) }
-        };
+        }};
+        description.vertexDescription = vertexDescription;
 
         description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
 

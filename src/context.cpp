@@ -951,8 +951,10 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
         }
 
         vk::PipelineVertexInputStateCreateInfo vertexInputState = {};
-        vertexInputState.setVertexBindingDescriptions(description.bindings);
-        vertexInputState.setVertexAttributeDescriptions(description.attributes);
+        if (description.vertexDescription.has_value()) {
+            vertexInputState.setVertexBindingDescriptions(description.vertexDescription->layouts.elements);
+            vertexInputState.setVertexAttributeDescriptions(description.vertexDescription->attributes.elements);
+        }
 
         vk::PipelineColorBlendStateCreateInfo colorBlendState = {};
         colorBlendState.setAttachments(description.attachments.elements);

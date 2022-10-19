@@ -54,6 +54,35 @@ namespace vfx {
         }
     };
 
+    struct PipelineVertexLayoutDescriptionArray {
+        std::vector<vk::VertexInputBindingDescription> elements = {};
+
+        auto operator[](size_t i) -> vk::VertexInputBindingDescription& {
+            if (elements.size() >= i) {
+                elements.resize(i + 1, vk::VertexInputBindingDescription{
+                    .binding = u32(i),
+                    .inputRate = vk::VertexInputRate::eVertex
+                });
+            }
+            return elements[i];
+        }
+    };
+    struct PipelineVertexAttributeDescriptionArray {
+        std::vector<vk::VertexInputAttributeDescription> elements = {};
+
+        auto operator[](size_t i) -> vk::VertexInputAttributeDescription& {
+            if (elements.size() >= i) {
+                elements.resize(i + 1, vk::VertexInputAttributeDescription{});
+            }
+            return elements[i];
+        }
+    };
+
+    struct PipelineVertexDescription {
+        PipelineVertexLayoutDescriptionArray layouts = {};
+        PipelineVertexAttributeDescriptionArray attributes = {};
+    };
+
     struct PipelineStateDescription {
         Arc<Function> vertexFunction = {};
         Arc<Function> fragmentFunction = {};
@@ -68,12 +97,7 @@ namespace vfx {
         vk::PipelineRasterizationStateCreateInfo rasterizationState = {};
         vk::PipelineMultisampleStateCreateInfo multisampleState = {};
         vk::PipelineDepthStencilStateCreateInfo depthStencilState = {};
-        //    vk::PipelineColorBlendStateCreateInfo colorBlendState = {};
-        //    vk::Pipeline basePipelineHandle = {};
-        //    i32 basePipelineIndex = {};
-
-        std::vector<vk::VertexInputBindingDescription> bindings = {};
-        std::vector<vk::VertexInputAttributeDescription> attributes = {};
+        std::optional<PipelineVertexDescription> vertexDescription = {};
         PipelineColorBlendAttachmentStateArray attachments = {};
     };
 

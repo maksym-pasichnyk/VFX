@@ -398,14 +398,15 @@ private:
     void createCubePipelineState() {
         vfx::PipelineStateDescription description{};
 
-        description.bindings = {
+        vfx::PipelineVertexDescription vertexDescription{};
+        vertexDescription.layouts = {{
             {0, sizeof(vfx::Vertex), vk::VertexInputRate::eVertex}
-        };
-
-        description.attributes = {
+        }};
+        vertexDescription.attributes = {{
             {0, 0, vk::Format::eR32G32B32Sfloat, offsetof(vfx::Vertex, position) },
             {1, 0, vk::Format::eR8G8B8A8Unorm, offsetof(vfx::Vertex, color) }
-        };
+        }};
+        description.vertexDescription = vertexDescription;
 
         description.colorAttachmentFormats[0] = swapchain->getPixelFormat();
         description.depthAttachmentFormat = vk::Format::eD32Sfloat;
