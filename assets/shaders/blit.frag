@@ -16,10 +16,9 @@ layout(location = 0) in struct {
 void main() {
     if (IsDepthAttachment) {
         float depthSample = texture(sampler2D(mainTexture, mainSampler), v_in.texcoord).r;
+        float depth = 0.01f / depthSample;
 
-        float depth = (1.0f - depthSample) / 0.01f;
-
-        out_color = vec4(depth.xxx, 1.0f);
+        out_color = vec4(vec3(1.0f / depth), 1.0f);
     } else {
         out_color = texture(sampler2D(mainTexture, mainSampler), v_in.texcoord);
     }

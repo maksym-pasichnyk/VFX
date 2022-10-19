@@ -6,18 +6,17 @@
 #include <glm/ext.hpp>
 
 struct Camera {
-private:
-    static constexpr auto clip = glm::mat4{
-        1.0f,  0.0f, 0.0f, 0.0f,
-        0.0f, -1.0f, 0.0f, 0.0f,
-        0.0f,  0.0f, 1.0f, 0.0f,
-        0.0f,  0.0f, 0.0f, 1.0f
-    };
-
 public:
-    [[nodiscard]]
-    static auto getInfinityProjectionMatrix(f32 fov, f32 aspect, f32 zNear) -> glm::mat4 {
-        return clip * glm::infinitePerspectiveLH(glm::radians(fov), aspect, zNear);
+    static auto getInfinityProjectionMatrix(float fov, float aspect, float zNear) {
+        f32 range = glm::tan(glm::radians(fov) / 2.0f);
+
+        glm::mat4 out(0.0f);
+        out[0][0] =  1.0f / (range * aspect);
+        out[1][1] = -1.0f / (range);
+        out[2][2] =  0.0f;
+        out[2][3] =  1.0f;
+        out[3][2] =  zNear;
+        return out;
     }
 
 public:

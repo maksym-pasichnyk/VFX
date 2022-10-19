@@ -296,7 +296,7 @@ private:
             sdf_rendering_info.depthAttachment.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal;
             sdf_rendering_info.depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
             sdf_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-            sdf_rendering_info.depthAttachment.clearDepth = 1.0f;
+            sdf_rendering_info.depthAttachment.clearDepth = 0.0f;
 
             cmd->beginRendering(sdf_rendering_info);
             cmd->setPipelineState(sdfPipelineState);
@@ -317,7 +317,7 @@ private:
             cube_rendering_info.depthAttachment.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal;
             cube_rendering_info.depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
             cube_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-            cube_rendering_info.depthAttachment.clearDepth = 1.0f;
+            cube_rendering_info.depthAttachment.clearDepth = 0.0f;
 
             cmd->beginRendering(cube_rendering_info);
             cmd->setPipelineState(cubePipelineState);
@@ -381,7 +381,7 @@ private:
 
         description.depthStencilState.depthTestEnable = VK_TRUE;
         description.depthStencilState.depthWriteEnable = VK_TRUE;
-        description.depthStencilState.depthCompareOp = vk::CompareOp::eLess;
+        description.depthStencilState.depthCompareOp = vk::CompareOp::eGreater;
 
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
         description.rasterizationState.lineWidth = 1.0f;
@@ -419,7 +419,7 @@ private:
 
         description.depthStencilState.depthTestEnable = VK_TRUE;
         description.depthStencilState.depthWriteEnable = VK_TRUE;
-        description.depthStencilState.depthCompareOp = vk::CompareOp::eLess;
+        description.depthStencilState.depthCompareOp = vk::CompareOp::eGreater;
 
         description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
         description.rasterizationState.cullMode = vk::CullModeFlagBits::eNone;

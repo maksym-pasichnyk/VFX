@@ -253,19 +253,18 @@ vec2 getLight(vec3 point) {
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 uv = 2.0f * fragCoord - 1.0f;
-    vec3 rd = normalize(vec3(InverseViewProjectionMatrix * vec4(uv, 1.0f, 1.0f)));
+    vec3 rd = normalize(vec3(InverseViewProjectionMatrix * vec4(uv, 0.0f, 1.0f)));
     vec3 ro = CameraPosition;
 
     vec3 p = ro + rd * render(Ray(ro, rd));
 
     vec2 light = getLight(p);
 
-    vec4 pos = ViewProjectionMatrix * vec4(p, 1.0f);
+    vec4 position = ViewProjectionMatrix * vec4(p, 1.0f);
+    float depth = position.z + position.w + 0.01f;
 
-    float depth = (pos.z + pos.w - 0.01f * 2.0f) * 0.5f;
-
-    vec3 color = vec3(1.0f / depth) * vec3(1.0f, 0.0f, 0.0f);
+    vec3 color = vec3(1.0f / depth) * vec3(1, 0, 0);
 
     fragColor = vec4(color, 1.0f);
-    gl_FragDepth = 1.0f - 0.01f / depth;
+    gl_FragDepth = 0.01f / depth;
 }
