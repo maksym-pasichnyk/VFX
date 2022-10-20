@@ -12,6 +12,8 @@
 #include "spdlog/spdlog.h"
 #include "spirv_reflect.h"
 
+#include <set>
+
 namespace vfx {
     // todo: fill table with valid aspect
     inline const auto image_aspect_flags_table = std::unordered_map<vk::Format, vk::ImageAspectFlags> {
@@ -462,12 +464,6 @@ vfx::Context::Context(const vfx::ContextDescription& description) {
 
 vfx::Context::~Context() {
     vmaDestroyAllocator(allocator);
-    logical_device.destroy();
-
-    if (debug_utils) {
-        instance.destroyDebugUtilsMessengerEXT(debug_utils);
-    }
-    instance.destroy();
 }
 
 void vfx::Context::create_instance(const vfx::ContextDescription& description) {
@@ -505,7 +501,7 @@ void vfx::Context::create_instance(const vfx::ContextDescription& description) {
         instance_create_info.setPApplicationInfo(&application_info);
         instance_create_info.setPEnabledLayerNames(layers);
         instance_create_info.setPEnabledExtensionNames(description.extensions);
-        instance = vk::createInstance(instance_create_info);
+        instance = vk::createInstanceUnique(instance_create_info);
     } else {
         auto layers = std::vector<const char*>{
             "VK_LAYER_KHRONOS_synchronization2"
@@ -516,10 +512,10 @@ void vfx::Context::create_instance(const vfx::ContextDescription& description) {
         instance_create_info.setPApplicationInfo(&application_info);
         instance_create_info.setPEnabledLayerNames(layers);
         instance_create_info.setPEnabledExtensionNames(description.extensions);
-        instance = vk::createInstance(instance_create_info);
+        instance = vk::createInstanceUnique(instance_create_info);
     }
 
-    vk::defaultDispatchLoaderDynamic.init(instance);
+    vk::defaultDispatchLoaderDynamic.init(*instance);
 
     if (description.enableDebugUtils) {
         vk::DebugUtilsMessageSeverityFlagsEXT message_severity_flags{};
@@ -538,44 +534,71 @@ void vfx::Context::create_instance(const vfx::ContextDescription& description) {
             .messageType = message_type_flags,
             .pfnUserCallback = debug_callback
         };
-        debug_utils = instance.createDebugUtilsMessengerEXT(debug_create_info);
+        debug_utils = instance->createDebugUtilsMessengerEXTUnique(debug_create_info);
     }
 }
 
 void vfx::Context::select_physical_device() {
-    for (auto device : instance.enumeratePhysicalDevices()) {
-        const auto families = find_queue_families(instance, device);
-        if (!families) {
-            continue;
-        }
+    gpu = instance->enumeratePhysicalDevices()[0];
 
-        physical_device = device;
-        graphics_family = families->first;
-        present_family = families->second;
-        break;
+    const auto queue_family_properties = gpu.getQueueFamilyProperties();
+
+    // find a graphics queue family index
+    graphics_queue_family_index = std::numeric_limits<u32>::max();
+    for (u32 i = 0; i < queue_family_properties.size(); i++) {
+        if (queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
+            graphics_queue_family_index = i;
+            break;
+        }
     }
-//    depthStencilFormat = select_depth_format(physical_device);
+    if (graphics_queue_family_index == std::numeric_limits<u32>::max()) {
+        spdlog::error("No graphics queue family index found");
+        exit(1);
+    }
+
+    // find a present queue family index
+    present_queue_family_index = std::numeric_limits<u32>::max();
+    for (u32 i = 0; i < queue_family_properties.size(); i++) {
+        if (glfwGetPhysicalDevicePresentationSupport(*instance, gpu, i)) {
+            present_queue_family_index = i;
+            break;
+        }
+    }
+    if (present_queue_family_index == std::numeric_limits<u32>::max()) {
+        spdlog::error("No present queue family index found");
+        exit(1);
+    }
+
+    // find a compute queue family index
+    compute_queue_family_index = std::numeric_limits<u32>::max();
+    for (u32 i = 0; i < queue_family_properties.size(); i++) {
+        if (queue_family_properties[i].queueFlags & vk::QueueFlagBits::eCompute) {
+            compute_queue_family_index = i;
+            break;
+        }
+    }
+    if (compute_queue_family_index == std::numeric_limits<u32>::max()) {
+        spdlog::error("No compute queue family index found");
+        exit(1);
+    }
 }
 
 void vfx::Context::create_logical_device() {
     f32 queue_priority = 1.0f;
-    auto queue_create_infos = std::vector<vk::DeviceQueueCreateInfo>{};
-
-    const auto graphics_queue_create_info = vk::DeviceQueueCreateInfo {
-        .queueFamilyIndex = graphics_family,
-        .queueCount = 1,
-        .pQueuePriorities = &queue_priority
+    auto unique_queue_families = std::set<u32>{
+        graphics_queue_family_index,
+        present_queue_family_index,
+        compute_queue_family_index
     };
-    queue_create_infos.emplace_back(graphics_queue_create_info);
 
-    if (graphics_family != present_family) {
-        const auto present_queue_create_info = vk::DeviceQueueCreateInfo {
-            .queueFamilyIndex = present_family,
-            .queueCount = 1,
-            .pQueuePriorities = &queue_priority
-        };
+    std::vector<vk::DeviceQueueCreateInfo> queue_create_infos{};
+    for (uint32_t queue_family_index : unique_queue_families) {
+        vk::DeviceQueueCreateInfo queue_create_info{};
+        queue_create_info.setQueueFamilyIndex(queue_family_index);
+        queue_create_info.setQueueCount(1);
+        queue_create_info.setPQueuePriorities(&queue_priority);
 
-        queue_create_infos.emplace_back(present_queue_create_info);
+        queue_create_infos.push_back(queue_create_info);
     }
 
     static constexpr auto device_extensions = std::array{
@@ -612,70 +635,69 @@ void vfx::Context::create_logical_device() {
     features.setSamplerAnisotropy(VK_TRUE);
     features.setMultiViewport(VK_TRUE);
 
-    const auto features_2 = vk::PhysicalDeviceFeatures2{
-        .pNext = &dynamic_rendering_features,
-        .features = features
-    };
+    auto features_2 = vk::PhysicalDeviceFeatures2{};
+    features_2.setPNext(&dynamic_rendering_features);
+    features_2.setFeatures(features);
 
     auto device_create_info = vk::DeviceCreateInfo{};
     device_create_info.setPNext(&features_2);
     device_create_info.setQueueCreateInfos(queue_create_infos);
     device_create_info.setPEnabledExtensionNames(device_extensions);
 
-    logical_device = physical_device.createDevice(device_create_info, nullptr);
-    vk::defaultDispatchLoaderDynamic.init(logical_device);
+    device = gpu.createDeviceUnique(device_create_info, nullptr);
+    vk::defaultDispatchLoaderDynamic.init(*device);
 
-    present_queue = logical_device.getQueue(present_family, 0);
-    graphics_queue = logical_device.getQueue(graphics_family, 0);
+    graphics_queue = device->getQueue(graphics_queue_family_index, 0);
+    present_queue = device->getQueue(present_queue_family_index, 0);
+    compute_queue = device->getQueue(compute_queue_family_index, 0);
 }
 
 void vfx::Context::create_memory_allocator() {
-    const auto functions = VmaVulkanFunctions{
-        .vkGetInstanceProcAddr = vk::defaultDispatchLoaderDynamic.vkGetInstanceProcAddr,
-        .vkGetDeviceProcAddr = vk::defaultDispatchLoaderDynamic.vkGetDeviceProcAddr,
-        .vkGetPhysicalDeviceProperties = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceProperties,
-        .vkGetPhysicalDeviceMemoryProperties = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceMemoryProperties,
-        .vkAllocateMemory = vk::defaultDispatchLoaderDynamic.vkAllocateMemory,
-        .vkFreeMemory = vk::defaultDispatchLoaderDynamic.vkFreeMemory,
-        .vkMapMemory = vk::defaultDispatchLoaderDynamic.vkMapMemory,
-        .vkUnmapMemory = vk::defaultDispatchLoaderDynamic.vkUnmapMemory,
-        .vkFlushMappedMemoryRanges = vk::defaultDispatchLoaderDynamic.vkFlushMappedMemoryRanges,
-        .vkInvalidateMappedMemoryRanges = vk::defaultDispatchLoaderDynamic.vkInvalidateMappedMemoryRanges,
-        .vkBindBufferMemory = vk::defaultDispatchLoaderDynamic.vkBindBufferMemory,
-        .vkBindImageMemory = vk::defaultDispatchLoaderDynamic.vkBindImageMemory,
-        .vkGetBufferMemoryRequirements = vk::defaultDispatchLoaderDynamic.vkGetBufferMemoryRequirements,
-        .vkGetImageMemoryRequirements = vk::defaultDispatchLoaderDynamic.vkGetImageMemoryRequirements,
-        .vkCreateBuffer = vk::defaultDispatchLoaderDynamic.vkCreateBuffer,
-        .vkDestroyBuffer = vk::defaultDispatchLoaderDynamic.vkDestroyBuffer,
-        .vkCreateImage = vk::defaultDispatchLoaderDynamic.vkCreateImage,
-        .vkDestroyImage = vk::defaultDispatchLoaderDynamic.vkDestroyImage,
-        .vkCmdCopyBuffer = vk::defaultDispatchLoaderDynamic.vkCmdCopyBuffer,
+    VmaVulkanFunctions functions = {};
+    functions.vkGetInstanceProcAddr = vk::defaultDispatchLoaderDynamic.vkGetInstanceProcAddr;
+    functions.vkGetDeviceProcAddr = vk::defaultDispatchLoaderDynamic.vkGetDeviceProcAddr;
+    functions.vkGetPhysicalDeviceProperties = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceProperties;
+    functions.vkGetPhysicalDeviceMemoryProperties = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceMemoryProperties;
+    functions.vkAllocateMemory = vk::defaultDispatchLoaderDynamic.vkAllocateMemory;
+    functions.vkFreeMemory = vk::defaultDispatchLoaderDynamic.vkFreeMemory;
+    functions.vkMapMemory = vk::defaultDispatchLoaderDynamic.vkMapMemory;
+    functions.vkUnmapMemory = vk::defaultDispatchLoaderDynamic.vkUnmapMemory;
+    functions.vkFlushMappedMemoryRanges = vk::defaultDispatchLoaderDynamic.vkFlushMappedMemoryRanges;
+    functions.vkInvalidateMappedMemoryRanges = vk::defaultDispatchLoaderDynamic.vkInvalidateMappedMemoryRanges;
+    functions.vkBindBufferMemory = vk::defaultDispatchLoaderDynamic.vkBindBufferMemory;
+    functions.vkBindImageMemory = vk::defaultDispatchLoaderDynamic.vkBindImageMemory;
+    functions.vkGetBufferMemoryRequirements = vk::defaultDispatchLoaderDynamic.vkGetBufferMemoryRequirements;
+    functions.vkGetImageMemoryRequirements = vk::defaultDispatchLoaderDynamic.vkGetImageMemoryRequirements;
+    functions.vkCreateBuffer = vk::defaultDispatchLoaderDynamic.vkCreateBuffer;
+    functions.vkDestroyBuffer = vk::defaultDispatchLoaderDynamic.vkDestroyBuffer;
+    functions.vkCreateImage = vk::defaultDispatchLoaderDynamic.vkCreateImage;
+    functions.vkDestroyImage = vk::defaultDispatchLoaderDynamic.vkDestroyImage;
+    functions.vkCmdCopyBuffer = vk::defaultDispatchLoaderDynamic.vkCmdCopyBuffer;
 #if VMA_DEDICATED_ALLOCATION || VMA_VULKAN_VERSION >= 1001000
-        /// Fetch "vkGetBufferMemoryRequirements2" on Vulkan >= 1.1, fetch "vkGetBufferMemoryRequirements2KHR" when using VK_KHR_dedicated_allocation extension.
-        .vkGetBufferMemoryRequirements2KHR = vk::defaultDispatchLoaderDynamic.vkGetBufferMemoryRequirements2KHR,
-        /// Fetch "vkGetImageMemoryRequirements 2" on Vulkan >= 1.1, fetch "vkGetImageMemoryRequirements2KHR" when using VK_KHR_dedicated_allocation extension.
-        .vkGetImageMemoryRequirements2KHR = vk::defaultDispatchLoaderDynamic.vkGetImageMemoryRequirements2KHR,
+    /// Fetch "vkGetBufferMemoryRequirements2" on Vulkan >= 1.1, fetch "vkGetBufferMemoryRequirements2KHR" when using VK_KHR_dedicated_allocation extension.
+    functions.vkGetBufferMemoryRequirements2KHR = vk::defaultDispatchLoaderDynamic.vkGetBufferMemoryRequirements2KHR;
+    /// Fetch "vkGetImageMemoryRequirements 2" on Vulkan >= 1.1, fetch "vkGetImageMemoryRequirements2KHR" when using VK_KHR_dedicated_allocation extension.
+    functions.vkGetImageMemoryRequirements2KHR = vk::defaultDispatchLoaderDynamic.vkGetImageMemoryRequirements2KHR;
 #endif
 #if VMA_BIND_MEMORY2 || VMA_VULKAN_VERSION >= 1001000
-        /// Fetch "vkBindBufferMemory2" on Vulkan >= 1.1, fetch "vkBindBufferMemory2KHR" when using VK_KHR_bind_memory2 extension.
-        .vkBindBufferMemory2KHR = vk::defaultDispatchLoaderDynamic.vkBindBufferMemory2KHR,
-        /// Fetch "vkBindImageMemory2" on Vulkan >= 1.1, fetch "vkBindImageMemory2KHR" when using VK_KHR_bind_memory2 extension.
-        .vkBindImageMemory2KHR = vk::defaultDispatchLoaderDynamic.vkBindImageMemory2KHR,
+    /// Fetch "vkBindBufferMemory2" on Vulkan >= 1.1, fetch "vkBindBufferMemory2KHR" when using VK_KHR_bind_memory2 extension.
+    functions.vkBindBufferMemory2KHR = vk::defaultDispatchLoaderDynamic.vkBindBufferMemory2KHR;
+    /// Fetch "vkBindImageMemory2" on Vulkan >= 1.1, fetch "vkBindImageMemory2KHR" when using VK_KHR_bind_memory2 extension.
+    functions.vkBindImageMemory2KHR = vk::defaultDispatchLoaderDynamic.vkBindImageMemory2KHR;
 #endif
 #if VMA_MEMORY_BUDGET || VMA_VULKAN_VERSION >= 1001000
-        .vkGetPhysicalDeviceMemoryProperties2KHR = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceMemoryProperties2KHR,
+    functions.vkGetPhysicalDeviceMemoryProperties2KHR = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceMemoryProperties2KHR;
 #endif
-    };
 
-    const auto allocatorCreateInfo = VmaAllocatorCreateInfo{
-        .physicalDevice = physical_device,
-        .device = logical_device,
+    const auto allocator_create_info = VmaAllocatorCreateInfo{
+        .physicalDevice = gpu,
+        .device = *device,
         .pVulkanFunctions = &functions,
-        .instance = instance,
+        .instance = *instance,
         .vulkanApiVersion = VK_API_VERSION_1_2
     };
 
-    vmaCreateAllocator(&allocatorCreateInfo, &allocator);
+    vmaCreateAllocator(&allocator_create_info, &allocator);
 }
 
 auto vfx::Context::makeRenderPass(const vfx::RenderPassDescription& description) -> Arc<RenderPass> {
@@ -709,12 +731,12 @@ auto vfx::Context::makeRenderPass(const vfx::RenderPassDescription& description)
 
     auto out = Box<RenderPass>::alloc();
     out->context = this;
-    out->handle = logical_device.createRenderPass(create_info);
+    out->handle = device->createRenderPass(create_info);
     return out;
 }
 
 void vfx::Context::freeRenderPass(RenderPass* pass) {
-    logical_device.destroyRenderPass(pass->handle);
+    device->destroyRenderPass(pass->handle);
 }
 
 auto vfx::Context::makeTexture(const vfx::TextureDescription& description) -> Arc<Texture> {
@@ -750,7 +772,7 @@ auto vfx::Context::makeTexture(const vfx::TextureDescription& description) -> Ar
             .layerCount     = 1
         }
     };
-    auto view = logical_device.createImageView(view_create_info);
+    auto view = device->createImageView(view_create_info);
 
     auto out = Box<Texture>::alloc();
     out->context = this;
@@ -765,7 +787,7 @@ auto vfx::Context::makeTexture(const vfx::TextureDescription& description) -> Ar
 }
 
 void vfx::Context::freeTexture(Texture* texture) {
-    logical_device.destroyImageView(texture->view);
+    device->destroyImageView(texture->view);
     if (texture->allocation != nullptr) {
         vmaDestroyImage(allocator, texture->image, texture->allocation);
     }
@@ -774,12 +796,12 @@ void vfx::Context::freeTexture(Texture* texture) {
 auto vfx::Context::makeSampler(const vk::SamplerCreateInfo& info) -> Arc<Sampler> {
     auto out = Arc<Sampler>::alloc();
     out->context = this;
-    out->handle = logical_device.createSampler(info);
+    out->handle = device->createSampler(info);
     return out;
 }
 
 void vfx::Context::freeSampler(Sampler* sampler) {
-    logical_device.destroySampler(sampler->handle);
+    device->destroySampler(sampler->handle);
 }
 
 auto vfx::Context::makeBuffer(vfx::BufferUsage target, u64 size) -> Arc<Buffer> {
@@ -822,7 +844,7 @@ auto vfx::Context::makeLibrary(const std::vector<char>& bytes) -> Arc<Library> {
         .codeSize = bytes.size(),
         .pCode    = reinterpret_cast<const u32 *>(bytes.data())
     };
-    auto module = logical_device.createShaderModule(module_create_info);
+    auto module = device->createShaderModule(module_create_info);
 
     auto out = Arc<Library>::alloc();
     out->context = this;
@@ -838,7 +860,7 @@ auto vfx::Context::makeLibrary(const std::vector<char>& bytes) -> Arc<Library> {
 }
 
 void vfx::Context::freeLibrary(Library* library) {
-    logical_device.destroyShaderModule(library->module);
+    device->destroyShaderModule(library->module);
     spvReflectDestroyShaderModule(&library->reflect);
 }
 
@@ -911,13 +933,13 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
     for (u32 i = 0; i < out->descriptorSetLayouts.size(); ++i) {
         auto dsl_create_info = vk::DescriptorSetLayoutCreateInfo{};
         dsl_create_info.setBindings(descriptor_set_descriptions[i].bindings);
-        out->descriptorSetLayouts[i] = logical_device.createDescriptorSetLayout(dsl_create_info);
+        out->descriptorSetLayouts[i] = device->createDescriptorSetLayout(dsl_create_info);
     }
 
     auto pipeline_layout_create_info = vk::PipelineLayoutCreateInfo{};
     pipeline_layout_create_info.setSetLayouts(out->descriptorSetLayouts);
     pipeline_layout_create_info.setPushConstantRanges(constant_ranges);
-    out->pipelineLayout = logical_device.createPipelineLayout(pipeline_layout_create_info);
+    out->pipelineLayout = device->createPipelineLayout(pipeline_layout_create_info);
 
     {
         vk::PipelineViewportStateCreateInfo viewportState = {};
@@ -983,7 +1005,7 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
         pipeline_create_info.setBasePipelineIndex(0);
 
         vk::Pipeline pipeline{};
-        std::ignore = logical_device.createGraphicsPipelines(
+        std::ignore = device->createGraphicsPipelines(
             {},
             1,
             &pipeline_create_info,
@@ -999,30 +1021,30 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
 
 void vfx::Context::freePipelineState(PipelineState* pipelineState) {
     for (auto& layout : pipelineState->descriptorSetLayouts) {
-        logical_device.destroyDescriptorSetLayout(layout);
+        device->destroyDescriptorSetLayout(layout);
     }
 
-    logical_device.destroyPipelineLayout(pipelineState->pipelineLayout);
-    logical_device.destroyPipeline(pipelineState->pipeline);
+    device->destroyPipelineLayout(pipelineState->pipelineLayout);
+    device->destroyPipeline(pipelineState->pipeline);
 }
 
 auto vfx::Context::makeCommandQueue(u32 count) -> Arc<CommandQueue> {
     auto out = Box<CommandQueue>::alloc();
     out->context = this;
-    out->handle = logical_device.getQueue(graphics_family, 0);
+    out->handle = device->getQueue(graphics_queue_family_index, 0);
 
     const auto pool_create_info = vk::CommandPoolCreateInfo {
         .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-        .queueFamilyIndex = graphics_family
+        .queueFamilyIndex = graphics_queue_family_index
     };
-    out->pool = logical_device.createCommandPool(pool_create_info);
+    out->pool = device->createCommandPool(pool_create_info);
 
     const auto command_buffers_allocate_info = vk::CommandBufferAllocateInfo{
         .commandPool = out->pool,
         .level = vk::CommandBufferLevel::ePrimary,
         .commandBufferCount = count
     };
-    out->rawCommandBuffers = logical_device.allocateCommandBuffers(command_buffers_allocate_info);
+    out->rawCommandBuffers = device->allocateCommandBuffers(command_buffers_allocate_info);
 
     out->fences.resize(count);
     out->semaphores.resize(count);
@@ -1030,10 +1052,10 @@ auto vfx::Context::makeCommandQueue(u32 count) -> Arc<CommandQueue> {
     for (size_t i = 0; i < count; ++i) {
         vk::FenceCreateInfo fence_create_info{};
         fence_create_info.setFlags(vk::FenceCreateFlagBits::eSignaled);
-        out->fences[i] = logical_device.createFence(fence_create_info);
+        out->fences[i] = device->createFence(fence_create_info);
 
         vk::SemaphoreCreateInfo semaphore_create_info{};
-        out->semaphores[i] = logical_device.createSemaphore(semaphore_create_info);
+        out->semaphores[i] = device->createSemaphore(semaphore_create_info);
 
         out->commandBuffers[i].context = this;
         out->commandBuffers[i].commandQueue = &*out;
@@ -1050,13 +1072,13 @@ void vfx::Context::freeCommandQueue(CommandQueue* queue) {
     }
 
     for (auto& semaphore : queue->semaphores) {
-        logical_device.destroySemaphore(semaphore);
+        device->destroySemaphore(semaphore);
     }
 
     for (auto& fence : queue->fences) {
-        logical_device.destroyFence(fence);
+        device->destroyFence(fence);
     }
 
-    logical_device.freeCommandBuffers(queue->pool, queue->rawCommandBuffers);
-    logical_device.destroyCommandPool(queue->pool);
+    device->freeCommandBuffers(queue->pool, queue->rawCommandBuffers);
+    device->destroyCommandPool(queue->pool);
 }

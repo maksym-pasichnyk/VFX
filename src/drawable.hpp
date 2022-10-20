@@ -9,7 +9,7 @@ namespace vfx {
     struct Swapchain;
     struct Drawable {
         u32 index{};
-        Swapchain* layer{};
+        Swapchain* swapchain{};
         Arc<Texture> texture{};
     };
 }

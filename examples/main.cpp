@@ -138,7 +138,7 @@ private:
     Arc<vfx::Texture> depthAttachmentTexture{};
 
     // todo: bindless
-    vk::DescriptorPool descriptor_pool{};
+    vk::UniqueDescriptorPool descriptor_pool{};
     std::vector<vk::DescriptorSet> descriptor_sets{};
 
     Arc<DrawList> cubeDrawList{};
@@ -160,13 +160,14 @@ public:
 
         setenv("VFX_ENABLE_API_VALIDATION", "1", 1);
         context = vfx::createSystemDefaultContext();
-        swapchain = Arc<vfx::Swapchain>::alloc(vfx::SwapchainDescription{
-            .context = context,
-            .surface = window->makeSurface(context),
-            .colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
-            .pixelFormat = vk::Format::eB8G8R8A8Unorm,
-            .displaySyncEnabled = true
-        });
+
+        swapchain = Arc<vfx::Swapchain>::alloc(context);
+        swapchain->surface = window->makeSurface(context);
+        swapchain->colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
+        swapchain->pixelFormat = vk::Format::eB8G8R8A8Unorm;
+        swapchain->displaySyncEnabled = true;
+        swapchain->updateDrawables();
+
         commandQueue = context->makeCommandQueue(16);
 
         widgets = Arc<Widgets>::alloc(context, window);
@@ -190,8 +191,7 @@ public:
     }
 
     ~Demo() override {
-        context->logical_device.waitIdle();
-        context->logical_device.destroyDescriptorPool(descriptor_pool);
+        context->device->waitIdle();
     }
 
     void run() {
@@ -256,7 +256,7 @@ private:
 
         auto area = vk::Rect2D{};
         area.setOffset(vk::Offset2D{0, 0});
-        area.setExtent(swapchain->getDrawableSize());
+        area.setExtent(swapchain->drawableSize);
 
         auto viewport = vk::Viewport{};
         viewport.setWidth(f32(area.extent.width));
@@ -365,7 +365,7 @@ private:
     void createSDFPipelineState() {
         vfx::PipelineStateDescription description{};
 
-        description.colorAttachmentFormats[0] = swapchain->getPixelFormat();
+        description.colorAttachmentFormats[0] = swapchain->pixelFormat;
         description.depthAttachmentFormat = vk::Format::eD32Sfloat;
 
         description.attachments[0].blendEnable = false;
@@ -404,7 +404,7 @@ private:
         }};
         description.vertexDescription = vertexDescription;
 
-        description.colorAttachmentFormats[0] = swapchain->getPixelFormat();
+        description.colorAttachmentFormats[0] = swapchain->pixelFormat;
         description.depthAttachmentFormat = vk::Format::eD32Sfloat;
 
         description.attachments[0].blendEnable = false;
@@ -434,7 +434,7 @@ private:
     void createPresentPipelineState() {
         vfx::PipelineStateDescription description{};
 
-        description.colorAttachmentFormats[0] = swapchain->getPixelFormat();
+        description.colorAttachmentFormats[0] = swapchain->pixelFormat;
 
         description.attachments[0].blendEnable = false;
         description.attachments[0].colorWriteMask =
@@ -461,17 +461,17 @@ private:
         auto pool_create_info = vk::DescriptorPoolCreateInfo{};
         pool_create_info.setMaxSets(2);
         pool_create_info.setPoolSizes(pool_sizes);
-        descriptor_pool = context->logical_device.createDescriptorPool(pool_create_info, nullptr);
+        descriptor_pool = context->device->createDescriptorPoolUnique(pool_create_info, nullptr);
 
         descriptor_sets.resize(2);
 
         auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
-        ds_allocate_info.setDescriptorPool(descriptor_pool);
+        ds_allocate_info.setDescriptorPool(*descriptor_pool);
         ds_allocate_info.setSetLayouts(presentPipelineState->descriptorSetLayouts);
-        descriptor_sets[0] = context->logical_device.allocateDescriptorSets(ds_allocate_info)[0];
+        descriptor_sets[0] = context->device->allocateDescriptorSets(ds_allocate_info)[0];
 
         ds_allocate_info.setSetLayouts(presentPipelineState->descriptorSetLayouts);
-        descriptor_sets[1] = context->logical_device.allocateDescriptorSets(ds_allocate_info)[0];
+        descriptor_sets[1] = context->device->allocateDescriptorSets(ds_allocate_info)[0];
     }
 
     void updateAttachmentDescriptors() {
@@ -486,7 +486,7 @@ private:
             .imageView = depthAttachmentTexture->view,
             .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         };
-        context->logical_device.updateDescriptorSets({
+        context->device->updateDescriptorSets({
             vk::WriteDescriptorSet{
                 .dstSet = descriptor_sets[0],
                 .dstBinding = 0,
@@ -663,12 +663,12 @@ private:
     }
 
     void createAttachments() {
-        auto size = swapchain->getDrawableSize();
+        auto size = swapchain->drawableSize;
 
-        globals.Resolution = {size.width, size.height};
+        globals.Resolution = vfx::int2(size.width, size.height);
 
         auto color_texture_description = vfx::TextureDescription{
-            .format = swapchain->getPixelFormat(),
+            .format = swapchain->pixelFormat,
             .width = size.width,
             .height = size.height,
             .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled
@@ -692,10 +692,9 @@ private:
 
 public:
     void windowDidResize() override {
-        context->logical_device.waitIdle();
+        context->device->waitIdle();
 
-        swapchain->freeDrawables();
-        swapchain->makeDrawables();
+        swapchain->updateDrawables();
 
         createAttachments();
 

@@ -65,7 +65,7 @@ auto Window::shouldClose() -> bool {
 
 auto Window::makeSurface(const Arc<vfx::Context>& context) -> Arc<vfx::Surface> {
     VkSurfaceKHR surface{};
-    glfwCreateWindowSurface(context->instance, handle, nullptr, &surface);
+    glfwCreateWindowSurface(*context->instance, handle, nullptr, &surface);
 
     auto out = Arc<vfx::Surface>::alloc();
     out->context = &*context;

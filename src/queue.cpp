@@ -137,7 +137,7 @@ void vfx::CommandBuffer::releaseReferences() {
 //    pipeline_create_info.setBasePipelineIndex(0);
 //
 //    vk::Pipeline pipeline{};
-//    auto result = commandQueue->context->logical_device.createGraphicsPipelines(
+//    auto result = commandQueue->context->device->createGraphicsPipelines(
 //        {},
 //        1,
 //        &pipeline_create_info,
@@ -178,10 +178,10 @@ void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
     auto present_info = vk::PresentInfoKHR{};
     present_info.setWaitSemaphores(semaphore);
     present_info.setSwapchainCount(1);
-    present_info.setPSwapchains(&drawable->layer->handle);
+    present_info.setPSwapchains(&*drawable->swapchain->handle);
     present_info.setPImageIndices(&drawable->index);
 
-    vk::Result result = drawable->layer->context->present_queue.presentKHR(present_info);
+    vk::Result result = drawable->swapchain->context->present_queue.presentKHR(present_info);
 
     if (result == vk::Result::eErrorOutOfDateKHR) {
         spdlog::info("Swapchain is out of date");
@@ -282,7 +282,7 @@ void vfx::CommandBuffer::drawIndexed(u32 indexCount, u32 instanceCount, u32 firs
 }
 
 void vfx::CommandBuffer::waitUntilCompleted() {
-    std::ignore = commandQueue->context->logical_device.waitForFences(fence, VK_TRUE, std::numeric_limits<u64>::max());
+    std::ignore = commandQueue->context->device->waitForFences(fence, VK_TRUE, std::numeric_limits<u64>::max());
 }
 
 void vfx::CommandBuffer::flushBarriers() {
@@ -335,13 +335,13 @@ vfx::CommandQueue::~CommandQueue() {
 }
 
 auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
-//    std::ignore = context->logical_device.waitForFences(fences, VK_FALSE, std::numeric_limits<u64>::max());
+//    std::ignore = context->device->waitForFences(fences, VK_FALSE, std::numeric_limits<u64>::max());
 
     while (true) {
         for (auto& commandBuffer : commandBuffers) {
-            vk::Result result = context->logical_device.getFenceStatus(commandBuffer.fence);
+            vk::Result result = context->device->getFenceStatus(commandBuffer.fence);
             if (result == vk::Result::eSuccess) {
-                std::ignore = context->logical_device.resetFences(1, &commandBuffer.fence);
+                std::ignore = context->device->resetFences(1, &commandBuffer.fence);
                 // todo: release references to resources after execution completed
                 commandBuffer.releaseReferences();
                 commandBuffer.retainedReferences = true;
@@ -354,13 +354,13 @@ auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
 }
 
 auto vfx::CommandQueue::makeCommandBufferWithUnretainedReferences() -> vfx::CommandBuffer* {
-//    std::ignore = context->logical_device.waitForFences(fences, VK_FALSE, std::numeric_limits<u64>::max());
+//    std::ignore = context->device->waitForFences(fences, VK_FALSE, std::numeric_limits<u64>::max());
 
     while (true) {
         for (auto& commandBuffer : commandBuffers) {
-            vk::Result result = context->logical_device.getFenceStatus(commandBuffer.fence);
+            vk::Result result = context->device->getFenceStatus(commandBuffer.fence);
             if (result == vk::Result::eSuccess) {
-                std::ignore = context->logical_device.resetFences(1, &commandBuffer.fence);
+                std::ignore = context->device->resetFences(1, &commandBuffer.fence);
                 // todo: release references to resources after execution completed
                 commandBuffer.releaseReferences();
                 commandBuffer.retainedReferences = false;

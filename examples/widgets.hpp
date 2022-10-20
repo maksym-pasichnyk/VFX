@@ -46,8 +46,6 @@ public:
 
     ~Widgets() {
         ImGui::DestroyContext(ctx);
-        
-        context->logical_device.destroyDescriptorPool(descriptor_pool);
     }
 
 public:
@@ -185,7 +183,7 @@ private:
             .descriptorType = vk::DescriptorType::eCombinedImageSampler,
             .pImageInfo = &image_info
         };
-        context->logical_device.updateDescriptorSets(write_descriptor_set, {});
+        context->device->updateDescriptorSets(write_descriptor_set, {});
     }
 
     void createPipelineState() {
@@ -235,12 +233,12 @@ private:
         auto pool_create_info = vk::DescriptorPoolCreateInfo{};
         pool_create_info.setMaxSets(1);
         pool_create_info.setPoolSizes(pool_sizes);
-        descriptor_pool = context->logical_device.createDescriptorPool(pool_create_info, nullptr);
+        descriptor_pool = context->device->createDescriptorPoolUnique(pool_create_info);
 
         auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
-        ds_allocate_info.setDescriptorPool(descriptor_pool);
+        ds_allocate_info.setDescriptorPool(*descriptor_pool);
         ds_allocate_info.setSetLayouts(pipelineState->descriptorSetLayouts);
-        descriptor_sets = context->logical_device.allocateDescriptorSets(ds_allocate_info);
+        descriptor_sets = context->device->allocateDescriptorSets(ds_allocate_info);
     }
 
     void setupRenderState(ImDrawData* draw_data, vfx::CommandBuffer* cmd, const Arc<vfx::Mesh>& mesh, i32 fb_width, i32 fb_height) {
@@ -276,6 +274,6 @@ private:
     Arc<vfx::PipelineState> pipelineState{};
 
     // todo: bindless
-    vk::DescriptorPool descriptor_pool{};
+    vk::UniqueDescriptorPool descriptor_pool{};
     std::vector<vk::DescriptorSet> descriptor_sets{};
 };

@@ -7,6 +7,8 @@
 
 #include "spdlog/spdlog.h"
 
+#include <set>
+
 namespace vfx {
     inline auto select_surface_extent(const vk::Extent2D& extent, const vk::SurfaceCapabilitiesKHR &capabilities) -> vk::Extent2D {
         if (capabilities.currentExtent.width != std::numeric_limits<u32>::max()) {
@@ -55,61 +57,57 @@ namespace vfx {
     }
 }
 
-vfx::Swapchain::Swapchain(const vfx::SwapchainDescription& description) {
-    context = description.context;
-    surface = description.surface;
-
-    colorSpace = description.colorSpace;
-    pixelFormat = description.pixelFormat;
-    displaySyncEnabled = description.displaySyncEnabled;
-
-    fence = context->logical_device.createFence({});
-
-    makeDrawables();
+vfx::Swapchain::Swapchain(const Arc<Context>& context) : context(context) {
+    fence = context->device->createFenceUnique({});
 }
 
 vfx::Swapchain::~Swapchain() {
     freeDrawables();
-    context->logical_device.destroyFence(fence);
 }
 
-void vfx::Swapchain::makeDrawables() {
-    const auto capabilities = context->physical_device.getSurfaceCapabilitiesKHR(surface->handle);
+void vfx::Swapchain::updateDrawables() {
+    drawables.clear();
+
+    const auto capabilities = context->gpu.getSurfaceCapabilitiesKHR(surface->handle);
     drawableSize = select_surface_extent(vk::Extent2D{0, 0}, capabilities);
 
     u32 min_image_count = capabilities.minImageCount + 1;
     if (capabilities.maxImageCount > 0) {
         min_image_count = std::min(min_image_count, capabilities.maxImageCount);
     }
-
-    const auto queue_family_indices = std::array{
-        context->graphics_family,
-        context->present_family
+    auto unique_family_indices = std::set<u32>{
+        context->graphics_queue_family_index,
+        context->present_queue_family_index
     };
 
-    const auto flag = context->graphics_family != context->present_family;
+    auto queue_family_indices = std::vector<u32>(
+        unique_family_indices.begin(),
+        unique_family_indices.end()
+    );
 
-    const auto swapchain_create_info = vk::SwapchainCreateInfoKHR {
-        .surface = surface->handle,
-        .minImageCount = min_image_count,
-        .imageFormat = pixelFormat,
-        .imageColorSpace = colorSpace,
-        .imageExtent = drawableSize,
-        .imageArrayLayers = 1,
-        .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-        .imageSharingMode = flag ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive,
-        .queueFamilyIndexCount = flag ? u32(queue_family_indices.size()) : 0,
-        .pQueueFamilyIndices = flag ? queue_family_indices.data() : nullptr,
-        .preTransform = capabilities.currentTransform,
-        .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
-        .presentMode = displaySyncEnabled ? vk::PresentModeKHR::eFifo : vk::PresentModeKHR::eImmediate,
-        .clipped = true,
-        .oldSwapchain = nullptr
-    };
+    vk::SwapchainCreateInfoKHR swapchain_create_info{};
+    swapchain_create_info.setSurface(surface->handle);
+    swapchain_create_info.setMinImageCount(min_image_count);
+    swapchain_create_info.setImageFormat(pixelFormat);
+    swapchain_create_info.setImageColorSpace(colorSpace);
+    swapchain_create_info.setImageExtent(drawableSize);
+    swapchain_create_info.setImageArrayLayers(1);
+    swapchain_create_info.setImageUsage(vk::ImageUsageFlagBits::eColorAttachment);
+    if (queue_family_indices.size() > 1) {
+        swapchain_create_info.setImageSharingMode(vk::SharingMode::eConcurrent);
+        swapchain_create_info.setQueueFamilyIndices(queue_family_indices);
+    } else {
+        swapchain_create_info.setImageSharingMode(vk::SharingMode::eExclusive);
+    }
+    swapchain_create_info.setPreTransform(capabilities.currentTransform);
+    swapchain_create_info.setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);
+    swapchain_create_info.setPresentMode(displaySyncEnabled ? vk::PresentModeKHR::eFifo : vk::PresentModeKHR::eImmediate);
+    swapchain_create_info.setClipped(true);
+    swapchain_create_info.setOldSwapchain(*handle);
 
-    handle = context->logical_device.createSwapchainKHR(swapchain_create_info, nullptr);
+    handle = context->device->createSwapchainKHRUnique(swapchain_create_info, nullptr);
 
-    auto images = context->logical_device.getSwapchainImagesKHR(handle);
+    auto images = context->device->getSwapchainImagesKHR(*handle);
 
     drawables.resize(images.size());
     for (u64 i = 0; i < images.size(); ++i) {
@@ -123,11 +121,11 @@ void vfx::Swapchain::makeDrawables() {
             }
         };
 
-        auto view = context->logical_device.createImageView(view_create_info);
+        auto view = context->device->createImageView(view_create_info);
 
         drawables[i] = Arc<Drawable>::alloc();
         drawables[i]->index = u32(i);
-        drawables[i]->layer = this;
+        drawables[i]->swapchain = this;
         drawables[i]->texture = Box<Texture>::alloc();
         drawables[i]->texture->context = &*context;
         drawables[i]->texture->size = drawableSize;
@@ -141,20 +139,20 @@ void vfx::Swapchain::makeDrawables() {
 
 void vfx::Swapchain::freeDrawables() {
     drawables.clear();
-    context->logical_device.destroySwapchainKHR(handle);
+    handle = {};
 }
 
 auto vfx::Swapchain::nextDrawable() -> vfx::Drawable* {
     u32 index;
-    auto result = context->logical_device.acquireNextImageKHR(
-        handle,
+    auto result = context->device->acquireNextImageKHR(
+        *handle,
         std::numeric_limits<uint64_t>::max(),
         nullptr,
-        fence,
+        *fence,
         &index
     );
-    std::ignore = context->logical_device.waitForFences(1, &fence, true, std::numeric_limits<uint64_t>::max());
-    std::ignore = context->logical_device.resetFences(1, &fence);
+    std::ignore = context->device->waitForFences(1, &*fence, true, std::numeric_limits<uint64_t>::max());
+    std::ignore = context->device->resetFences(1, &*fence);
 
     if (result == vk::Result::eErrorOutOfDateKHR) {
         spdlog::info("Swapchain is out of date");
@@ -165,12 +163,3 @@ auto vfx::Swapchain::nextDrawable() -> vfx::Drawable* {
     }
     return &*drawables[u64(index)];
 }
-
-auto vfx::Swapchain::getPixelFormat() -> vk::Format {
-    return pixelFormat;
-}
-
-auto vfx::Swapchain::getDrawableSize() -> vk::Extent2D {
-    return drawableSize;
-}
-

@@ -32,19 +32,23 @@ namespace vfx {
     struct Context {
     public:
         vk::DynamicLoader dl{};
-        vk::Instance instance{};
+        vk::UniqueInstance instance{};
+        vk::UniqueDebugUtilsMessengerEXT debug_utils{};
+
         VmaAllocator allocator{};
-        vk::DebugUtilsMessengerEXT debug_utils{};
 
-        u32 present_family{};
-        u32 graphics_family{};
-        vk::PhysicalDevice physical_device{};
+        vk::PhysicalDevice gpu{};
 
-        vk::Device logical_device{};
-        vk::Queue present_queue{};
+        vk::UniqueDevice device{};
+
         vk::Queue graphics_queue{};
+        u32 graphics_queue_family_index{};
 
-//        vk::Format depthStencilFormat{};
+        vk::Queue present_queue{};
+        u32 present_queue_family_index{};
+
+        vk::Queue compute_queue{};
+        u32 compute_queue_family_index{};
 
     public:
         explicit Context(const ContextDescription& description);

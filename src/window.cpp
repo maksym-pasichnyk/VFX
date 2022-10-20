@@ -4,5 +4,5 @@
 vfx::Surface::Surface() {}
 
 vfx::Surface::~Surface() {
-    context->instance.destroySurfaceKHR(handle);
+    context->instance->destroySurfaceKHR(handle);
 }
