@@ -66,8 +66,8 @@ add_library(VFX STATIC
     src/context.hpp
     src/texture.hpp
     src/buffer.hpp
-        src/surface.hpp
-        src/surface.cpp
+    src/surface.hpp
+    src/surface.cpp
     src/pass.hpp
     src/material.hpp
     src/assets.hpp
@@ -80,8 +80,6 @@ add_library(VFX STATIC
     src/queue.cpp
     src/texture.cpp
     src/buffer.cpp
-    src/mesh.cpp
-    src/mesh.hpp
     src/swapchain.cpp
     src/context.cpp
     src/material.cpp
@@ -130,6 +128,10 @@ add_executable(VFX-example
     examples/Core.hpp
     examples/ImGuiRenderer.cpp
     examples/Math.hpp
+    examples/DrawList.cpp
+    examples/DrawList.hpp
+    examples/Mesh.cpp
+    examples/Mesh.hpp
 )
 target_link_libraries(VFX-example PRIVATE VFX)
 target_compile_shaders(VFX-example

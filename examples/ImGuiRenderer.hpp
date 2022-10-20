@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core.hpp"
+#include "Mesh.hpp"
 #include "Application.hpp"
 
 struct ImDrawData;
@@ -18,7 +19,7 @@ public:
 private:
     void createFontTexture();
     void createPipelineState();
-    void setupRenderState(ImDrawData* data, vfx::CommandBuffer* cmd, const Arc<vfx::Mesh>& mesh, i32 width, i32 height);
+    void setupRenderState(ImDrawData* data, vfx::CommandBuffer* cmd, const Arc<Mesh>& mesh, i32 width, i32 height);
 
 private:
     ImGuiContext* ctx;

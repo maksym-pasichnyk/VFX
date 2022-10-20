@@ -1,7 +1,6 @@
 #include "context.hpp"
 
 #include "pass.hpp"
-#include "mesh.hpp"
 #include "queue.hpp"
 #include "types.hpp"
 #include "buffer.hpp"
@@ -832,6 +831,12 @@ auto vfx::Context::makeBuffer(vfx::BufferUsage target, u64 size) -> Arc<Buffer> 
     out->allocation = allocation;
     out->allocationInfo = allocation_info;
     out->allocationSize = size;
+    return out;
+}
+
+auto vfx::Context::makeBuffer(BufferUsage target, void* src, u64 size) -> Arc<Buffer> {
+    auto out = makeBuffer(target, size);
+    out->update(src, size, 0);
     return out;
 }
 

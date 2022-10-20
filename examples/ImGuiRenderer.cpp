@@ -1,5 +1,6 @@
 #include "ImGuiRenderer.hpp"
 #include "Math.hpp"
+#include "Mesh.hpp"
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -68,17 +69,29 @@ void ImGuiRenderer::draw(vfx::CommandBuffer* cmd) {
         return;
     }
 
-    auto mesh = Arc<vfx::Mesh>::alloc(&*context);
-    mesh->setIndexBufferParams(data->TotalIdxCount, sizeof(ImDrawIdx));
-    mesh->setVertexBufferParams(data->TotalVtxCount, sizeof(ImDrawVert));
+    auto mesh = Arc<Mesh>::alloc();
 
-    auto vtx_dst_offset = 0;
-    auto idx_dst_offset = 0;
+    mesh->indexCount = data->TotalIdxCount;
+    mesh->vertexCount = data->TotalVtxCount;
+
+    mesh->indexBuffer = context->makeBuffer(vfx::BufferUsage::Index, mesh->indexCount * sizeof(ImDrawIdx));
+    mesh->vertexBuffer = context->makeBuffer(vfx::BufferUsage::Vertex, mesh->vertexCount * sizeof(ImDrawVert));
+
+    auto indexBufferOffset = 0;
+    auto vertexBufferOffset = 0;
     for (ImDrawList* drawList : std::span(data->CmdLists, data->CmdListsCount)) {
-        mesh->setVertexBufferData(drawList->VtxBuffer.Data, drawList->VtxBuffer.Size, vtx_dst_offset);
-        mesh->setIndexBufferData(drawList->IdxBuffer.Data, drawList->IdxBuffer.Size, idx_dst_offset);
-        vtx_dst_offset += drawList->VtxBuffer.Size;
-        idx_dst_offset += drawList->IdxBuffer.Size;
+        mesh->indexBuffer->update(
+            drawList->IdxBuffer.Data,
+            drawList->IdxBuffer.Size * sizeof(ImDrawIdx),
+            indexBufferOffset * sizeof(ImDrawIdx)
+        );
+        mesh->vertexBuffer->update(
+            drawList->VtxBuffer.Data,
+            drawList->VtxBuffer.Size * sizeof(ImDrawVert),
+            vertexBufferOffset * sizeof(ImDrawVert)
+        );
+        indexBufferOffset += drawList->IdxBuffer.Size;
+        vertexBufferOffset += drawList->VtxBuffer.Size;
     }
 
     cmd->setPipelineState(pipelineState);
@@ -216,7 +229,7 @@ void ImGuiRenderer::createPipelineState() {
     descriptor_sets = context->device->allocateDescriptorSets(ds_allocate_info);
 }
 
-void ImGuiRenderer::setupRenderState(ImDrawData* data, vfx::CommandBuffer* cmd, const Arc<vfx::Mesh>& mesh, i32 width, i32 height) {
+void ImGuiRenderer::setupRenderState(ImDrawData* data, vfx::CommandBuffer* cmd, const Arc<Mesh>& mesh, i32 width, i32 height) {
     if (data->TotalVtxCount > 0) {
         cmd->bindVertexBuffer(0, mesh->vertexBuffer, 0);
         cmd->bindIndexBuffer(mesh->indexBuffer, 0, vk::IndexType::eUint16);

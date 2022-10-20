@@ -7,7 +7,6 @@
 #include "drawable.hpp"
 #include "glsl.hpp"
 #include "material.hpp"
-#include "mesh.hpp"
 #include "pass.hpp"
 #include "queue.hpp"
 #include "signal.hpp"

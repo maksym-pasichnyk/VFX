@@ -5,6 +5,7 @@
 #include "Application.hpp"
 #include "Camera.hpp"
 #include "imgui.h"
+#include "DrawList.hpp"
 
 Renderer::Renderer(const Arc<vfx::Context>& context, const Arc<vfx::Swapchain>& swapchain, const Arc<Window>& window) : context(context), swapchain(swapchain) {
     imgui = Arc<ImGuiRenderer>::alloc(context, window);
