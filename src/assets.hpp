@@ -5,8 +5,8 @@
 #include <filesystem>
 
 struct Assets {
-    static auto read_file(const std::filesystem::path& path) -> std::vector<char> {
-        auto full_path = std::filesystem::current_path() / ".." / "assets" / path;
+    static auto readFile(const std::filesystem::path& path) -> std::vector<char> {
+        auto full_path = std::filesystem::current_path() / "assets" / path;
 
         std::vector<char> out(std::filesystem::file_size(full_path));
         std::ifstream file{full_path, std::ios::binary};

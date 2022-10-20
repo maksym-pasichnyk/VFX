@@ -1,6 +1,6 @@
 #pragma once
 
-#include "surface.hpp"
+#include "Core.hpp"
 
 struct WindowDelegate {
     virtual ~WindowDelegate() = default;

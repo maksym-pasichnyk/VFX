@@ -117,10 +117,19 @@ target_compile_definitions(VFX PUBLIC
 
 add_executable(VFX-example
     examples/main.cpp
-    examples/camera.hpp
-    examples/widgets.hpp
+    examples/Camera.hpp
+    examples/ImGuiRenderer.hpp
     examples/Application.cpp
     examples/Application.hpp
+    examples/Time.cpp
+    examples/Time.hpp
+    examples/Renderer.cpp
+    examples/Renderer.hpp
+    examples/GameObject.cpp
+    examples/GameObject.hpp
+    examples/Core.hpp
+    examples/ImGuiRenderer.cpp
+    examples/Math.hpp
 )
 target_link_libraries(VFX-example PRIVATE VFX)
 target_compile_shaders(VFX-example

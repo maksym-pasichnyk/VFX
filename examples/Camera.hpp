@@ -1,9 +1,7 @@
 #pragma once
 
 #include "types.hpp"
-
-#include <glm/glm.hpp>
-#include <glm/ext.hpp>
+#include "Math.hpp"
 
 struct Camera {
 public:
