@@ -121,7 +121,6 @@ struct DrawList {
     }
 };
 
-
 struct Demo : Application, WindowDelegate {
 private:
     Arc<Window> window{};
@@ -319,8 +318,8 @@ private:
             cmd->setPipelineState(cubePipelineState);
             cmd->handle->pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
 
-            cmd->handle->bindVertexBuffers(0, cubeVertexBuffer->handle, vk::DeviceSize{0});
-            cmd->handle->bindIndexBuffer(cubeIndexBuffer->handle, 0, vk::IndexType::eUint32);
+            cmd->bindVertexBuffer(0, cubeVertexBuffer, vk::DeviceSize{0});
+            cmd->bindIndexBuffer(cubeIndexBuffer, 0, vk::IndexType::eUint32);
 
             cmd->drawIndexed(cubeDrawList->indices.size(), 1, 0, 0, 0);
             cmd->endRendering();
@@ -693,11 +692,9 @@ private:
 public:
     void windowDidResize() override {
         context->device->waitIdle();
-
         swapchain->updateDrawables();
 
         createAttachments();
-
         updateAttachmentDescriptors();
         draw();
     }

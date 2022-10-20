@@ -26,6 +26,10 @@ public:
     auto shouldClose() -> bool;
 
     auto makeSurface(const Arc<vfx::Context>& context) -> Arc<vfx::Surface>;
+
+private:
+    void windowDidResize();
+    void windowShouldClose();
 };
 
 struct Application {

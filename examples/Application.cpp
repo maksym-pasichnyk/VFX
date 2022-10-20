@@ -4,8 +4,6 @@
 
 #include "context.hpp"
 
-
-
 Application::Application() {
     glfwInit();
 }
@@ -21,7 +19,6 @@ void Application::pollEvents() {
 Window::Window(u32 width, u32 height) {
     glfwDefaultWindowHints();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-//    glfwWindowHint(GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
 
     handle = glfwCreateWindow(i32(width), i32(height), "", nullptr, nullptr);
 
@@ -31,9 +28,7 @@ Window::Window(u32 width, u32 height) {
         if (self->handle != window) {
             return;
         }
-        if (self->delegate) {
-            self->delegate->windowDidResize();
-        }
+        self->windowDidResize();
     });
 
     glfwSetWindowCloseCallback(handle, [](GLFWwindow* window) {
@@ -41,9 +36,7 @@ Window::Window(u32 width, u32 height) {
         if (self->handle != window) {
             return;
         }
-        if (self->delegate) {
-            self->delegate->windowShouldClose();
-        }
+        self->windowShouldClose();
     });
 }
 
@@ -71,4 +64,16 @@ auto Window::makeSurface(const Arc<vfx::Context>& context) -> Arc<vfx::Surface> 
     out->context = &*context;
     out->handle = surface;
     return out;
+}
+
+void Window::windowDidResize() {
+    if (delegate) {
+        delegate->windowDidResize();
+    }
+}
+
+void Window::windowShouldClose() {
+    if (delegate) {
+        delegate->windowShouldClose();
+    }
 }
