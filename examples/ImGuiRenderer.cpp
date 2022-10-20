@@ -188,7 +188,7 @@ void ImGuiRenderer::createPipelineState() {
     }};
     description.vertexDescription = vertexDescription;
 
-    description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
+    description.colorAttachmentFormats[0] = vk::Format::eR32G32B32A32Sfloat;
 
     description.attachments[0].blendEnable = true;
     description.attachments[0].srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;

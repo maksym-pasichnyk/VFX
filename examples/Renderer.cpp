@@ -100,8 +100,8 @@ void Renderer::draw() {
         sdf_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
         sdf_rendering_info.depthAttachment.clearDepth = 0.0f;
 
-        cmd->beginRendering(sdf_rendering_info);
         cmd->setPipelineState(sdfPipelineState);
+        cmd->beginRendering(sdf_rendering_info);
         cmd->handle->pushConstants(sdfPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
         cmd->draw(6, 1, 0, 0);
         cmd->endRendering();
@@ -121,11 +121,11 @@ void Renderer::draw() {
         cube_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
         cube_rendering_info.depthAttachment.clearDepth = 0.0f;
 
-        cmd->beginRendering(cube_rendering_info);
         cmd->setPipelineState(cubePipelineState);
+        cmd->beginRendering(cube_rendering_info);
         cmd->handle->pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
 
-        gameObject->render(cmd);
+        gameObject->draw(cmd);
 
         cmd->endRendering();
     }
@@ -255,6 +255,7 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
     present_rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
     present_rendering_info.colorAttachments[0].clearColor = vfx::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
 
+    cmd->setPipelineState(presentPipelineState);
     cmd->beginRendering(present_rendering_info);
     cmd->setViewport(0, viewport);
 
@@ -277,7 +278,6 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
     isDepthAttachment = 0;
 
     cmd->setScissor(0, colorArea);
-    cmd->setPipelineState(presentPipelineState);
     cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
     cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
     cmd->draw(6, 1, 0, 0);
@@ -330,7 +330,7 @@ void Renderer::createAttachments() {
     globals.Resolution = vfx::int2(size.width, size.height);
 
     auto color_texture_description = vfx::TextureDescription{
-        .format = swapchain->pixelFormat,
+        .format = vk::Format::eR32G32B32A32Sfloat,
         .width = size.width,
         .height = size.height,
         .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled
@@ -355,7 +355,7 @@ void Renderer::createAttachments() {
 void Renderer::createSDFPipelineState() {
     vfx::PipelineStateDescription description{};
 
-    description.colorAttachmentFormats[0] = swapchain->pixelFormat;
+    description.colorAttachmentFormats[0] = vk::Format::eR32G32B32A32Sfloat;
     description.depthAttachmentFormat = vk::Format::eD32Sfloat;
 
     description.attachments[0].blendEnable = false;
@@ -394,7 +394,7 @@ void Renderer::createCubePipelineState() {
     }};
     description.vertexDescription = vertexDescription;
 
-    description.colorAttachmentFormats[0] = swapchain->pixelFormat;
+    description.colorAttachmentFormats[0] = vk::Format::eR32G32B32A32Sfloat;
     description.depthAttachmentFormat = vk::Format::eD32Sfloat;
 
     description.attachments[0].blendEnable = false;

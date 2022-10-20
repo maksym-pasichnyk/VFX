@@ -26,7 +26,7 @@ GameObject::GameObject(const Arc<vfx::Context>& context) {
     );
 }
 
-void GameObject::render(vfx::CommandBuffer* cmd) {
+void GameObject::draw(vfx::CommandBuffer* cmd) {
     cmd->bindIndexBuffer(mesh->indexBuffer, 0, vk::IndexType::eUint32);
     cmd->bindVertexBuffer(0, mesh->vertexBuffer, vk::DeviceSize{0});
     cmd->drawIndexed(mesh->indexCount, 1, 0, 0, 0);
