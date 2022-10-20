@@ -96,9 +96,9 @@ namespace vfx {
         Context* context{};
         CommandQueue* commandQueue{};
 
-        vk::Fence fence{};
-        vk::Semaphore semaphore{};
-        vk::CommandBuffer handle{};
+        vk::UniqueFence fence{};
+        vk::UniqueSemaphore semaphore{};
+        vk::UniqueCommandBuffer handle{};
 
     private:
         void reset();
@@ -149,11 +149,7 @@ namespace vfx {
 
         vk::Queue handle{};
         vk::CommandPool pool{};
-
-        std::vector<vk::Fence> fences{};
-        std::vector<vk::Semaphore> semaphores{};
-        std::vector<vk::CommandBuffer> rawCommandBuffers{};
-
-        std::vector<CommandBuffer> commandBuffers{};
+        std::vector<Arc<CommandBuffer>> retainedList{};
+        std::vector<Arc<CommandBuffer>> unretainedList{};
     };
 }

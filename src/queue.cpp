@@ -157,26 +157,26 @@ auto vfx::CommandBuffer::getRetainedReferences() const -> bool {
 }
 
 void vfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
-    handle.begin(info);
+    handle->begin(info);
 }
 
 void vfx::CommandBuffer::end() {
-    handle.end();
+    handle->end();
 }
 
 void vfx::CommandBuffer::submit() {
     auto submit_info = vk::SubmitInfo{};
     submit_info.setCommandBufferCount(1);
-    submit_info.setPCommandBuffers(&handle);
+    submit_info.setPCommandBuffers(&*handle);
     submit_info.setSignalSemaphoreCount(1);
-    submit_info.setPSignalSemaphores(&semaphore);
+    submit_info.setPSignalSemaphores(&*semaphore);
 
-    commandQueue->handle.submit(submit_info, fence);
+    commandQueue->handle.submit(submit_info, *fence);
 }
 
 void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
     auto present_info = vk::PresentInfoKHR{};
-    present_info.setWaitSemaphores(semaphore);
+    present_info.setWaitSemaphores(*semaphore);
     present_info.setSwapchainCount(1);
     present_info.setPSwapchains(&*drawable->swapchain->handle);
     present_info.setPImageIndices(&drawable->index);
@@ -193,7 +193,7 @@ void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
 }
 
 void vfx::CommandBuffer::setPipelineState(const Arc<PipelineState>& state) {
-    handle.bindPipeline(vk::PipelineBindPoint::eGraphics, state->pipeline);
+    handle->bindPipeline(vk::PipelineBindPoint::eGraphics, state->pipeline);
 }
 
 //void vfx::CommandBuffer::beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents) {
@@ -258,31 +258,31 @@ void vfx::CommandBuffer::beginRendering(const RenderingInfo& description) {
         fillAttachmentInfo(stencilAttachment, description.stencilAttachment);
         info.setPStencilAttachment(&stencilAttachment);
     }
-    handle.beginRendering(info);
+    handle->beginRendering(info);
 }
 
 void vfx::CommandBuffer::endRendering() {
-    handle.endRendering();
+    handle->endRendering();
 }
 
 void vfx::CommandBuffer::setScissor(u32 firstScissor, const vk::Rect2D& rect) {
-    handle.setScissor(firstScissor, 1, &rect);
+    handle->setScissor(firstScissor, 1, &rect);
 }
 
 void vfx::CommandBuffer::setViewport(u32 firstViewport, const vk::Viewport& viewport) {
-    handle.setViewport(firstViewport, 1, &viewport);
+    handle->setViewport(firstViewport, 1, &viewport);
 }
 
 void vfx::CommandBuffer::draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) {
-    handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
+    handle->draw(vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
 void vfx::CommandBuffer::drawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance) {
-    handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+    handle->drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 }
 
 void vfx::CommandBuffer::waitUntilCompleted() {
-    std::ignore = commandQueue->context->device->waitForFences(fence, VK_TRUE, std::numeric_limits<u64>::max());
+    std::ignore = commandQueue->context->device->waitForFences(*fence, VK_TRUE, std::numeric_limits<u64>::max());
 }
 
 void vfx::CommandBuffer::flushBarriers() {
@@ -295,7 +295,7 @@ void vfx::CommandBuffer::flushBarriers() {
     info.setImageMemoryBarriers(imageMemoryBarriers);
     info.setBufferMemoryBarriers(bufferMemoryBarriers);
 
-    handle.pipelineBarrier2(info);
+    handle->pipelineBarrier2(info);
 
     memoryBarriers.clear();
     imageMemoryBarriers.clear();
@@ -318,14 +318,14 @@ void vfx::CommandBuffer::bindIndexBuffer(const Arc<Buffer>& buffer, vk::DeviceSi
     if (retainedReferences) {
         bufferReferences.emplace_back(buffer);
     }
-    handle.bindIndexBuffer(buffer->handle, offset, indexType);
+    handle->bindIndexBuffer(buffer->handle, offset, indexType);
 }
 
 void vfx::CommandBuffer::bindVertexBuffer(int firstBinding, const Arc<Buffer>& buffer, vk::DeviceSize offset) {
     if (retainedReferences) {
         bufferReferences.emplace_back(buffer);
     }
-    handle.bindVertexBuffers(firstBinding, 1, &buffer->handle, &offset);
+    handle->bindVertexBuffers(firstBinding, 1, &buffer->handle, &offset);
 }
 
 vfx::CommandQueue::CommandQueue() {}
@@ -335,39 +335,65 @@ vfx::CommandQueue::~CommandQueue() {
 }
 
 auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
-//    std::ignore = context->device->waitForFences(fences, VK_FALSE, std::numeric_limits<u64>::max());
-
-    while (true) {
-        for (auto& commandBuffer : commandBuffers) {
-            vk::Result result = context->device->getFenceStatus(commandBuffer.fence);
-            if (result == vk::Result::eSuccess) {
-                std::ignore = context->device->resetFences(1, &commandBuffer.fence);
-                // todo: release references to resources after execution completed
-                commandBuffer.releaseReferences();
-                commandBuffer.retainedReferences = true;
-                return &commandBuffer;
-            }
+    for (auto& cmd : retainedList) {
+        vk::Result result = context->device->getFenceStatus(*cmd->fence);
+        if (result == vk::Result::eSuccess) {
+            std::ignore = context->device->resetFences(1, &*cmd->fence);
+            // todo: release references to resources after execution completed
+            cmd->releaseReferences();
+            return &*cmd;
         }
     }
 
-    return nullptr;
+    const auto command_buffers_allocate_info = vk::CommandBufferAllocateInfo{
+        .commandPool = pool,
+        .level = vk::CommandBufferLevel::ePrimary,
+        .commandBufferCount = 1
+    };
+
+    auto out = Arc<CommandBuffer>::alloc();
+    out->retainedReferences = true;
+    out->context = context;
+    out->commandQueue = this;
+    out->handle = std::move(context->device->allocateCommandBuffersUnique(command_buffers_allocate_info)[0]);
+
+    vk::FenceCreateInfo fence_create_info{};
+    out->fence = context->device->createFenceUnique(fence_create_info);
+
+    vk::SemaphoreCreateInfo semaphore_create_info{};
+    out->semaphore = context->device->createSemaphoreUnique(semaphore_create_info);
+
+    return &*retainedList.emplace_back(std::move(out));
 }
 
 auto vfx::CommandQueue::makeCommandBufferWithUnretainedReferences() -> vfx::CommandBuffer* {
-//    std::ignore = context->device->waitForFences(fences, VK_FALSE, std::numeric_limits<u64>::max());
-
-    while (true) {
-        for (auto& commandBuffer : commandBuffers) {
-            vk::Result result = context->device->getFenceStatus(commandBuffer.fence);
-            if (result == vk::Result::eSuccess) {
-                std::ignore = context->device->resetFences(1, &commandBuffer.fence);
-                // todo: release references to resources after execution completed
-                commandBuffer.releaseReferences();
-                commandBuffer.retainedReferences = false;
-                return &commandBuffer;
-            }
+    for (auto& cmd : unretainedList) {
+        vk::Result result = context->device->getFenceStatus(*cmd->fence);
+        if (result == vk::Result::eSuccess) {
+            std::ignore = context->device->resetFences(1, &*cmd->fence);
+            // todo: release references to resources after execution completed
+            cmd->releaseReferences();
+            return &*cmd;
         }
     }
 
-    return nullptr;
+    const auto command_buffers_allocate_info = vk::CommandBufferAllocateInfo{
+        .commandPool = pool,
+        .level = vk::CommandBufferLevel::ePrimary,
+        .commandBufferCount = 1
+    };
+
+    auto out = Arc<CommandBuffer>::alloc();
+    out->retainedReferences = false;
+    out->context = context;
+    out->commandQueue = this;
+    out->handle = std::move(context->device->allocateCommandBuffersUnique(command_buffers_allocate_info)[0]);
+
+    vk::FenceCreateInfo fence_create_info{};
+    out->fence = context->device->createFenceUnique(fence_create_info);
+
+    vk::SemaphoreCreateInfo semaphore_create_info{};
+    out->semaphore = context->device->createSemaphoreUnique(semaphore_create_info);
+
+    return &*unretainedList.emplace_back(std::move(out));
 }

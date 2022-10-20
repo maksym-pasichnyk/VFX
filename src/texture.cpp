@@ -60,13 +60,13 @@ void vfx::Texture::setPixelData(std::span<const glm::u8vec4> pixels) {
         }
     };
 
-    auto queue = context->makeCommandQueue(1);
+    auto queue = context->makeCommandQueue();
     auto cmd = queue->makeCommandBuffer();
 
     cmd->begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-    cmd->handle.pipelineBarrier(vk::PipelineStageFlagBits::eHost, vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, {barrier_1});
-    cmd->handle.copyBufferToImage(tmp->handle, image, vk::ImageLayout::eTransferDstOptimal, {region});
-    cmd->handle.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader, {}, {}, {}, {barrier_2});
+    cmd->handle->pipelineBarrier(vk::PipelineStageFlagBits::eHost, vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, {barrier_1});
+    cmd->handle->copyBufferToImage(tmp->handle, image, vk::ImageLayout::eTransferDstOptimal, {region});
+    cmd->handle->pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader, {}, {}, {}, {barrier_2});
     cmd->end();
     cmd->submit();
     cmd->waitUntilCompleted();

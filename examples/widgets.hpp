@@ -97,7 +97,7 @@ public:
         }
 
         cmd->setPipelineState(pipelineState);
-        cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineState->pipelineLayout, 0, descriptor_sets, {});
+        cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineState->pipelineLayout, 0, descriptor_sets, {});
 
         setupRenderState(draw_data, cmd, mesh, fb_width, fb_height);
 
@@ -257,7 +257,7 @@ private:
             -(pos * inv_size + 1.0f)
         };
 
-        cmd->handle.pushConstants(
+        cmd->handle->pushConstants(
             pipelineState->pipelineLayout,
             vk::ShaderStageFlagBits::eVertex,
             0,

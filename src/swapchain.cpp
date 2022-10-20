@@ -126,7 +126,7 @@ void vfx::Swapchain::updateDrawables() {
         drawables[i] = Arc<Drawable>::alloc();
         drawables[i]->index = u32(i);
         drawables[i]->swapchain = this;
-        drawables[i]->texture = Box<Texture>::alloc();
+        drawables[i]->texture = Arc<Texture>::alloc();
         drawables[i]->texture->context = &*context;
         drawables[i]->texture->size = drawableSize;
         drawables[i]->texture->format = pixelFormat;

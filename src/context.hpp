@@ -79,7 +79,7 @@ namespace vfx {
         auto makePipelineState(const PipelineStateDescription& description) -> Arc<PipelineState>;
         void freePipelineState(PipelineState* pipelineState);
 
-        auto makeCommandQueue(u32 count) -> Arc<CommandQueue>;
+        auto makeCommandQueue() -> Arc<CommandQueue>;
         void freeCommandQueue(CommandQueue* queue);
     };
 

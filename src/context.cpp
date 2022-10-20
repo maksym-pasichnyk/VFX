@@ -598,7 +598,7 @@ void vfx::Context::create_logical_device() {
         queue_create_info.setQueueCount(1);
         queue_create_info.setPQueuePriorities(&queue_priority);
 
-        queue_create_infos.push_back(queue_create_info);
+        queue_create_infos.emplace_back(queue_create_info);
     }
 
     static constexpr auto device_extensions = std::array{
@@ -729,7 +729,7 @@ auto vfx::Context::makeRenderPass(const vfx::RenderPassDescription& description)
     create_info.setAttachments(description.attachments.elements);
     create_info.setDependencies(description.dependencies);
 
-    auto out = Box<RenderPass>::alloc();
+    auto out = Arc<RenderPass>::alloc();
     out->context = this;
     out->handle = device->createRenderPass(create_info);
     return out;
@@ -774,7 +774,7 @@ auto vfx::Context::makeTexture(const vfx::TextureDescription& description) -> Ar
     };
     auto view = device->createImageView(view_create_info);
 
-    auto out = Box<Texture>::alloc();
+    auto out = Arc<Texture>::alloc();
     out->context = this;
     out->size.width = description.width;
     out->size.height = description.height;
@@ -826,7 +826,7 @@ auto vfx::Context::makeBuffer(vfx::BufferUsage target, u64 size) -> Arc<Buffer> 
         &allocation,
         &allocation_info
     );
-    auto out = Box<Buffer>::alloc();
+    auto out = Arc<Buffer>::alloc();
     out->context = this;
     out->handle = buffer;
     out->allocation = allocation;
@@ -865,7 +865,7 @@ void vfx::Context::freeLibrary(Library* library) {
 }
 
 auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& description) -> Arc<PipelineState> {
-    auto out = Box<PipelineState>::alloc();
+    auto out = Arc<PipelineState>::alloc();
     out->context = this;
 //    out->description = description;
 
@@ -1028,8 +1028,8 @@ void vfx::Context::freePipelineState(PipelineState* pipelineState) {
     device->destroyPipeline(pipelineState->pipeline);
 }
 
-auto vfx::Context::makeCommandQueue(u32 count) -> Arc<CommandQueue> {
-    auto out = Box<CommandQueue>::alloc();
+auto vfx::Context::makeCommandQueue() -> Arc<CommandQueue> {
+    auto out = Arc<CommandQueue>::alloc();
     out->context = this;
     out->handle = device->getQueue(graphics_queue_family_index, 0);
 
@@ -1039,46 +1039,12 @@ auto vfx::Context::makeCommandQueue(u32 count) -> Arc<CommandQueue> {
     };
     out->pool = device->createCommandPool(pool_create_info);
 
-    const auto command_buffers_allocate_info = vk::CommandBufferAllocateInfo{
-        .commandPool = out->pool,
-        .level = vk::CommandBufferLevel::ePrimary,
-        .commandBufferCount = count
-    };
-    out->rawCommandBuffers = device->allocateCommandBuffers(command_buffers_allocate_info);
-
-    out->fences.resize(count);
-    out->semaphores.resize(count);
-    out->commandBuffers.resize(count);
-    for (size_t i = 0; i < count; ++i) {
-        vk::FenceCreateInfo fence_create_info{};
-        fence_create_info.setFlags(vk::FenceCreateFlagBits::eSignaled);
-        out->fences[i] = device->createFence(fence_create_info);
-
-        vk::SemaphoreCreateInfo semaphore_create_info{};
-        out->semaphores[i] = device->createSemaphore(semaphore_create_info);
-
-        out->commandBuffers[i].context = this;
-        out->commandBuffers[i].commandQueue = &*out;
-        out->commandBuffers[i].fence = out->fences[i];
-        out->commandBuffers[i].handle = out->rawCommandBuffers[i];
-        out->commandBuffers[i].semaphore = out->semaphores[i];
-    }
     return out;
 }
 
 void vfx::Context::freeCommandQueue(CommandQueue* queue) {
-    for (auto& commandBuffer : queue->commandBuffers) {
-        commandBuffer.reset();
-    }
+    queue->retainedList.clear();
+    queue->unretainedList.clear();
 
-    for (auto& semaphore : queue->semaphores) {
-        device->destroySemaphore(semaphore);
-    }
-
-    for (auto& fence : queue->fences) {
-        device->destroyFence(fence);
-    }
-
-    device->freeCommandBuffers(queue->pool, queue->rawCommandBuffers);
     device->destroyCommandPool(queue->pool);
 }

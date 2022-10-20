@@ -168,7 +168,7 @@ public:
         swapchain->displaySyncEnabled = true;
         swapchain->updateDrawables();
 
-        commandQueue = context->makeCommandQueue(16);
+        commandQueue = context->makeCommandQueue();
 
         widgets = Arc<Widgets>::alloc(context, window);
 
@@ -296,7 +296,7 @@ private:
 
             cmd->beginRendering(sdf_rendering_info);
             cmd->setPipelineState(sdfPipelineState);
-            cmd->handle.pushConstants(sdfPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
+            cmd->handle->pushConstants(sdfPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
             cmd->draw(6, 1, 0, 0);
             cmd->endRendering();
         } else if (example == Example::Cube) {
@@ -317,10 +317,10 @@ private:
 
             cmd->beginRendering(cube_rendering_info);
             cmd->setPipelineState(cubePipelineState);
-            cmd->handle.pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
+            cmd->handle->pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
 
-            cmd->handle.bindVertexBuffers(0, cubeVertexBuffer->handle, vk::DeviceSize{0});
-            cmd->handle.bindIndexBuffer(cubeIndexBuffer->handle, 0, vk::IndexType::eUint32);
+            cmd->handle->bindVertexBuffers(0, cubeVertexBuffer->handle, vk::DeviceSize{0});
+            cmd->handle->bindIndexBuffer(cubeIndexBuffer->handle, 0, vk::IndexType::eUint32);
 
             cmd->drawIndexed(cubeDrawList->indices.size(), 1, 0, 0, 0);
             cmd->endRendering();
@@ -600,8 +600,8 @@ private:
 //        if (example == Example::SDF) {
 //            cmd->setScissor(0, area);
 //            cmd->setPipelineState(presentPipelineState);
-//            cmd->handle.pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
-//            cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
+//            cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
+//            cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
 //            cmd->draw(6, 1, 0, 0);
 //        } else if (example == Example::Cube) {
             auto colorArea = vk::Rect2D{};
@@ -616,15 +616,15 @@ private:
 
             cmd->setScissor(0, colorArea);
             cmd->setPipelineState(presentPipelineState);
-            cmd->handle.pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
-            cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
+            cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
+            cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
             cmd->draw(6, 1, 0, 0);
 
             isDepthAttachment = 1;
 
             cmd->setScissor(0, depthArea);
-            cmd->handle.pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
-            cmd->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[1], 0, nullptr);
+            cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
+            cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[1], 0, nullptr);
             cmd->draw(6, 1, 0, 0);
 //        }
 
