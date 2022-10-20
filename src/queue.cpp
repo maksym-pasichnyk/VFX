@@ -1,6 +1,6 @@
 #include "pass.hpp"
 #include "queue.hpp"
-#include "window.hpp"
+#include "surface.hpp"
 #include "buffer.hpp"
 #include "context.hpp"
 #include "texture.hpp"

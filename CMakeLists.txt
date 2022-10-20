@@ -66,8 +66,8 @@ add_library(VFX STATIC
     src/context.hpp
     src/texture.hpp
     src/buffer.hpp
-    src/window.hpp
-    src/window.cpp
+        src/surface.hpp
+        src/surface.cpp
     src/pass.hpp
     src/material.hpp
     src/assets.hpp

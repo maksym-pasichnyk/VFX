@@ -4,7 +4,7 @@
 #include "mesh.hpp"
 #include "buffer.hpp"
 #include "assets.hpp"
-#include "window.hpp"
+#include "surface.hpp"
 #include "context.hpp"
 #include "material.hpp"
 

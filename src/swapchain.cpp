@@ -2,7 +2,7 @@
 #include "drawable.hpp"
 #include "context.hpp"
 #include "texture.hpp"
-#include "window.hpp"
+#include "surface.hpp"
 #include "pass.hpp"
 
 #include "spdlog/spdlog.h"
