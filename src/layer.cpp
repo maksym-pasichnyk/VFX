@@ -24,13 +24,13 @@ namespace vfx {
 }
 
 vfx::Layer::Layer(const Arc<Device>& device) : device(device) {
-    fence = device->handle->createFenceUnique({});
+    fence = device->handle->createFenceUnique({}, VK_NULL_HANDLE, device->interface);
 }
 
 void vfx::Layer::updateDrawables() {
     drawables.clear();
 
-    const auto capabilities = device->gpu.getSurfaceCapabilitiesKHR(*surface);
+    const auto capabilities = device->gpu.getSurfaceCapabilitiesKHR(*surface, device->interface);
     drawableSize = select_surface_extent(vk::Extent2D{0, 0}, capabilities);
 
     u32 min_image_count = capabilities.minImageCount + 1;
@@ -67,9 +67,9 @@ void vfx::Layer::updateDrawables() {
     swapchain_create_info.setClipped(true);
     swapchain_create_info.setOldSwapchain(*swapchain);
 
-    swapchain = device->handle->createSwapchainKHRUnique(swapchain_create_info, nullptr);
+    swapchain = device->handle->createSwapchainKHRUnique(swapchain_create_info, nullptr, device->interface);
 
-    auto images = device->handle->getSwapchainImagesKHR(*swapchain);
+    auto images = device->handle->getSwapchainImagesKHR(*swapchain, device->interface);
 
     drawables.resize(images.size());
     for (u64 i = 0; i < images.size(); ++i) {
@@ -83,7 +83,7 @@ void vfx::Layer::updateDrawables() {
             }
         };
 
-        auto view = device->handle->createImageView(view_create_info);
+        auto view = device->handle->createImageView(view_create_info, VK_NULL_HANDLE, device->interface);
 
         drawables[i] = Arc<Drawable>::alloc();
         drawables[i]->index = u32(i);
@@ -111,10 +111,11 @@ auto vfx::Layer::nextDrawable() -> vfx::Drawable* {
         std::numeric_limits<uint64_t>::max(),
         nullptr,
         *fence,
-        &index
+        &index,
+        device->interface
     );
-    std::ignore = device->handle->waitForFences(1, &*fence, true, std::numeric_limits<uint64_t>::max());
-    std::ignore = device->handle->resetFences(1, &*fence);
+    std::ignore = device->handle->waitForFences(1, &*fence, true, std::numeric_limits<uint64_t>::max(), device->interface);
+    std::ignore = device->handle->resetFences(1, &*fence, device->interface);
 
     if (result == vk::Result::eErrorOutOfDateKHR) {
         spdlog::info("Swapchain is out of date");

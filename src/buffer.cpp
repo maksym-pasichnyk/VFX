@@ -21,5 +21,5 @@ void vfx::Buffer::setLabel(const std::string& name) {
     info.setObject(u64(VkBuffer(handle)));
     info.setPObjectName(name.c_str());
 
-    device->handle->debugMarkerSetObjectNameEXT(info);
+    device->handle->debugMarkerSetObjectNameEXT(info, device->interface);
 }

@@ -57,7 +57,7 @@ auto Window::shouldClose() -> bool {
 auto Window::makeSurface(const Arc<vfx::Context>& context) -> vk::UniqueSurfaceKHR {
     VkSurfaceKHR surface{};
     glfwCreateWindowSurface(*context->instance, handle, nullptr, &surface);
-    return vk::UniqueSurfaceKHR(surface, *context->instance);
+    return vk::UniqueSurfaceKHR(surface, vk::UniqueSurfaceKHR::ObjectDestroy(*context->instance, VK_NULL_HANDLE, context->interface));
 }
 
 void Window::windowDidResize() {

@@ -316,15 +316,15 @@ namespace vfx {
         { vk::Format::eR12X4UnormPack16KHR, vk::ImageAspectFlagBits::eColor },
     };
 
-    inline auto get_supported_format(vk::PhysicalDevice device, std::span<const vk::Format> formats, vk::FormatFeatureFlags flags) -> vk::Format {
+    inline auto get_supported_format(vk::DispatchLoaderDynamic interface, vk::PhysicalDevice device, std::span<const vk::Format> formats, vk::FormatFeatureFlags flags) -> vk::Format {
         for (auto format : formats) {
-            const auto properties = device.getFormatProperties(format);
+            const auto properties = device.getFormatProperties(format, interface);
             if ((properties.optimalTilingFeatures & flags) == flags) {
                 return format;
             }
         }
         for (auto format : formats) {
-            const auto properties = device.getFormatProperties(format);
+            const auto properties = device.getFormatProperties(format, interface);
             if ((properties.linearTilingFeatures & flags) == flags) {
                 return format;
             }
@@ -332,13 +332,14 @@ namespace vfx {
         return vk::Format::eUndefined;
     }
 
-    inline auto select_depth_format(vk::PhysicalDevice device) -> vk::Format {
+    inline auto select_depth_format(vk::DispatchLoaderDynamic interface, vk::PhysicalDevice device) -> vk::Format {
         static constexpr auto formats = std::array{
             vk::Format::eD32SfloatS8Uint,
             vk::Format::eD24UnormS8Uint,
             vk::Format::eD32Sfloat
         };
         return get_supported_format(
+            interface,
             device,
             formats,
             vk::FormatFeatureFlagBits::eDepthStencilAttachment
@@ -357,9 +358,9 @@ vfx::Device::~Device() {
 }
 
 void vfx::Device::select_physical_device(const Arc<Context>& context) {
-    gpu = context->instance->enumeratePhysicalDevices()[0];
+    gpu = context->instance->enumeratePhysicalDevices(context->interface)[0];
 
-    const auto queue_family_properties = gpu.getQueueFamilyProperties();
+    const auto queue_family_properties = gpu.getQueueFamilyProperties(context->interface);
 
     // find a graphics queue family index
     graphics_queue_family_index = std::numeric_limits<u32>::max();
@@ -469,51 +470,21 @@ void vfx::Device::create_logical_device(const Arc<Context>& context) {
     device_create_info.setQueueCreateInfos(queue_create_infos);
     device_create_info.setPEnabledExtensionNames(device_extensions);
 
-    handle = gpu.createDeviceUnique(device_create_info, nullptr);
-    vk::defaultDispatchLoaderDynamic.init(*handle);
+    handle = gpu.createDeviceUnique(device_create_info, nullptr, context->interface);
+    interface.init(*context->interface.vkGetInstanceProcAddr);
+    interface.init(*context->instance);
+    interface.init(*handle);
 
-    graphics_queue = handle->getQueue(graphics_queue_family_index, 0);
-    present_queue = handle->getQueue(present_queue_family_index, 0);
-    compute_queue = handle->getQueue(compute_queue_family_index, 0);
+    graphics_queue = handle->getQueue(graphics_queue_family_index, 0, interface);
+    present_queue = handle->getQueue(present_queue_family_index, 0, interface);
+    compute_queue = handle->getQueue(compute_queue_family_index, 0, interface);
 }
 
 void vfx::Device::create_memory_allocator(const Arc<Context>& context) {
-    VmaVulkanFunctions functions = {};
-    functions.vkGetInstanceProcAddr = vk::defaultDispatchLoaderDynamic.vkGetInstanceProcAddr;
-    functions.vkGetDeviceProcAddr = vk::defaultDispatchLoaderDynamic.vkGetDeviceProcAddr;
-    functions.vkGetPhysicalDeviceProperties = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceProperties;
-    functions.vkGetPhysicalDeviceMemoryProperties = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceMemoryProperties;
-    functions.vkAllocateMemory = vk::defaultDispatchLoaderDynamic.vkAllocateMemory;
-    functions.vkFreeMemory = vk::defaultDispatchLoaderDynamic.vkFreeMemory;
-    functions.vkMapMemory = vk::defaultDispatchLoaderDynamic.vkMapMemory;
-    functions.vkUnmapMemory = vk::defaultDispatchLoaderDynamic.vkUnmapMemory;
-    functions.vkFlushMappedMemoryRanges = vk::defaultDispatchLoaderDynamic.vkFlushMappedMemoryRanges;
-    functions.vkInvalidateMappedMemoryRanges = vk::defaultDispatchLoaderDynamic.vkInvalidateMappedMemoryRanges;
-    functions.vkBindBufferMemory = vk::defaultDispatchLoaderDynamic.vkBindBufferMemory;
-    functions.vkBindImageMemory = vk::defaultDispatchLoaderDynamic.vkBindImageMemory;
-    functions.vkGetBufferMemoryRequirements = vk::defaultDispatchLoaderDynamic.vkGetBufferMemoryRequirements;
-    functions.vkGetImageMemoryRequirements = vk::defaultDispatchLoaderDynamic.vkGetImageMemoryRequirements;
-    functions.vkCreateBuffer = vk::defaultDispatchLoaderDynamic.vkCreateBuffer;
-    functions.vkDestroyBuffer = vk::defaultDispatchLoaderDynamic.vkDestroyBuffer;
-    functions.vkCreateImage = vk::defaultDispatchLoaderDynamic.vkCreateImage;
-    functions.vkDestroyImage = vk::defaultDispatchLoaderDynamic.vkDestroyImage;
-    functions.vkCmdCopyBuffer = vk::defaultDispatchLoaderDynamic.vkCmdCopyBuffer;
-#if VMA_DEDICATED_ALLOCATION || VMA_VULKAN_VERSION >= 1001000
-    /// Fetch "vkGetBufferMemoryRequirements2" on Vulkan >= 1.1, fetch "vkGetBufferMemoryRequirements2KHR" when using VK_KHR_dedicated_allocation extension.
-    functions.vkGetBufferMemoryRequirements2KHR = vk::defaultDispatchLoaderDynamic.vkGetBufferMemoryRequirements2KHR;
-    /// Fetch "vkGetImageMemoryRequirements 2" on Vulkan >= 1.1, fetch "vkGetImageMemoryRequirements2KHR" when using VK_KHR_dedicated_allocation extension.
-    functions.vkGetImageMemoryRequirements2KHR = vk::defaultDispatchLoaderDynamic.vkGetImageMemoryRequirements2KHR;
-#endif
-#if VMA_BIND_MEMORY2 || VMA_VULKAN_VERSION >= 1001000
-    /// Fetch "vkBindBufferMemory2" on Vulkan >= 1.1, fetch "vkBindBufferMemory2KHR" when using VK_KHR_bind_memory2 extension.
-    functions.vkBindBufferMemory2KHR = vk::defaultDispatchLoaderDynamic.vkBindBufferMemory2KHR;
-    /// Fetch "vkBindImageMemory2" on Vulkan >= 1.1, fetch "vkBindImageMemory2KHR" when using VK_KHR_bind_memory2 extension.
-    functions.vkBindImageMemory2KHR = vk::defaultDispatchLoaderDynamic.vkBindImageMemory2KHR;
-#endif
-#if VMA_MEMORY_BUDGET || VMA_VULKAN_VERSION >= 1001000
-    functions.vkGetPhysicalDeviceMemoryProperties2KHR = vk::defaultDispatchLoaderDynamic.vkGetPhysicalDeviceMemoryProperties2KHR;
-#endif
-
+    const auto functions = VmaVulkanFunctions{
+        .vkGetInstanceProcAddr = interface.vkGetInstanceProcAddr,
+        .vkGetDeviceProcAddr = interface.vkGetDeviceProcAddr
+    };
     const auto allocator_create_info = VmaAllocatorCreateInfo{
         .physicalDevice = gpu,
         .device = *handle,
@@ -521,7 +492,6 @@ void vfx::Device::create_memory_allocator(const Arc<Context>& context) {
         .instance = *context->instance,
         .vulkanApiVersion = VK_API_VERSION_1_2
     };
-
     vmaCreateAllocator(&allocator_create_info, &allocator);
 }
 
@@ -556,12 +526,12 @@ auto vfx::Device::makeRenderPass(const RenderPassDescription& description) -> Ar
 
     auto out = Arc<RenderPass>::alloc();
     out->device = this;
-    out->handle = handle->createRenderPass(create_info);
+    out->handle = handle->createRenderPass(create_info, VK_NULL_HANDLE, interface);
     return out;
 }
 
 void vfx::Device::freeRenderPass(RenderPass* pass) {
-    handle->destroyRenderPass(pass->handle);
+    handle->destroyRenderPass(pass->handle, VK_NULL_HANDLE, interface);
 }
 
 auto vfx::Device::makeTexture(const TextureDescription& description) -> Arc<Texture> {
@@ -597,7 +567,7 @@ auto vfx::Device::makeTexture(const TextureDescription& description) -> Arc<Text
             .layerCount     = 1
         }
     };
-    auto view = handle->createImageView(view_create_info);
+    auto view = handle->createImageView(view_create_info, VK_NULL_HANDLE, interface);
 
     auto out = Arc<Texture>::alloc();
     out->device = this;
@@ -612,7 +582,7 @@ auto vfx::Device::makeTexture(const TextureDescription& description) -> Arc<Text
 }
 
 void vfx::Device::freeTexture(Texture* texture) {
-    handle->destroyImageView(texture->view);
+    handle->destroyImageView(texture->view, VK_NULL_HANDLE, interface);
     if (texture->allocation != nullptr) {
         vmaDestroyImage(allocator, texture->image, texture->allocation);
     }
@@ -621,12 +591,12 @@ void vfx::Device::freeTexture(Texture* texture) {
 auto vfx::Device::makeSampler(const vk::SamplerCreateInfo& info) -> Arc<Sampler> {
     auto out = Arc<Sampler>::alloc();
     out->device = this;
-    out->handle = handle->createSampler(info);
+    out->handle = handle->createSampler(info, VK_NULL_HANDLE, interface);
     return out;
 }
 
 void vfx::Device::freeSampler(Sampler* sampler) {
-    handle->destroySampler(sampler->handle);
+    handle->destroySampler(sampler->handle, VK_NULL_HANDLE, interface);
 }
 
 auto vfx::Device::makeBuffer(vk::BufferUsageFlags usage, u64 size, VmaAllocationCreateFlags options) -> Arc<Buffer> {
@@ -677,7 +647,7 @@ auto vfx::Device::makeLibrary(const std::vector<char>& bytes) -> Arc<Library> {
         .codeSize = bytes.size(),
         .pCode    = reinterpret_cast<const u32 *>(bytes.data())
     };
-    auto module = handle->createShaderModule(module_create_info);
+    auto module = handle->createShaderModule(module_create_info, VK_NULL_HANDLE, interface);
 
     auto out = Arc<Library>::alloc();
     out->device = this;
@@ -693,7 +663,7 @@ auto vfx::Device::makeLibrary(const std::vector<char>& bytes) -> Arc<Library> {
 }
 
 void vfx::Device::freeLibrary(Library* library) {
-    handle->destroyShaderModule(library->module);
+    handle->destroyShaderModule(library->module, VK_NULL_HANDLE, interface);
     spvReflectDestroyShaderModule(&library->reflect);
 }
 
@@ -792,13 +762,13 @@ auto vfx::Device::makePipelineState(const vfx::PipelineStateDescription& descrip
     for (u32 i = 0; i < out->descriptorSetLayouts.size(); ++i) {
         auto dsl_create_info = vk::DescriptorSetLayoutCreateInfo{};
         dsl_create_info.setBindings(descriptor_set_descriptions[i].bindings);
-        out->descriptorSetLayouts[i] = handle->createDescriptorSetLayout(dsl_create_info);
+        out->descriptorSetLayouts[i] = handle->createDescriptorSetLayout(dsl_create_info, VK_NULL_HANDLE, interface);
     }
 
     auto pipeline_layout_create_info = vk::PipelineLayoutCreateInfo{};
     pipeline_layout_create_info.setSetLayouts(out->descriptorSetLayouts);
     pipeline_layout_create_info.setPushConstantRanges(constant_ranges);
-    out->pipelineLayout = handle->createPipelineLayout(pipeline_layout_create_info);
+    out->pipelineLayout = handle->createPipelineLayout(pipeline_layout_create_info, VK_NULL_HANDLE, interface);
 
     {
         vk::PipelineViewportStateCreateInfo viewportState = {};
@@ -869,7 +839,8 @@ auto vfx::Device::makePipelineState(const vfx::PipelineStateDescription& descrip
             1,
             &pipeline_create_info,
             nullptr,
-            &pipeline
+            &pipeline,
+            interface
         );
 
         out->pipeline = pipeline;
@@ -880,23 +851,23 @@ auto vfx::Device::makePipelineState(const vfx::PipelineStateDescription& descrip
 
 void vfx::Device::freePipelineState(PipelineState* pipelineState) {
     for (auto& layout : pipelineState->descriptorSetLayouts) {
-        handle->destroyDescriptorSetLayout(layout);
+        handle->destroyDescriptorSetLayout(layout, VK_NULL_HANDLE, interface);
     }
 
-    handle->destroyPipelineLayout(pipelineState->pipelineLayout);
-    handle->destroyPipeline(pipelineState->pipeline);
+    handle->destroyPipelineLayout(pipelineState->pipelineLayout, VK_NULL_HANDLE, interface);
+    handle->destroyPipeline(pipelineState->pipeline, VK_NULL_HANDLE, interface);
 }
 
 auto vfx::Device::makeCommandQueue() -> Arc<CommandQueue> {
     auto out = Arc<CommandQueue>::alloc();
     out->device = this;
-    out->handle = handle->getQueue(graphics_queue_family_index, 0);
+    out->handle = handle->getQueue(graphics_queue_family_index, 0, interface);
 
     const auto pool_create_info = vk::CommandPoolCreateInfo {
         .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
         .queueFamilyIndex = graphics_queue_family_index
     };
-    out->pool = handle->createCommandPool(pool_create_info);
+    out->pool = handle->createCommandPool(pool_create_info, VK_NULL_HANDLE, interface);
 
     return out;
 }
@@ -905,7 +876,7 @@ void vfx::Device::freeCommandQueue(CommandQueue* queue) {
     queue->retainedList.clear();
     queue->unretainedList.clear();
 
-    handle->destroyCommandPool(queue->pool);
+    handle->destroyCommandPool(queue->pool, VK_NULL_HANDLE, interface);
 }
 
 // todo: get sizes from layout
@@ -916,17 +887,17 @@ auto vfx::Device::makeResourceGroup(vk::DescriptorSetLayout layout, const std::v
     auto pool_create_info = vk::DescriptorPoolCreateInfo{};
     pool_create_info.setMaxSets(1);
     pool_create_info.setPoolSizes(sizes);
-    out->pool = handle->createDescriptorPool(pool_create_info);
+    out->pool = handle->createDescriptorPool(pool_create_info, VK_NULL_HANDLE, interface);
 
     auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
     ds_allocate_info.setDescriptorPool(out->pool);
     ds_allocate_info.setDescriptorSetCount(1);
     ds_allocate_info.setPSetLayouts(&layout);
-    out->set = handle->allocateDescriptorSets(ds_allocate_info)[0];
+    out->set = handle->allocateDescriptorSets(ds_allocate_info, interface)[0];
 
     return out;
 }
 
 void vfx::Device::freeResourceGroup(vfx::ResourceGroup* group) {
-    handle->destroyDescriptorPool(group->pool);
+    handle->destroyDescriptorPool(group->pool, VK_NULL_HANDLE, interface);
 }

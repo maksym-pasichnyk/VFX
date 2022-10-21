@@ -237,6 +237,7 @@ void ImGuiRenderer::setupRenderState(ImDrawData* data, vfx::CommandBuffer* cmd, 
         vk::ShaderStageFlagBits::eVertex,
         0,
         std::span(transform).size_bytes(),
-        transform.data()
+        transform.data(),
+        device->interface
     );
 }

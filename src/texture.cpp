@@ -15,7 +15,7 @@ void vfx::Sampler::setLabel(const std::string& name) {
     info.setObject(u64(VkSampler(handle)));
     info.setPObjectName(name.c_str());
 
-    device->handle->debugMarkerSetObjectNameEXT(info);
+    device->handle->debugMarkerSetObjectNameEXT(info, device->interface);
 }
 
 vfx::Texture::Texture() {}
@@ -63,7 +63,7 @@ void vfx::Texture::setPixelData(std::span<const glm::u8vec4> pixels) {
         }
     });
     cmd->flushBarriers();
-    cmd->handle->copyBufferToImage(tmp->handle, image, vk::ImageLayout::eTransferDstOptimal, 1, &region);
+    cmd->handle->copyBufferToImage(tmp->handle, image, vk::ImageLayout::eTransferDstOptimal, 1, &region, device->interface);
     cmd->imageMemoryBarrier(vk::ImageMemoryBarrier2{
         .srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
         .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
@@ -92,12 +92,12 @@ void vfx::Texture::setLabel(const std::string& name) {
     image_info.setObject(u64(VkImage(image)));
     image_info.setPObjectName(name.c_str());
 
-    device->handle->debugMarkerSetObjectNameEXT(image_info);
+    device->handle->debugMarkerSetObjectNameEXT(image_info, device->interface);
 
     vk::DebugMarkerObjectNameInfoEXT view_info = {};
     view_info.setObjectType(vk::DebugReportObjectTypeEXT::eImageView);
     view_info.setObject(u64(VkImageView(view)));
     view_info.setPObjectName(name.c_str());
 
-    device->handle->debugMarkerSetObjectNameEXT(view_info);
+    device->handle->debugMarkerSetObjectNameEXT(view_info, device->interface);
 }

@@ -1,16 +1,5 @@
 #include "context.hpp"
-
-#include "pass.hpp"
-#include "group.hpp"
-#include "queue.hpp"
-#include "types.hpp"
-#include "buffer.hpp"
-#include "texture.hpp"
-#include "material.hpp"
-
-#include "GLFW/glfw3.h"
 #include "spdlog/spdlog.h"
-#include "spirv_reflect.h"
 
 namespace vfx {
     inline VKAPI_ATTR auto VKAPI_CALL debug_callback(
@@ -47,7 +36,7 @@ namespace vfx {
 }
 
 vfx::Context::Context() {
-    vk::defaultDispatchLoaderDynamic.init(dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
+    interface.init(dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
 
     auto application_info = vk::ApplicationInfo{
         .pApplicationName = "",
@@ -94,9 +83,8 @@ vfx::Context::Context() {
     instance_create_info.setPApplicationInfo(&application_info);
     instance_create_info.setPEnabledLayerNames(layers);
     instance_create_info.setPEnabledExtensionNames(extensions);
-    instance = vk::createInstanceUnique(instance_create_info);
-
-    vk::defaultDispatchLoaderDynamic.init(*instance);
+    instance = vk::createInstanceUnique(instance_create_info, VK_NULL_HANDLE, interface);
+    interface.init(*instance);
 
     if (enableApiValidation) {
         vk::DebugUtilsMessageSeverityFlagsEXT message_severity_flags{};
@@ -115,6 +103,6 @@ vfx::Context::Context() {
             .messageType = message_type_flags,
             .pfnUserCallback = debug_callback
         };
-        debug_utils = instance->createDebugUtilsMessengerEXTUnique(debug_create_info);
+        debug_utils = instance->createDebugUtilsMessengerEXTUnique(debug_create_info, VK_NULL_HANDLE, interface);
     }
 }

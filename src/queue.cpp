@@ -157,11 +157,11 @@ auto vfx::CommandBuffer::getRetainedReferences() const -> bool {
 }
 
 void vfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
-    handle->begin(info);
+    handle->begin(info, device->interface);
 }
 
 void vfx::CommandBuffer::end() {
-    handle->end();
+    handle->end(device->interface);
 }
 
 void vfx::CommandBuffer::submit() {
@@ -171,7 +171,7 @@ void vfx::CommandBuffer::submit() {
     submit_info.setSignalSemaphoreCount(1);
     submit_info.setPSignalSemaphores(&*semaphore);
 
-    commandQueue->handle.submit(submit_info, *fence);
+    commandQueue->handle.submit(submit_info, *fence, device->interface);
 }
 
 void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
@@ -181,7 +181,7 @@ void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
     present_info.setPSwapchains(&*drawable->layer->swapchain);
     present_info.setPImageIndices(&drawable->index);
 
-    vk::Result result = drawable->layer->device->present_queue.presentKHR(present_info);
+    vk::Result result = drawable->layer->device->present_queue.presentKHR(present_info, device->interface);
 
     if (result == vk::Result::eErrorOutOfDateKHR) {
         spdlog::info("Swapchain is out of date");
@@ -193,7 +193,7 @@ void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
 }
 
 void vfx::CommandBuffer::setPipelineState(const Arc<PipelineState>& state) {
-    handle->bindPipeline(vk::PipelineBindPoint::eGraphics, state->pipeline);
+    handle->bindPipeline(vk::PipelineBindPoint::eGraphics, state->pipeline, device->interface);
 }
 
 void vfx::CommandBuffer::setResourceGroup(const Arc<PipelineState>& state, const Arc<ResourceGroup>& group, u32 index) {
@@ -201,7 +201,7 @@ void vfx::CommandBuffer::setResourceGroup(const Arc<PipelineState>& state, const
         resourceGroupReferences.emplace(group);
     }
 
-    handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, state->pipelineLayout, index, 1, &group->set, 0, nullptr);
+    handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, state->pipelineLayout, index, 1, &group->set, 0, nullptr, device->interface);
 }
 
 //void vfx::CommandBuffer::beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents) {
@@ -266,31 +266,31 @@ void vfx::CommandBuffer::beginRendering(const RenderingInfo& description) {
         fillAttachmentInfo(stencilAttachment, description.stencilAttachment);
         info.setPStencilAttachment(&stencilAttachment);
     }
-    handle->beginRendering(info);
+    handle->beginRendering(info, device->interface);
 }
 
 void vfx::CommandBuffer::endRendering() {
-    handle->endRendering();
+    handle->endRendering(device->interface);
 }
 
 void vfx::CommandBuffer::setScissor(u32 firstScissor, const vk::Rect2D& rect) {
-    handle->setScissor(firstScissor, 1, &rect);
+    handle->setScissor(firstScissor, 1, &rect, device->interface);
 }
 
 void vfx::CommandBuffer::setViewport(u32 firstViewport, const vk::Viewport& viewport) {
-    handle->setViewport(firstViewport, 1, &viewport);
+    handle->setViewport(firstViewport, 1, &viewport, device->interface);
 }
 
 void vfx::CommandBuffer::draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) {
-    handle->draw(vertexCount, instanceCount, firstVertex, firstInstance);
+    handle->draw(vertexCount, instanceCount, firstVertex, firstInstance, device->interface);
 }
 
 void vfx::CommandBuffer::drawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance) {
-    handle->drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+    handle->drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, device->interface);
 }
 
 void vfx::CommandBuffer::waitUntilCompleted() {
-    std::ignore = commandQueue->device->handle->waitForFences(*fence, VK_TRUE, std::numeric_limits<u64>::max());
+    std::ignore = commandQueue->device->handle->waitForFences(*fence, VK_TRUE, std::numeric_limits<u64>::max(), device->interface);
 }
 
 void vfx::CommandBuffer::flushBarriers() {
@@ -303,7 +303,7 @@ void vfx::CommandBuffer::flushBarriers() {
     info.setImageMemoryBarriers(imageMemoryBarriers);
     info.setBufferMemoryBarriers(bufferMemoryBarriers);
 
-    handle->pipelineBarrier2(info);
+    handle->pipelineBarrier2(info, device->interface);
 
     memoryBarriers.clear();
     imageMemoryBarriers.clear();
@@ -326,14 +326,14 @@ void vfx::CommandBuffer::bindIndexBuffer(const Arc<Buffer>& buffer, vk::DeviceSi
     if (retainedReferences) {
         bufferReferences.emplace(buffer);
     }
-    handle->bindIndexBuffer(buffer->handle, offset, indexType);
+    handle->bindIndexBuffer(buffer->handle, offset, indexType, device->interface);
 }
 
 void vfx::CommandBuffer::bindVertexBuffer(int firstBinding, const Arc<Buffer>& buffer, vk::DeviceSize offset) {
     if (retainedReferences) {
         bufferReferences.emplace(buffer);
     }
-    handle->bindVertexBuffers(firstBinding, 1, &buffer->handle, &offset);
+    handle->bindVertexBuffers(firstBinding, 1, &buffer->handle, &offset, device->interface);
 }
 
 vfx::CommandQueue::CommandQueue() {}
@@ -344,9 +344,9 @@ vfx::CommandQueue::~CommandQueue() {
 
 auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
     for (auto& cmd : retainedList) {
-        vk::Result result = device->handle->getFenceStatus(*cmd->fence);
+        vk::Result result = device->handle->getFenceStatus(*cmd->fence, device->interface);
         if (result == vk::Result::eSuccess) {
-            std::ignore = device->handle->resetFences(1, &*cmd->fence);
+            std::ignore = device->handle->resetFences(1, &*cmd->fence, device->interface);
             // todo: release references to resources after execution completed
             cmd->releaseReferences();
             return &*cmd;
@@ -363,22 +363,22 @@ auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
     out->retainedReferences = true;
     out->device = device;
     out->commandQueue = this;
-    out->handle = std::move(device->handle->allocateCommandBuffersUnique(command_buffers_allocate_info)[0]);
+    out->handle = std::move(device->handle->allocateCommandBuffersUnique(command_buffers_allocate_info, device->interface)[0]);
 
     vk::FenceCreateInfo fence_create_info{};
-    out->fence = device->handle->createFenceUnique(fence_create_info);
+    out->fence = device->handle->createFenceUnique(fence_create_info, VK_NULL_HANDLE, device->interface);
 
     vk::SemaphoreCreateInfo semaphore_create_info{};
-    out->semaphore = device->handle->createSemaphoreUnique(semaphore_create_info);
+    out->semaphore = device->handle->createSemaphoreUnique(semaphore_create_info, VK_NULL_HANDLE, device->interface);
 
     return &*retainedList.emplace_back(std::move(out));
 }
 
 auto vfx::CommandQueue::makeCommandBufferWithUnretainedReferences() -> vfx::CommandBuffer* {
     for (auto& cmd : unretainedList) {
-        vk::Result result = device->handle->getFenceStatus(*cmd->fence);
+        vk::Result result = device->handle->getFenceStatus(*cmd->fence, device->interface);
         if (result == vk::Result::eSuccess) {
-            std::ignore = device->handle->resetFences(1, &*cmd->fence);
+            std::ignore = device->handle->resetFences(1, &*cmd->fence, device->interface);
             // todo: release references to resources after execution completed
             cmd->releaseReferences();
             return &*cmd;
@@ -395,13 +395,13 @@ auto vfx::CommandQueue::makeCommandBufferWithUnretainedReferences() -> vfx::Comm
     out->retainedReferences = false;
     out->device = device;
     out->commandQueue = this;
-    out->handle = std::move(device->handle->allocateCommandBuffersUnique(command_buffers_allocate_info)[0]);
+    out->handle = std::move(device->handle->allocateCommandBuffersUnique(command_buffers_allocate_info, device->interface)[0]);
 
     vk::FenceCreateInfo fence_create_info{};
-    out->fence = device->handle->createFenceUnique(fence_create_info);
+    out->fence = device->handle->createFenceUnique(fence_create_info, VK_NULL_HANDLE, device->interface);
 
     vk::SemaphoreCreateInfo semaphore_create_info{};
-    out->semaphore = device->handle->createSemaphoreUnique(semaphore_create_info);
+    out->semaphore = device->handle->createSemaphoreUnique(semaphore_create_info, VK_NULL_HANDLE, device->interface);
 
     return &*unretainedList.emplace_back(std::move(out));
 }

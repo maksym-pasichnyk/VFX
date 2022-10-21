@@ -11,6 +11,7 @@ namespace vfx {
     public:
         vk::DynamicLoader dl{};
         vk::UniqueInstance instance{};
+        vk::DispatchLoaderDynamic interface{};
         vk::UniqueDebugUtilsMessengerEXT debug_utils{};
 
     public:

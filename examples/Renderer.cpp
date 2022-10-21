@@ -128,7 +128,7 @@ void Renderer::draw() {
         cmd->setPipelineState(sdfPipelineState);
         cmd->setResourceGroup(sdfPipelineState, sdfResourceGroup, 0);
         cmd->beginRendering(sdf_rendering_info);
-        cmd->handle->pushConstants(sdfPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(ModelConstants), &modelConstants);
+        cmd->handle->pushConstants(sdfPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(ModelConstants), &modelConstants, device->interface);
         cmd->draw(6, 1, 0, 0);
         cmd->endRendering();
     } else if (example == Example::Cube) {
@@ -150,7 +150,7 @@ void Renderer::draw() {
         cmd->setPipelineState(cubePipelineState);
         cmd->setResourceGroup(cubePipelineState, cubeResourceGroup, 0);
         cmd->beginRendering(cube_rendering_info);
-        cmd->handle->pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(ModelConstants), &modelConstants);
+        cmd->handle->pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(ModelConstants), &modelConstants, device->interface);
         gameObject->draw(cmd);
 
         cmd->endRendering();
@@ -190,7 +190,7 @@ void Renderer::drawGui() {
     }
 
     if (ImGui::Checkbox("VSync", &layer->displaySyncEnabled)) {
-        device->handle->waitIdle();
+        device->handle->waitIdle(device->interface);
 
         layer->updateDrawables();
     }
@@ -302,7 +302,7 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
     settings.gamma             = gamma;
 
     cmd->setScissor(0, colorArea);
-    cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Settings), &settings);
+    cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Settings), &settings, device->interface);
     cmd->draw(6, 1, 0, 0);
 
     settings.isDepthAttachment = VK_TRUE;
@@ -311,7 +311,7 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
     settings.gamma             = gamma;
 
     cmd->setScissor(0, depthArea);
-    cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Settings), &settings);
+    cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Settings), &settings, device->interface);
     cmd->draw(6, 1, 0, 0);
 
     cmd->endRendering();

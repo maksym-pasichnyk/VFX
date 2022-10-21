@@ -23,7 +23,7 @@ void vfx::ResourceGroup::setBuffer(const Arc<Buffer>& buffer, u64 offset, u32 bi
         .descriptorType = vk::DescriptorType::eUniformBuffer,
         .pBufferInfo = &descriptor_buffer_info
     };
-    device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr);
+    device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, device->interface);
 }
 
 void vfx::ResourceGroup::setTexture(const Arc<Texture>& texture, u32 binding) {
@@ -39,7 +39,7 @@ void vfx::ResourceGroup::setTexture(const Arc<Texture>& texture, u32 binding) {
         .descriptorType = vk::DescriptorType::eSampledImage,
         .pImageInfo = &descriptor_image_info
     };
-    device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr);
+    device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, device->interface);
 }
 
 void vfx::ResourceGroup::setSampler(const Arc<Sampler>& sampler, u32 binding) {
@@ -54,7 +54,7 @@ void vfx::ResourceGroup::setSampler(const Arc<Sampler>& sampler, u32 binding) {
         .descriptorType = vk::DescriptorType::eSampler,
         .pImageInfo = &descriptor_image_info
     };
-    device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr);
+    device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, device->interface);
 }
 
 void vfx::ResourceGroup::setLabel(const std::string& name) {
@@ -63,12 +63,12 @@ void vfx::ResourceGroup::setLabel(const std::string& name) {
     pool_info.setObject(u64(VkDescriptorPool(pool)));
     pool_info.setPObjectName(name.c_str());
 
-    device->handle->debugMarkerSetObjectNameEXT(pool_info);
+    device->handle->debugMarkerSetObjectNameEXT(pool_info, device->interface);
 
     vk::DebugMarkerObjectNameInfoEXT set_info = {};
     set_info.setObjectType(vk::DebugReportObjectTypeEXT::eDescriptorSet);
     set_info.setObject(u64(VkDescriptorSet(set)));
     set_info.setPObjectName(name.c_str());
 
-    device->handle->debugMarkerSetObjectNameEXT(pool_info);
+    device->handle->debugMarkerSetObjectNameEXT(pool_info, device->interface);
 }

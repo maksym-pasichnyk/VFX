@@ -28,6 +28,7 @@ namespace vfx {
 
         vk::PhysicalDevice gpu{};
         vk::UniqueDevice handle{};
+        vk::DispatchLoaderDynamic interface{};
 
         vk::Queue graphics_queue{};
         u32 graphics_queue_family_index{};

@@ -10,6 +10,9 @@ set(SPIRV_REFLECT_EXAMPLES OFF)
 set(SPIRV_REFLECT_EXECUTABLE OFF)
 set(SPIRV_REFLECT_STATIC_LIB ON)
 
+set(VMA_STATIC_VULKAN_FUNCTIONS OFF)
+set(VMA_DYNAMIC_VULKAN_FUNCTIONS ON)
+
 find_package(Vulkan REQUIRED)
 
 add_subdirectory(deps/glm)
@@ -66,21 +69,26 @@ add_library(VFX STATIC
     src/context.hpp
     src/texture.hpp
     src/buffer.hpp
-        src/pass.hpp
+    src/pass.hpp
     src/material.hpp
     src/assets.hpp
-    src/vulkan.cpp
     src/delegate.hpp
     src/signal.hpp
-        src/queue.hpp
+    src/queue.hpp
     src/queue.cpp
     src/texture.cpp
     src/buffer.cpp
-        src/context.cpp
+    src/context.cpp
     src/material.cpp
     src/pass.cpp
     src/glsl.hpp
-        src/group.cpp src/group.hpp src/layer.cpp src/layer.hpp src/device.cpp src/device.hpp)
+    src/group.cpp
+    src/group.hpp
+    src/layer.cpp
+    src/layer.hpp
+    src/device.cpp
+    src/device.hpp
+)
 target_include_directories(VFX PUBLIC src)
 target_link_libraries(VFX PUBLIC
     glm
@@ -101,6 +109,7 @@ target_compile_definitions(VFX PUBLIC
     -DGLM_FORCE_DEFAULT_ALIGNED_GENTYPES
     -DVULKAN_HPP_NO_STRUCT_CONSTRUCTORS
     -DVULKAN_HPP_NO_UNION_CONSTRUCTORS
+    -DVULKAN_HPP_NO_DEFAULT_DISPATCHER
     -DVK_NO_PROTOTYPES
     -DVK_ENABLE_BETA_EXTENSIONS
     -DVK_USE_PLATFORM_MACOS_MVK
