@@ -20,30 +20,8 @@ Renderer::Renderer(const Arc<vfx::Context>& context, const Arc<vfx::Swapchain>& 
 
     sceneConstantsBuffer = context->makeBuffer(vfx::BufferUsage::Constant, sizeof(SceneConstants));
 
-    auto global_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = sceneConstantsBuffer->handle,
-        .offset = 0,
-        .range = sizeof(SceneConstants)
-    };
-
-    context->device->updateDescriptorSets({
-        vk::WriteDescriptorSet{
-            .dstSet = sdfPipelineStateDescriptorSet,
-            .dstBinding = 0,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eUniformBuffer,
-            .pBufferInfo = &global_buffer_info
-        },
-        vk::WriteDescriptorSet{
-            .dstSet = cubePipelineStateDescriptorSet,
-            .dstBinding = 0,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eUniformBuffer,
-            .pBufferInfo = &global_buffer_info
-        }
-    }, {});
+    sdfResourceGroup->setBuffer(sceneConstantsBuffer, 0, 0);
+    cubeResourceGroup->setBuffer(sceneConstantsBuffer, 0, 0);
 
     gameObject = Arc<GameObject>::alloc(context);
 }
@@ -129,8 +107,8 @@ void Renderer::draw() {
         sdf_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
         sdf_rendering_info.depthAttachment.clearDepth = 0.0f;
 
-        cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, sdfPipelineState->pipelineLayout, 0, 1, &sdfPipelineStateDescriptorSet, 0, nullptr);
         cmd->setPipelineState(sdfPipelineState);
+        cmd->setResourceGroup(sdfPipelineState, sdfResourceGroup, 0);
         cmd->beginRendering(sdf_rendering_info);
         cmd->handle->pushConstants(sdfPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(ModelConstants), &modelConstants);
         cmd->draw(6, 1, 0, 0);
@@ -151,8 +129,8 @@ void Renderer::draw() {
         cube_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
         cube_rendering_info.depthAttachment.clearDepth = 0.0f;
 
-        cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, cubePipelineState->pipelineLayout, 0, 1, &cubePipelineStateDescriptorSet, 0, nullptr);
         cmd->setPipelineState(cubePipelineState);
+        cmd->setResourceGroup(cubePipelineState, cubeResourceGroup, 0);
         cmd->beginRendering(cube_rendering_info);
         cmd->handle->pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(ModelConstants), &modelConstants);
         gameObject->draw(cmd);
@@ -280,6 +258,8 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
     present_rendering_info.colorAttachments[0].clearColor = vfx::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
 
     cmd->setPipelineState(presentPipelineState);
+    cmd->setResourceGroup(presentPipelineState, presentResourceGroup, 0);
+
     cmd->beginRendering(present_rendering_info);
     cmd->setViewport(0, viewport);
 
@@ -305,7 +285,6 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
 
     cmd->setScissor(0, colorArea);
     cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Settings), &settings);
-    cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &presentPipelineStateDescriptorSets[0], 0, nullptr);
     cmd->draw(6, 1, 0, 0);
 
     settings.isDepthAttachment = VK_TRUE;
@@ -315,7 +294,6 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
 
     cmd->setScissor(0, depthArea);
     cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Settings), &settings);
-    cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &presentPipelineStateDescriptorSets[1], 0, nullptr);
     cmd->draw(6, 1, 0, 0);
 
     cmd->endRendering();
@@ -414,19 +392,9 @@ void Renderer::createSDFPipelineState() {
     description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
     sdfPipelineState = context->makePipelineState(description);
-
-    auto pool_sizes = std::array{
-        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1},
-    };
-    auto pool_create_info = vk::DescriptorPoolCreateInfo{};
-    pool_create_info.setMaxSets(1);
-    pool_create_info.setPoolSizes(pool_sizes);
-    sdfPipelineStateDescriptorPool = context->device->createDescriptorPoolUnique(pool_create_info);
-
-    auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
-    ds_allocate_info.setDescriptorPool(*sdfPipelineStateDescriptorPool);
-    ds_allocate_info.setSetLayouts(sdfPipelineState->descriptorSetLayouts);
-    sdfPipelineStateDescriptorSet = context->device->allocateDescriptorSets(ds_allocate_info)[0];
+    sdfResourceGroup = context->makeResourceGroup(sdfPipelineState->descriptorSetLayouts[0], {
+        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1}
+    });
 }
 
 void Renderer::createCubePipelineState() {
@@ -467,19 +435,9 @@ void Renderer::createCubePipelineState() {
     description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
     cubePipelineState = context->makePipelineState(description);
-
-    auto pool_sizes = std::array{
-        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1},
-    };
-    auto pool_create_info = vk::DescriptorPoolCreateInfo{};
-    pool_create_info.setMaxSets(1);
-    pool_create_info.setPoolSizes(pool_sizes);
-    cubePipelineStateDescriptorPool = context->device->createDescriptorPoolUnique(pool_create_info);
-
-    auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
-    ds_allocate_info.setDescriptorPool(*cubePipelineStateDescriptorPool);
-    ds_allocate_info.setSetLayouts(cubePipelineState->descriptorSetLayouts);
-    cubePipelineStateDescriptorSet = context->device->allocateDescriptorSets(ds_allocate_info)[0];
+    cubeResourceGroup = context->makeResourceGroup(cubePipelineState->descriptorSetLayouts[0], {
+        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1}
+    });
 }
 
 void Renderer::createPresentPipelineState() {
@@ -504,71 +462,14 @@ void Renderer::createPresentPipelineState() {
     description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
     presentPipelineState = context->makePipelineState(description);
-
-    auto pool_sizes = std::array{
+    presentResourceGroup = context->makeResourceGroup(presentPipelineState->descriptorSetLayouts[0], {
+        vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
         vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 2},
-        vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 2}
-    };
-    auto pool_create_info = vk::DescriptorPoolCreateInfo{};
-    pool_create_info.setMaxSets(2);
-    pool_create_info.setPoolSizes(pool_sizes);
-    presentPipelineStateDescriptorPool = context->device->createDescriptorPoolUnique(pool_create_info);
-
-    presentPipelineStateDescriptorSets.resize(2);
-
-    auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
-    ds_allocate_info.setDescriptorPool(*presentPipelineStateDescriptorPool);
-    ds_allocate_info.setSetLayouts(presentPipelineState->descriptorSetLayouts);
-    presentPipelineStateDescriptorSets[0] = context->device->allocateDescriptorSets(ds_allocate_info)[0];
-
-    ds_allocate_info.setSetLayouts(presentPipelineState->descriptorSetLayouts);
-    presentPipelineStateDescriptorSets[1] = context->device->allocateDescriptorSets(ds_allocate_info)[0];
+    });
 }
 
 void Renderer::updateAttachmentDescriptors() {
-    const auto sampler_image_info = vk::DescriptorImageInfo {
-        .sampler = sampler->handle
-    };
-    const auto color_image_info = vk::DescriptorImageInfo{
-        .imageView = colorAttachmentTexture->view,
-        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-    };
-    const auto depth_image_info = vk::DescriptorImageInfo{
-        .imageView = depthAttachmentTexture->view,
-        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-    };
-    context->device->updateDescriptorSets({
-        vk::WriteDescriptorSet{
-            .dstSet = presentPipelineStateDescriptorSets[0],
-            .dstBinding = 0,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eSampledImage,
-            .pImageInfo = &color_image_info
-        },
-        vk::WriteDescriptorSet{
-            .dstSet = presentPipelineStateDescriptorSets[0],
-            .dstBinding = 1,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eSampler,
-            .pImageInfo = &sampler_image_info
-        },
-        vk::WriteDescriptorSet{
-            .dstSet = presentPipelineStateDescriptorSets[1],
-            .dstBinding = 0,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eSampledImage,
-            .pImageInfo = &depth_image_info
-        },
-        vk::WriteDescriptorSet{
-            .dstSet = presentPipelineStateDescriptorSets[1],
-            .dstBinding = 1,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eSampler,
-            .pImageInfo = &sampler_image_info
-        }
-    }, {});
+    presentResourceGroup->setSampler(sampler, 0);
+    presentResourceGroup->setTexture(colorAttachmentTexture, 1);
+    presentResourceGroup->setTexture(depthAttachmentTexture, 2);
 }

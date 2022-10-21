@@ -25,6 +25,7 @@ namespace vfx {
     struct RenderPass;
     struct CommandQueue;
     struct PipelineState;
+    struct ResourceGroup;
     struct TextureDescription;
     struct RenderPassDescription;
     struct PipelineStateDescription;
@@ -81,6 +82,9 @@ namespace vfx {
 
         auto makeCommandQueue() -> Arc<CommandQueue>;
         void freeCommandQueue(CommandQueue* queue);
+
+        auto makeResourceGroup(vk::DescriptorSetLayout layout, const std::vector<vk::DescriptorPoolSize>& sizes) -> Arc<ResourceGroup>;
+        void freeResourceGroup(ResourceGroup* group);
     };
 
     extern auto createSystemDefaultContext() -> Arc<Context>;

@@ -1,4 +1,5 @@
 #include "pass.hpp"
+#include "group.hpp"
 #include "queue.hpp"
 #include "surface.hpp"
 #include "buffer.hpp"
@@ -68,6 +69,7 @@ void vfx::CommandBuffer::reset() {
 void vfx::CommandBuffer::releaseReferences() {
     bufferReferences.clear();
     textureReferences.clear();
+    resourceGroupReferences.clear();
 }
 
 //auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
@@ -196,6 +198,14 @@ void vfx::CommandBuffer::setPipelineState(const Arc<PipelineState>& state) {
     handle->bindPipeline(vk::PipelineBindPoint::eGraphics, state->pipeline);
 }
 
+void vfx::CommandBuffer::setResourceGroup(const Arc<PipelineState>& state, const Arc<ResourceGroup>& group, u32 index) {
+    if (retainedReferences) {
+        resourceGroupReferences.emplace(group);
+    }
+
+    handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, state->pipelineLayout, index, 1, &group->set, 0, nullptr);
+}
+
 //void vfx::CommandBuffer::beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents) {
 //    handle.beginRenderPass(info, contents);
 //    renderPass = info.renderPass;
@@ -215,10 +225,10 @@ void vfx::CommandBuffer::beginRendering(const RenderingInfo& description) {
     for (u64 i = 0; i < colorAttachmentCount; ++i) {
         if (retainedReferences) {
             if (description.colorAttachments.elements[i].texture) {
-                textureReferences.emplace_back(description.colorAttachments.elements[i].texture);
+                textureReferences.emplace(description.colorAttachments.elements[i].texture);
             }
             if (description.colorAttachments.elements[i].resolveTexture) {
-                textureReferences.emplace_back(description.colorAttachments.elements[i].resolveTexture);
+                textureReferences.emplace(description.colorAttachments.elements[i].resolveTexture);
             }
         }
         if (description.colorAttachments.elements[i].texture || description.colorAttachments.elements[i].resolveTexture) {
@@ -236,10 +246,10 @@ void vfx::CommandBuffer::beginRendering(const RenderingInfo& description) {
     info.setPColorAttachments(colorAttachments.data());
     if (retainedReferences) {
         if (description.depthAttachment.texture) {
-            textureReferences.emplace_back(description.depthAttachment.texture);
+            textureReferences.emplace(description.depthAttachment.texture);
         }
         if (description.depthAttachment.resolveTexture) {
-            textureReferences.emplace_back(description.depthAttachment.resolveTexture);
+            textureReferences.emplace(description.depthAttachment.resolveTexture);
         }
     }
     if (description.depthAttachment.texture || description.depthAttachment.resolveTexture) {
@@ -248,10 +258,10 @@ void vfx::CommandBuffer::beginRendering(const RenderingInfo& description) {
     }
     if (retainedReferences) {
         if (description.stencilAttachment.texture) {
-            textureReferences.emplace_back(description.stencilAttachment.texture);
+            textureReferences.emplace(description.stencilAttachment.texture);
         }
         if (description.stencilAttachment.resolveTexture) {
-            textureReferences.emplace_back(description.stencilAttachment.resolveTexture);
+            textureReferences.emplace(description.stencilAttachment.resolveTexture);
         }
     }
     if (description.stencilAttachment.texture || description.stencilAttachment.resolveTexture) {
@@ -316,14 +326,14 @@ void vfx::CommandBuffer::bufferMemoryBarrier(const vk::BufferMemoryBarrier2& bar
 
 void vfx::CommandBuffer::bindIndexBuffer(const Arc<Buffer>& buffer, vk::DeviceSize offset, vk::IndexType indexType) {
     if (retainedReferences) {
-        bufferReferences.emplace_back(buffer);
+        bufferReferences.emplace(buffer);
     }
     handle->bindIndexBuffer(buffer->handle, offset, indexType);
 }
 
 void vfx::CommandBuffer::bindVertexBuffer(int firstBinding, const Arc<Buffer>& buffer, vk::DeviceSize offset) {
     if (retainedReferences) {
-        bufferReferences.emplace_back(buffer);
+        bufferReferences.emplace(buffer);
     }
     handle->bindVertexBuffers(firstBinding, 1, &buffer->handle, &offset);
 }

@@ -9,8 +9,9 @@ layout(push_constant) uniform Globals {
 
 layout(location = 0) out vec4 out_color;
 
-layout(set = 0, binding = 0) uniform texture2D mainTexture;
-layout(set = 0, binding = 1) uniform sampler mainSampler;
+layout(set = 0, binding = 0) uniform sampler textureSampler;
+layout(set = 0, binding = 1) uniform texture2D albedoTexture;
+layout(set = 0, binding = 2) uniform texture2D depthTexture;
 
 layout(location = 0) in struct {
     vec2 texcoord;
@@ -19,10 +20,10 @@ layout(location = 0) in struct {
 void main() {
     vec3 color;
     if (IsDepthAttachment) {
-        float depthSample = texture(sampler2D(mainTexture, mainSampler), v_in.texcoord).r;
+        float depthSample = texture(sampler2D(depthTexture, textureSampler), v_in.texcoord).r;
         color = vec3(depthSample / 0.01f);
     } else {
-        color = texture(sampler2D(mainTexture, mainSampler), v_in.texcoord).rgb;
+        color = texture(sampler2D(albedoTexture, textureSampler), v_in.texcoord).rgb;
     }
 
     if (IsHDREnabled) {

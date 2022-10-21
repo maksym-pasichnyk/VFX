@@ -85,7 +85,7 @@ add_library(VFX STATIC
     src/material.cpp
     src/pass.cpp
     src/glsl.hpp
-)
+        src/group.cpp src/group.hpp)
 target_include_directories(VFX PUBLIC src)
 target_link_libraries(VFX PUBLIC
     glm

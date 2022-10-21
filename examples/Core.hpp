@@ -1,5 +1,6 @@
 #pragma once
 
+#include "group.hpp"
 #include "assets.hpp"
 #include "buffer.hpp"
 #include "context.hpp"

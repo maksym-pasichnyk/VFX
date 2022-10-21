@@ -3,6 +3,7 @@
 #include "types.hpp"
 
 #include <map>
+#include <set>
 #include <tuple>
 #include <vector>
 #include <vulkan/vulkan.hpp>
@@ -74,6 +75,7 @@ namespace vfx {
     struct Drawable;
     struct CommandQueue;
     struct PipelineState;
+    struct ResourceGroup;
     struct CommandBuffer final {
         friend Context;
         friend CommandQueue;
@@ -89,8 +91,9 @@ namespace vfx {
         std::vector<vk::ImageMemoryBarrier2> imageMemoryBarriers = {};
         std::vector<vk::BufferMemoryBarrier2> bufferMemoryBarriers = {};
 
-        std::vector<Arc<Buffer>> bufferReferences{};
-        std::vector<Arc<Texture>> textureReferences{};
+        std::set<Arc<Buffer>> bufferReferences{};
+        std::set<Arc<Texture>> textureReferences{};
+        std::set<Arc<ResourceGroup>> resourceGroupReferences{};
 
     public:
         Context* context{};
@@ -112,6 +115,7 @@ namespace vfx {
         void submit();
         void present(Drawable* drawable);
         void setPipelineState(const Arc<PipelineState>& state);
+        void setResourceGroup(const Arc<PipelineState>& state, const Arc<ResourceGroup>& group, u32 index);
 //        void beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents);
 //        void endRenderPass();
         void beginRendering(const RenderingInfo& description);

@@ -7,8 +7,9 @@ layout(location = 0) in struct {
     vec2 UV;
 } In;
 
-layout(set = 0, binding = 0) uniform sampler2D sTexture;
+layout(set = 0, binding = 0) uniform sampler sSampler;
+layout(set = 0, binding = 1) uniform texture2D sTexture;
 
 void main() {
-    fColor = In.Color * texture(sTexture, In.UV.st);
+    fColor = In.Color * texture(sampler2D(sTexture, sSampler), In.UV.st);
 }

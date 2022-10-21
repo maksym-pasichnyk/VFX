@@ -27,8 +27,5 @@ private:
     Arc<vfx::Sampler> fontSampler{};
     Arc<vfx::Texture> fontTexture{};
     Arc<vfx::PipelineState> pipelineState{};
-
-    // todo: bindless
-    vk::UniqueDescriptorPool descriptor_pool{};
-    std::vector<vk::DescriptorSet> descriptor_sets{};
+    Arc<vfx::ResourceGroup> resourceGroup{};
 };

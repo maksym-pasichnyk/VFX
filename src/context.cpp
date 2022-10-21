@@ -1,6 +1,7 @@
 #include "context.hpp"
 
 #include "pass.hpp"
+#include "group.hpp"
 #include "queue.hpp"
 #include "types.hpp"
 #include "buffer.hpp"
@@ -1078,4 +1079,27 @@ void vfx::Context::freeCommandQueue(CommandQueue* queue) {
     queue->unretainedList.clear();
 
     device->destroyCommandPool(queue->pool);
+}
+
+// todo: get sizes from layout
+auto vfx::Context::makeResourceGroup(vk::DescriptorSetLayout layout, const std::vector<vk::DescriptorPoolSize>& sizes) -> Arc<ResourceGroup> {
+    auto out = Arc<ResourceGroup>::alloc();
+    out->context = this;
+
+    auto pool_create_info = vk::DescriptorPoolCreateInfo{};
+    pool_create_info.setMaxSets(1);
+    pool_create_info.setPoolSizes(sizes);
+    out->pool = device->createDescriptorPool(pool_create_info);
+
+    auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
+    ds_allocate_info.setDescriptorPool(out->pool);
+    ds_allocate_info.setDescriptorSetCount(1);
+    ds_allocate_info.setPSetLayouts(&layout);
+    out->set = device->allocateDescriptorSets(ds_allocate_info)[0];
+
+    return out;
+}
+
+void vfx::Context::freeResourceGroup(vfx::ResourceGroup* group) {
+    device->destroyDescriptorPool(group->pool);
 }

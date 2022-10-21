@@ -95,7 +95,7 @@ void ImGuiRenderer::draw(vfx::CommandBuffer* cmd) {
     }
 
     cmd->setPipelineState(pipelineState);
-    cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineState->pipelineLayout, 0, descriptor_sets, {});
+    cmd->setResourceGroup(pipelineState, resourceGroup, 0);
 
     setupRenderState(data, cmd, mesh, fb_width, fb_height);
 
@@ -158,20 +158,8 @@ void ImGuiRenderer::createFontTexture() {
     fontTexture->setPixelData(std::span(reinterpret_cast<const glm::u8vec4 *>(pixels), width * height));
     ctx->IO.Fonts->SetTexID(fontTexture.get());
 
-    const auto image_info = vk::DescriptorImageInfo{
-        .sampler = fontSampler->handle,
-        .imageView = fontTexture->view,
-        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-    };
-    const auto write_descriptor_set = vk::WriteDescriptorSet{
-        .dstSet = descriptor_sets[0],
-        .dstBinding = 0,
-        .dstArrayElement = 0,
-        .descriptorCount = 1,
-        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-        .pImageInfo = &image_info
-    };
-    context->device->updateDescriptorSets(write_descriptor_set, {});
+    resourceGroup->setSampler(fontSampler, 0);
+    resourceGroup->setTexture(fontTexture, 1);
 }
 
 void ImGuiRenderer::createPipelineState() {
@@ -214,19 +202,10 @@ void ImGuiRenderer::createPipelineState() {
     description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
     pipelineState = context->makePipelineState(description);
-
-    auto pool_sizes = std::array{
-        vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1}
-    };
-    auto pool_create_info = vk::DescriptorPoolCreateInfo{};
-    pool_create_info.setMaxSets(1);
-    pool_create_info.setPoolSizes(pool_sizes);
-    descriptor_pool = context->device->createDescriptorPoolUnique(pool_create_info);
-
-    auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
-    ds_allocate_info.setDescriptorPool(*descriptor_pool);
-    ds_allocate_info.setSetLayouts(pipelineState->descriptorSetLayouts);
-    descriptor_sets = context->device->allocateDescriptorSets(ds_allocate_info);
+    resourceGroup = context->makeResourceGroup(pipelineState->descriptorSetLayouts[0], {
+        vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
+        vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 1}
+    });
 }
 
 void ImGuiRenderer::setupRenderState(ImDrawData* data, vfx::CommandBuffer* cmd, const Arc<Mesh>& mesh, i32 width, i32 height) {

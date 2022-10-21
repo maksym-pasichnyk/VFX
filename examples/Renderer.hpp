@@ -47,16 +47,9 @@ public:
     Arc<vfx::Texture> colorAttachmentTexture{};
     Arc<vfx::Texture> depthAttachmentTexture{};
 
-
-    // todo: bindless
-    vk::UniqueDescriptorPool sdfPipelineStateDescriptorPool{};
-    vk::DescriptorSet sdfPipelineStateDescriptorSet{};
-
-    vk::UniqueDescriptorPool cubePipelineStateDescriptorPool{};
-    vk::DescriptorSet cubePipelineStateDescriptorSet{};
-
-    vk::UniqueDescriptorPool presentPipelineStateDescriptorPool{};
-    std::vector<vk::DescriptorSet> presentPipelineStateDescriptorSets{};
+    Arc<vfx::ResourceGroup> sdfResourceGroup{};
+    Arc<vfx::ResourceGroup> cubeResourceGroup{};
+    Arc<vfx::ResourceGroup> presentResourceGroup{};
 
     Arc<GameObject> gameObject{};
 
