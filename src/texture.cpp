@@ -9,6 +9,15 @@ vfx::Sampler::~Sampler() {
     context->freeSampler(this);
 }
 
+void vfx::Sampler::setLabel(const std::string& name) {
+    vk::DebugMarkerObjectNameInfoEXT info = {};
+    info.setObjectType(vk::DebugReportObjectTypeEXT::eSampler);
+    info.setObject(u64(VkSampler(handle)));
+    info.setPObjectName(name.c_str());
+
+    context->device->debugMarkerSetObjectNameEXT(info);
+}
+
 vfx::Texture::Texture() {}
 
 vfx::Texture::~Texture() {
@@ -61,7 +70,7 @@ void vfx::Texture::setPixelData(std::span<const glm::u8vec4> pixels) {
     };
 
     auto queue = context->makeCommandQueue();
-    auto cmd = queue->makeCommandBuffer();
+    auto cmd = queue->makeCommandBufferWithUnretainedReferences();
 
     cmd->begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
     cmd->handle->pipelineBarrier(vk::PipelineStageFlagBits::eHost, vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, {barrier_1});
@@ -70,4 +79,20 @@ void vfx::Texture::setPixelData(std::span<const glm::u8vec4> pixels) {
     cmd->end();
     cmd->submit();
     cmd->waitUntilCompleted();
+}
+
+void vfx::Texture::setLabel(const std::string& name) {
+    vk::DebugMarkerObjectNameInfoEXT image_info = {};
+    image_info.setObjectType(vk::DebugReportObjectTypeEXT::eImage);
+    image_info.setObject(u64(VkImage(image)));
+    image_info.setPObjectName(name.c_str());
+
+    context->device->debugMarkerSetObjectNameEXT(image_info);
+
+    vk::DebugMarkerObjectNameInfoEXT view_info = {};
+    view_info.setObjectType(vk::DebugReportObjectTypeEXT::eImageView);
+    view_info.setObject(u64(VkImageView(view)));
+    view_info.setPObjectName(name.c_str());
+
+    context->device->debugMarkerSetObjectNameEXT(view_info);
 }

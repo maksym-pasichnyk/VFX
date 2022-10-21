@@ -14,3 +14,12 @@ void vfx::Buffer::update(const void* src, u64 size, u64 offset) {
     memcpy(dst, src, size);
     vmaUnmapMemory(context->allocator, allocation);
 }
+
+void vfx::Buffer::setLabel(const std::string& name) {
+    vk::DebugMarkerObjectNameInfoEXT info = {};
+    info.setObjectType(vk::DebugReportObjectTypeEXT::eBuffer);
+    info.setObject(u64(VkBuffer(handle)));
+    info.setPObjectName(name.c_str());
+
+    context->device->debugMarkerSetObjectNameEXT(info);
+}

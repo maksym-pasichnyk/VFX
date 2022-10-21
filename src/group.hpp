@@ -24,5 +24,6 @@ namespace vfx {
         void setBuffer(const Arc<Buffer>& buffer, u64 offset, u32 binding);
         void setTexture(const Arc<Texture>& texture, u32 binding);
         void setSampler(const Arc<Sampler>& sampler, u32 binding);
+        void setLabel(const std::string& name);
     };
 }

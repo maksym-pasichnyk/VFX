@@ -56,3 +56,19 @@ void vfx::ResourceGroup::setSampler(const Arc<Sampler>& sampler, u32 binding) {
     };
     context->device->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr);
 }
+
+void vfx::ResourceGroup::setLabel(const std::string& name) {
+    vk::DebugMarkerObjectNameInfoEXT pool_info = {};
+    pool_info.setObjectType(vk::DebugReportObjectTypeEXT::eDescriptorPool);
+    pool_info.setObject(u64(VkDescriptorPool(pool)));
+    pool_info.setPObjectName(name.c_str());
+
+    context->device->debugMarkerSetObjectNameEXT(pool_info);
+
+    vk::DebugMarkerObjectNameInfoEXT set_info = {};
+    set_info.setObjectType(vk::DebugReportObjectTypeEXT::eDescriptorSet);
+    set_info.setObject(u64(VkDescriptorSet(set)));
+    set_info.setPObjectName(name.c_str());
+
+    context->device->debugMarkerSetObjectNameEXT(pool_info);
+}

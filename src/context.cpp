@@ -448,6 +448,7 @@ auto vfx::createSystemDefaultContext() -> Arc<Context> {
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
             VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
             VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+            VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
         },
 #ifndef NDEBUG
         .enableDebugUtils = true
@@ -612,7 +613,8 @@ void vfx::Context::create_logical_device() {
         VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
         VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
         VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
-        VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
+        VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+        VK_EXT_DEBUG_MARKER_EXTENSION_NAME
     };
 
     auto synchronization_2_features = vk::PhysicalDeviceSynchronization2Features{};

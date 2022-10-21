@@ -24,6 +24,9 @@ namespace vfx {
     public:
         Sampler();
         ~Sampler();
+
+    public:
+        void setLabel(const std::string& name);
     };
 
     struct Texture {
@@ -42,5 +45,6 @@ namespace vfx {
 
     public:
         void setPixelData(std::span<const glm::u8vec4> pixels);
+        void setLabel(const std::string& name);
     };
 }

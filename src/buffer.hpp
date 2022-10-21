@@ -29,5 +29,6 @@ namespace vfx {
 
     public:
         void update(const void* src, u64 size, u64 offset);
+        void setLabel(const std::string& name);
     };
 }
