@@ -74,8 +74,16 @@ void ImGuiRenderer::draw(vfx::CommandBuffer* cmd) {
     mesh->indexCount = data->TotalIdxCount;
     mesh->vertexCount = data->TotalVtxCount;
 
-    mesh->indexBuffer = context->makeBuffer(vfx::BufferUsage::Index, mesh->indexCount * sizeof(ImDrawIdx));
-    mesh->vertexBuffer = context->makeBuffer(vfx::BufferUsage::Vertex, mesh->vertexCount * sizeof(ImDrawVert));
+    mesh->indexBuffer = context->makeBuffer(
+        vk::BufferUsageFlagBits::eIndexBuffer,
+        mesh->indexCount * sizeof(ImDrawIdx),
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
+    );
+    mesh->vertexBuffer = context->makeBuffer(
+        vk::BufferUsageFlagBits::eVertexBuffer,
+        mesh->vertexCount * sizeof(ImDrawVert),
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
+    );
 
     auto indexBufferOffset = 0;
     auto vertexBufferOffset = 0;

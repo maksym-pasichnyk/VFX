@@ -6,13 +6,13 @@
 #include <vulkan/vulkan.hpp>
 
 namespace vfx {
-    enum class BufferUsage {
-        Vertex   = 1 << 0,
-        Index    = 1 << 1,
-        CopySrc  = 1 << 2,
-        CopyDst  = 1 << 3,
-        Constant = 1 << 4
-    };
+//    enum class BufferUsage {
+//        Vertex   = 1 << 0,
+//        Index    = 1 << 1,
+//        CopySrc  = 1 << 2,
+//        CopyDst  = 1 << 3,
+//        Constant = 1 << 4
+//    };
 
     struct Context;
     struct Buffer {

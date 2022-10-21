@@ -18,7 +18,11 @@ Renderer::Renderer(const Arc<vfx::Context>& context, const Arc<vfx::Swapchain>& 
     createPresentPipelineState();
     updateAttachmentDescriptors();
 
-    sceneConstantsBuffer = context->makeBuffer(vfx::BufferUsage::Constant, sizeof(SceneConstants));
+    sceneConstantsBuffer = context->makeBuffer(
+        vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst,
+        sizeof(SceneConstants),
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
+    );
 
     sdfResourceGroup->setBuffer(sceneConstantsBuffer, 0, 0);
     cubeResourceGroup->setBuffer(sceneConstantsBuffer, 0, 0);
@@ -88,6 +92,20 @@ void Renderer::draw() {
     sceneConstants.ViewProjectionMatrix = sceneConstants.ProjectionMatrix * sceneConstants.ViewMatrix;
     sceneConstants.InverseViewProjectionMatrix = glm::inverse(sceneConstants.ViewProjectionMatrix);
     sceneConstantsBuffer->update(&sceneConstants, sizeof(SceneConstants), 0);
+
+//    cmd->handle->updateBuffer(sceneConstantsBuffer->handle, 0, sizeof(SceneConstants), &sceneConstants);
+//    cmd->bufferMemoryBarrier(vk::BufferMemoryBarrier2{
+//        .srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
+//        .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
+//        .dstStageMask = vk::PipelineStageFlagBits2::eVertexShader | vk::PipelineStageFlagBits2::eFragmentShader,
+//        .dstAccessMask = vk::AccessFlagBits2::eUniformRead,
+//        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+//        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+//        .buffer = sceneConstantsBuffer->handle,
+//        .offset = 0,
+//        .size = sizeof(SceneConstants)
+//    });
+//    cmd->flushBarriers();
 
     modelConstants.ModelMatrix = glm::mat4(1.0f);
 

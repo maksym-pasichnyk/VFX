@@ -15,7 +15,7 @@ namespace vfx {
         bool enableDebugUtils = false;
     };
 
-    enum class BufferUsage;
+//    enum class BufferUsage;
 
     struct Buffer;
     struct Texture;
@@ -70,8 +70,8 @@ namespace vfx {
         auto makeSampler(const vk::SamplerCreateInfo& info) -> Arc<Sampler>;
         void freeSampler(Sampler* sampler);
 
-        auto makeBuffer(BufferUsage target, u64 size) -> Arc<Buffer>;
-        auto makeBuffer(BufferUsage target, u64 size, const void* data) -> Arc<Buffer>;
+        auto makeBuffer(vk::BufferUsageFlags usage, u64 size, VmaAllocationCreateFlags options = 0) -> Arc<Buffer>;
+        auto makeBuffer(vk::BufferUsageFlags usage, u64 size, const void* data, VmaAllocationCreateFlags options = 0) -> Arc<Buffer>;
         void freeBuffer(Buffer* buffer);
 
         auto makeLibrary(const std::vector<char>& bytes) -> Arc<Library>;

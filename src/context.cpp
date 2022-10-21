@@ -320,40 +320,40 @@ namespace vfx {
         { vk::Format::eR12X4UnormPack16KHR, vk::ImageAspectFlagBits::eColor },
     };
 
-    inline constexpr auto get_buffer_usage_from_target(BufferUsage target) -> vk::BufferUsageFlags {
-        using Type = std::underlying_type_t<BufferUsage>;
-
-        auto flags = vk::BufferUsageFlags{};
-        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::Vertex)) {
-            flags |= vk::BufferUsageFlagBits::eVertexBuffer;
-        }
-        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::Index)) {
-            flags |= vk::BufferUsageFlagBits::eIndexBuffer;
-        }
-        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::CopySrc)) {
-            flags |= vk::BufferUsageFlagBits::eTransferSrc;
-        }
-        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::CopyDst)) {
-            flags |= vk::BufferUsageFlagBits::eTransferDst;
-        }
-        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::Constant)) {
-            flags |= vk::BufferUsageFlagBits::eUniformBuffer;
-        }
-        return flags;
-    }
-
-    inline constexpr auto get_memory_usage_from_target(BufferUsage target) -> VmaMemoryUsage {
-        using Type = std::underlying_type_t<BufferUsage>;
-
-        auto flags = VMA_MEMORY_USAGE_CPU_TO_GPU;
-        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::CopySrc)) {
-            flags = VMA_MEMORY_USAGE_CPU_ONLY;
-        }
-        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::CopyDst)) {
-            flags = VMA_MEMORY_USAGE_GPU_ONLY;
-        }
-        return flags;
-    }
+//    inline constexpr auto get_buffer_usage_from_target(BufferUsage target) -> vk::BufferUsageFlags {
+//        using Type = std::underlying_type_t<BufferUsage>;
+//
+//        auto flags = vk::BufferUsageFlags{};
+//        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::Vertex)) {
+//            flags |= vk::BufferUsageFlagBits::eVertexBuffer;
+//        }
+//        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::Index)) {
+//            flags |= vk::BufferUsageFlagBits::eIndexBuffer;
+//        }
+//        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::CopySrc)) {
+//            flags |= vk::BufferUsageFlagBits::eTransferSrc;
+//        }
+//        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::CopyDst)) {
+//            flags |= vk::BufferUsageFlagBits::eTransferDst;
+//        }
+//        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::Constant)) {
+//            flags |= vk::BufferUsageFlagBits::eUniformBuffer;
+//        }
+//        return flags;
+//    }
+//
+//    inline constexpr auto get_memory_usage_from_target(BufferUsage target) -> VmaMemoryUsage {
+//        using Type = std::underlying_type_t<BufferUsage>;
+//
+//        auto flags = VMA_MEMORY_USAGE_CPU_TO_GPU;
+//        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::CopySrc)) {
+//            flags = VMA_MEMORY_USAGE_CPU_ONLY;
+//        }
+//        if (static_cast<Type>(target) & static_cast<Type>(BufferUsage::CopyDst)) {
+//            flags = VMA_MEMORY_USAGE_GPU_ONLY;
+//        }
+//        return flags;
+//    }
 
     inline auto get_supported_format(vk::PhysicalDevice device, std::span<const vk::Format> formats, vk::FormatFeatureFlags flags) -> vk::Format {
         for (auto format : formats) {
@@ -806,14 +806,15 @@ void vfx::Context::freeSampler(Sampler* sampler) {
     device->destroySampler(sampler->handle);
 }
 
-auto vfx::Context::makeBuffer(BufferUsage target, u64 size) -> Arc<Buffer> {
+auto vfx::Context::makeBuffer(vk::BufferUsageFlags usage, u64 size, VmaAllocationCreateFlags options) -> Arc<Buffer> {
     const auto buffer_create_info = static_cast<VkBufferCreateInfo>(vk::BufferCreateInfo {
         .size = static_cast<vk::DeviceSize>(size),
-        .usage = get_buffer_usage_from_target(target)
+        .usage = usage
     });
 
     const auto allocation_create_info = VmaAllocationCreateInfo {
-        .usage = get_memory_usage_from_target(target)
+        .flags = options,
+        .usage = VMA_MEMORY_USAGE_AUTO
     };
 
     VkBuffer buffer;
@@ -837,8 +838,9 @@ auto vfx::Context::makeBuffer(BufferUsage target, u64 size) -> Arc<Buffer> {
     return out;
 }
 
-auto vfx::Context::makeBuffer(BufferUsage target, u64 size, const void* data) -> Arc<Buffer> {
-    auto out = makeBuffer(target, size);
+auto vfx::Context::makeBuffer(vk::BufferUsageFlags usage, u64 size, const void* data, VmaAllocationCreateFlags options) -> Arc<Buffer> {
+    auto out = makeBuffer(usage, size, options);
+    // todo: use transfer operation if buffer is not mappable
     out->update(data, size, 0);
     return out;
 }
