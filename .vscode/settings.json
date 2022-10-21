@@ -81,6 +81,7 @@
         "algorithm": "cpp",
         "cinttypes": "cpp",
         "codecvt": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "filesystem": "cpp"
     }
 }

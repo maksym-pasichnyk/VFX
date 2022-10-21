@@ -139,7 +139,7 @@ void ImGuiRenderer::createFontTexture() {
     ctx->IO.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
     auto font_texture_description = vfx::TextureDescription{
-        .format = vk::Format::eR8G8B8A8Unorm,
+        .format = vk::Format::eR8G8B8A8Srgb,
         .width = u32(width),
         .height = u32(height),
         .usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst
@@ -188,7 +188,7 @@ void ImGuiRenderer::createPipelineState() {
     }};
     description.vertexDescription = vertexDescription;
 
-    description.colorAttachmentFormats[0] = vk::Format::eR32G32B32A32Sfloat;
+    description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
 
     description.attachments[0].blendEnable = true;
     description.attachments[0].srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;

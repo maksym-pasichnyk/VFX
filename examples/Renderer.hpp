@@ -68,4 +68,8 @@ public:
 
     Globals globals{};
     Example example = Example::Cube;
+
+    bool enableHDR = true;
+    f32 exposure = 1.0f;
+    f32 gamma = 2.2f;
 };

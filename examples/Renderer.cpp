@@ -130,18 +130,6 @@ void Renderer::draw() {
         cmd->endRendering();
     }
 
-    auto gui_rendering_info = vfx::RenderingInfo{};
-    gui_rendering_info.renderArea = area;
-    gui_rendering_info.layerCount = 1;
-    gui_rendering_info.colorAttachments[0].texture = colorAttachmentTexture;
-    gui_rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-    gui_rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eLoad;
-    gui_rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
-
-    cmd->beginRendering(gui_rendering_info);
-    imgui->draw(cmd);
-    cmd->endRendering();
-
     auto drawable = swapchain->nextDrawable();
 
     encodePresent(cmd, drawable);
@@ -180,6 +168,12 @@ void Renderer::drawGui() {
 
         swapchain->updateDrawables();
     }
+
+    ImGui::Checkbox("HDR", &enableHDR);
+    ImGui::BeginDisabled(!enableHDR);
+    ImGui::DragFloat("Exposure", &exposure, 0.1f);
+    ImGui::DragFloat("Gamma", &gamma, 0.1f);
+    ImGui::EndDisabled();
 
     ImGui::End();
 }
@@ -259,14 +253,13 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
     cmd->beginRendering(present_rendering_info);
     cmd->setViewport(0, viewport);
 
-    vfx::int1 isDepthAttachment = 0;
-//        if (example == Example::SDF) {
-//            cmd->setScissor(0, area);
-//            cmd->setPipelineState(presentPipelineState);
-//            cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
-//            cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
-//            cmd->draw(6, 1, 0, 0);
-//        } else if (example == Example::Cube) {
+    struct Settings {
+        vk::Bool32 isDepthAttachment;
+        vk::Bool32 isHDREnabled;
+        vfx::float1 exposure;
+        vfx::float1 gamma;
+    } settings;
+
     auto colorArea = vk::Rect2D{};
     colorArea.setOffset(vk::Offset2D{0, 0});
     colorArea.setExtent(vk::Extent2D{u32(size.width) / 2, size.height});
@@ -275,21 +268,39 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
     depthArea.setOffset(vk::Offset2D{i32(size.width) / 2, 0});
     depthArea.setExtent(vk::Extent2D{u32(size.width) / 2, size.height});
 
-    isDepthAttachment = 0;
+    settings.isDepthAttachment = VK_FALSE;
+    settings.isHDREnabled      = enableHDR ? VK_TRUE : VK_FALSE;
+    settings.exposure          = exposure;
+    settings.gamma             = gamma;
 
     cmd->setScissor(0, colorArea);
-    cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
+    cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Settings), &settings);
     cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
     cmd->draw(6, 1, 0, 0);
 
-    isDepthAttachment = 1;
+    settings.isDepthAttachment = VK_TRUE;
+    settings.isHDREnabled      = enableHDR ? VK_TRUE : VK_FALSE;
+    settings.exposure          = exposure;
+    settings.gamma             = gamma;
 
     cmd->setScissor(0, depthArea);
-    cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(isDepthAttachment), &isDepthAttachment);
+    cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Settings), &settings);
     cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[1], 0, nullptr);
     cmd->draw(6, 1, 0, 0);
-//        }
 
+    cmd->endRendering();
+
+    auto gui_rendering_info = vfx::RenderingInfo{};
+    gui_rendering_info.renderArea = vk::Rect2D{.extent = drawable->texture->size};
+    gui_rendering_info.layerCount = 1;
+    gui_rendering_info.colorAttachments[0].texture = drawable->texture;
+    gui_rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    gui_rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eLoad;
+    gui_rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+
+    // Blend imgui on swapchain to avoid gamma correction
+    cmd->beginRendering(gui_rendering_info);
+    imgui->draw(cmd);
     cmd->endRendering();
 
     // todo: move to a better place
@@ -342,12 +353,6 @@ void Renderer::createAttachments() {
         .width = size.width,
         .height = size.height,
         .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
-        .components = {
-            .r = vk::ComponentSwizzle::eB,
-            .g = vk::ComponentSwizzle::eR,
-            .b = vk::ComponentSwizzle::eR,
-            .a = vk::ComponentSwizzle::eIdentity,
-        }
     };
     depthAttachmentTexture = context->makeTexture(depth_texture_description);
 }

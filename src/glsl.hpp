@@ -3,20 +3,20 @@
 #include "glm/gtx/compatibility.hpp"
 
 namespace vfx {
-    using bool1 [[gnu::aligned(4)]]  = glm::bool1;
-    using bool2 [[gnu::aligned(16)]] = glm::bool2;
-    using bool3 [[gnu::aligned(16)]] = glm::bool3;
-    using bool4 [[gnu::aligned(16)]] = glm::bool4;
+//    using bool1 [[gnu::aligned(4)]]  = glm::bool1;
+//    using bool2 [[gnu::aligned(16)]] = glm::bool2;
+//    using bool3 [[gnu::aligned(16)]] = glm::bool3;
+//    using bool4 [[gnu::aligned(16)]] = glm::bool4;
 
-    using bool2x2 [[gnu::aligned(16)]] = glm::bool2x2;
-    using bool2x3 [[gnu::aligned(16)]] = glm::bool2x3;
-    using bool2x4 [[gnu::aligned(16)]] = glm::bool2x4;
-    using bool3x2 [[gnu::aligned(16)]] = glm::bool3x2;
-    using bool3x3 [[gnu::aligned(16)]] = glm::bool3x3;
-    using bool3x4 [[gnu::aligned(16)]] = glm::bool3x4;
-    using bool4x2 [[gnu::aligned(16)]] = glm::bool4x2;
-    using bool4x3 [[gnu::aligned(16)]] = glm::bool4x3;
-    using bool4x4 [[gnu::aligned(16)]] = glm::bool4x4;
+//    using bool2x2 [[gnu::aligned(16)]] = glm::bool2x2;
+//    using bool2x3 [[gnu::aligned(16)]] = glm::bool2x3;
+//    using bool2x4 [[gnu::aligned(16)]] = glm::bool2x4;
+//    using bool3x2 [[gnu::aligned(16)]] = glm::bool3x2;
+//    using bool3x3 [[gnu::aligned(16)]] = glm::bool3x3;
+//    using bool3x4 [[gnu::aligned(16)]] = glm::bool3x4;
+//    using bool4x2 [[gnu::aligned(16)]] = glm::bool4x2;
+//    using bool4x3 [[gnu::aligned(16)]] = glm::bool4x3;
+//    using bool4x4 [[gnu::aligned(16)]] = glm::bool4x4;
 
     using int1 [[gnu::aligned(4)]]  = glm::i32;
     using int2 [[gnu::aligned(16)]] = glm::i32vec2;
