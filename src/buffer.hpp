@@ -14,10 +14,10 @@ namespace vfx {
 //        Constant = 1 << 4
 //    };
 
-    struct Context;
+    struct Device;
     struct Buffer {
     public:
-        Context* context{};
+        Device* device{};
         vk::Buffer handle{};
         VmaAllocation allocation{};
         VmaAllocationInfo allocationInfo{};

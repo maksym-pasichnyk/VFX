@@ -7,9 +7,9 @@
 #include "imgui.h"
 #include "DrawList.hpp"
 
-Renderer::Renderer(const Arc<vfx::Context>& context, const Arc<vfx::Swapchain>& swapchain, const Arc<Window>& window) : context(context), swapchain(swapchain) {
-    imgui = Arc<ImGuiRenderer>::alloc(context, window);
-    commandQueue = context->makeCommandQueue();
+Renderer::Renderer(const Arc<vfx::Device>& device, const Arc<vfx::Layer>& layer, const Arc<Window>& window) : device(device), layer(layer) {
+    imgui = Arc<ImGuiRenderer>::alloc(device, window);
+    commandQueue = device->makeCommandQueue();
 
     createSampler();
     createAttachments();
@@ -18,7 +18,7 @@ Renderer::Renderer(const Arc<vfx::Context>& context, const Arc<vfx::Swapchain>& 
     createPresentPipelineState();
     updateAttachmentDescriptors();
 
-    sceneConstantsBuffer = context->makeBuffer(
+    sceneConstantsBuffer = device->makeBuffer(
         vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst,
         sizeof(SceneConstants),
         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
@@ -27,7 +27,7 @@ Renderer::Renderer(const Arc<vfx::Context>& context, const Arc<vfx::Swapchain>& 
     sdfResourceGroup->setBuffer(sceneConstantsBuffer, 0, 0);
     cubeResourceGroup->setBuffer(sceneConstantsBuffer, 0, 0);
 
-    gameObject = Arc<GameObject>::alloc(context);
+    gameObject = Arc<GameObject>::alloc(device);
 }
 
 void Renderer::draw() {
@@ -72,7 +72,7 @@ void Renderer::draw() {
 
     auto area = vk::Rect2D{};
     area.setOffset(vk::Offset2D{0, 0});
-    area.setExtent(swapchain->drawableSize);
+    area.setExtent(layer->drawableSize);
 
     auto viewport = vk::Viewport{};
     viewport.setWidth(f32(area.extent.width));
@@ -156,7 +156,7 @@ void Renderer::draw() {
         cmd->endRendering();
     }
 
-    auto drawable = swapchain->nextDrawable();
+    auto drawable = layer->nextDrawable();
 
     encodePresent(cmd, drawable);
 
@@ -189,10 +189,10 @@ void Renderer::drawGui() {
         example = Example(item);
     }
 
-    if (ImGui::Checkbox("VSync", &swapchain->displaySyncEnabled)) {
-        context->device->waitIdle();
+    if (ImGui::Checkbox("VSync", &layer->displaySyncEnabled)) {
+        device->handle->waitIdle();
 
-        swapchain->updateDrawables();
+        layer->updateDrawables();
     }
 
     ImGui::Checkbox("HDR", &enableHDR);
@@ -358,11 +358,11 @@ void Renderer::createSampler() {
         .addressModeV = vk::SamplerAddressMode::eRepeat,
         .addressModeW = vk::SamplerAddressMode::eRepeat
     };
-    sampler = context->makeSampler(sampler_description);
+    sampler = device->makeSampler(sampler_description);
 }
 
 void Renderer::createAttachments() {
-    auto size = swapchain->drawableSize;
+    auto size = layer->drawableSize;
 
     sceneConstants.Resolution = vfx::int2(size.width, size.height);
 
@@ -372,7 +372,7 @@ void Renderer::createAttachments() {
         .height = size.height,
         .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled
     };
-    colorAttachmentTexture = context->makeTexture(color_texture_description);
+    colorAttachmentTexture = device->makeTexture(color_texture_description);
 
     auto depth_texture_description = vfx::TextureDescription{
         .format = vk::Format::eD32Sfloat,
@@ -380,7 +380,7 @@ void Renderer::createAttachments() {
         .height = size.height,
         .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
     };
-    depthAttachmentTexture = context->makeTexture(depth_texture_description);
+    depthAttachmentTexture = device->makeTexture(depth_texture_description);
 }
 
 void Renderer::createSDFPipelineState() {
@@ -403,14 +403,14 @@ void Renderer::createSDFPipelineState() {
     description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
     description.rasterizationState.lineWidth = 1.0f;
 
-    auto vertexLibrary = context->makeLibrary(Assets::readFile("shaders/sdf.vert.spv"));
-    auto fragmentLibrary = context->makeLibrary(Assets::readFile("shaders/sdf.frag.spv"));
+    auto vertexLibrary = device->makeLibrary(Assets::readFile("shaders/sdf.vert.spv"));
+    auto fragmentLibrary = device->makeLibrary(Assets::readFile("shaders/sdf.frag.spv"));
 
     description.vertexFunction = vertexLibrary->makeFunction("main");
     description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
-    sdfPipelineState = context->makePipelineState(description);
-    sdfResourceGroup = context->makeResourceGroup(sdfPipelineState->descriptorSetLayouts[0], {
+    sdfPipelineState = device->makePipelineState(description);
+    sdfResourceGroup = device->makeResourceGroup(sdfPipelineState->descriptorSetLayouts[0], {
         vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1}
     });
 }
@@ -446,14 +446,14 @@ void Renderer::createCubePipelineState() {
     description.rasterizationState.cullMode = vk::CullModeFlagBits::eNone;
     description.rasterizationState.lineWidth = 1.0f;
 
-    auto vertexLibrary = context->makeLibrary(Assets::readFile("shaders/cube.vert.spv"));
-    auto fragmentLibrary = context->makeLibrary(Assets::readFile("shaders/cube.frag.spv"));
+    auto vertexLibrary = device->makeLibrary(Assets::readFile("shaders/cube.vert.spv"));
+    auto fragmentLibrary = device->makeLibrary(Assets::readFile("shaders/cube.frag.spv"));
 
     description.vertexFunction = vertexLibrary->makeFunction("main");
     description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
-    cubePipelineState = context->makePipelineState(description);
-    cubeResourceGroup = context->makeResourceGroup(cubePipelineState->descriptorSetLayouts[0], {
+    cubePipelineState = device->makePipelineState(description);
+    cubeResourceGroup = device->makeResourceGroup(cubePipelineState->descriptorSetLayouts[0], {
         vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1}
     });
 }
@@ -461,7 +461,7 @@ void Renderer::createCubePipelineState() {
 void Renderer::createPresentPipelineState() {
     vfx::PipelineStateDescription description{};
 
-    description.colorAttachmentFormats[0] = swapchain->pixelFormat;
+    description.colorAttachmentFormats[0] = layer->pixelFormat;
 
     description.attachments[0].blendEnable = false;
     description.attachments[0].colorWriteMask =
@@ -473,14 +473,14 @@ void Renderer::createPresentPipelineState() {
     description.inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
     description.rasterizationState.lineWidth = 1.0f;
 
-    auto vertexLibrary = context->makeLibrary(Assets::readFile("shaders/blit.vert.spv"));
-    auto fragmentLibrary = context->makeLibrary(Assets::readFile("shaders/blit.frag.spv"));
+    auto vertexLibrary = device->makeLibrary(Assets::readFile("shaders/blit.vert.spv"));
+    auto fragmentLibrary = device->makeLibrary(Assets::readFile("shaders/blit.frag.spv"));
 
     description.vertexFunction = vertexLibrary->makeFunction("main");
     description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
-    presentPipelineState = context->makePipelineState(description);
-    presentResourceGroup = context->makeResourceGroup(presentPipelineState->descriptorSetLayouts[0], {
+    presentPipelineState = device->makePipelineState(description);
+    presentResourceGroup = device->makeResourceGroup(presentPipelineState->descriptorSetLayouts[0], {
         vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
         vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 2},
     });

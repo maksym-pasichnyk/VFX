@@ -1,13 +1,11 @@
 #include "pass.hpp"
 #include "group.hpp"
 #include "queue.hpp"
-#include "surface.hpp"
+#include "layer.hpp"
 #include "buffer.hpp"
-#include "context.hpp"
+#include "device.hpp"
 #include "texture.hpp"
 #include "material.hpp"
-#include "drawable.hpp"
-#include "swapchain.hpp"
 
 #include "spdlog/spdlog.h"
 
@@ -180,10 +178,10 @@ void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
     auto present_info = vk::PresentInfoKHR{};
     present_info.setWaitSemaphores(*semaphore);
     present_info.setSwapchainCount(1);
-    present_info.setPSwapchains(&*drawable->swapchain->handle);
+    present_info.setPSwapchains(&*drawable->layer->swapchain);
     present_info.setPImageIndices(&drawable->index);
 
-    vk::Result result = drawable->swapchain->context->present_queue.presentKHR(present_info);
+    vk::Result result = drawable->layer->device->present_queue.presentKHR(present_info);
 
     if (result == vk::Result::eErrorOutOfDateKHR) {
         spdlog::info("Swapchain is out of date");
@@ -292,7 +290,7 @@ void vfx::CommandBuffer::drawIndexed(u32 indexCount, u32 instanceCount, u32 firs
 }
 
 void vfx::CommandBuffer::waitUntilCompleted() {
-    std::ignore = commandQueue->context->device->waitForFences(*fence, VK_TRUE, std::numeric_limits<u64>::max());
+    std::ignore = commandQueue->device->handle->waitForFences(*fence, VK_TRUE, std::numeric_limits<u64>::max());
 }
 
 void vfx::CommandBuffer::flushBarriers() {
@@ -341,14 +339,14 @@ void vfx::CommandBuffer::bindVertexBuffer(int firstBinding, const Arc<Buffer>& b
 vfx::CommandQueue::CommandQueue() {}
 
 vfx::CommandQueue::~CommandQueue() {
-    context->freeCommandQueue(this);
+    device->freeCommandQueue(this);
 }
 
 auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
     for (auto& cmd : retainedList) {
-        vk::Result result = context->device->getFenceStatus(*cmd->fence);
+        vk::Result result = device->handle->getFenceStatus(*cmd->fence);
         if (result == vk::Result::eSuccess) {
-            std::ignore = context->device->resetFences(1, &*cmd->fence);
+            std::ignore = device->handle->resetFences(1, &*cmd->fence);
             // todo: release references to resources after execution completed
             cmd->releaseReferences();
             return &*cmd;
@@ -363,24 +361,24 @@ auto vfx::CommandQueue::makeCommandBuffer() -> vfx::CommandBuffer* {
 
     auto out = Arc<CommandBuffer>::alloc();
     out->retainedReferences = true;
-    out->context = context;
+    out->device = device;
     out->commandQueue = this;
-    out->handle = std::move(context->device->allocateCommandBuffersUnique(command_buffers_allocate_info)[0]);
+    out->handle = std::move(device->handle->allocateCommandBuffersUnique(command_buffers_allocate_info)[0]);
 
     vk::FenceCreateInfo fence_create_info{};
-    out->fence = context->device->createFenceUnique(fence_create_info);
+    out->fence = device->handle->createFenceUnique(fence_create_info);
 
     vk::SemaphoreCreateInfo semaphore_create_info{};
-    out->semaphore = context->device->createSemaphoreUnique(semaphore_create_info);
+    out->semaphore = device->handle->createSemaphoreUnique(semaphore_create_info);
 
     return &*retainedList.emplace_back(std::move(out));
 }
 
 auto vfx::CommandQueue::makeCommandBufferWithUnretainedReferences() -> vfx::CommandBuffer* {
     for (auto& cmd : unretainedList) {
-        vk::Result result = context->device->getFenceStatus(*cmd->fence);
+        vk::Result result = device->handle->getFenceStatus(*cmd->fence);
         if (result == vk::Result::eSuccess) {
-            std::ignore = context->device->resetFences(1, &*cmd->fence);
+            std::ignore = device->handle->resetFences(1, &*cmd->fence);
             // todo: release references to resources after execution completed
             cmd->releaseReferences();
             return &*cmd;
@@ -395,15 +393,15 @@ auto vfx::CommandQueue::makeCommandBufferWithUnretainedReferences() -> vfx::Comm
 
     auto out = Arc<CommandBuffer>::alloc();
     out->retainedReferences = false;
-    out->context = context;
+    out->device = device;
     out->commandQueue = this;
-    out->handle = std::move(context->device->allocateCommandBuffersUnique(command_buffers_allocate_info)[0]);
+    out->handle = std::move(device->handle->allocateCommandBuffersUnique(command_buffers_allocate_info)[0]);
 
     vk::FenceCreateInfo fence_create_info{};
-    out->fence = context->device->createFenceUnique(fence_create_info);
+    out->fence = device->handle->createFenceUnique(fence_create_info);
 
     vk::SemaphoreCreateInfo semaphore_create_info{};
-    out->semaphore = context->device->createSemaphoreUnique(semaphore_create_info);
+    out->semaphore = device->handle->createSemaphoreUnique(semaphore_create_info);
 
     return &*unretainedList.emplace_back(std::move(out));
 }

@@ -7,12 +7,12 @@
 
 namespace vfx {
     struct Buffer;
-    struct Context;
+    struct Device;
     struct Texture;
     struct Sampler;
     struct ResourceGroup {
     public:
-        Context* context;
+        Device* device;
         vk::DescriptorPool pool{};
         vk::DescriptorSet set{};
 

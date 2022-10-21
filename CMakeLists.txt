@@ -66,26 +66,21 @@ add_library(VFX STATIC
     src/context.hpp
     src/texture.hpp
     src/buffer.hpp
-    src/surface.hpp
-    src/surface.cpp
-    src/pass.hpp
+        src/pass.hpp
     src/material.hpp
     src/assets.hpp
     src/vulkan.cpp
     src/delegate.hpp
     src/signal.hpp
-    src/swapchain.hpp
-    src/drawable.hpp
-    src/queue.hpp
+        src/queue.hpp
     src/queue.cpp
     src/texture.cpp
     src/buffer.cpp
-    src/swapchain.cpp
-    src/context.cpp
+        src/context.cpp
     src/material.cpp
     src/pass.cpp
     src/glsl.hpp
-        src/group.cpp src/group.hpp)
+        src/group.cpp src/group.hpp src/layer.cpp src/layer.hpp src/device.cpp src/device.hpp)
 target_include_directories(VFX PUBLIC src)
 target_link_libraries(VFX PUBLIC
     glm

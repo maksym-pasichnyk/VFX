@@ -1,12 +1,12 @@
 #include "group.hpp"
+#include "device.hpp"
 #include "buffer.hpp"
 #include "texture.hpp"
-#include "context.hpp"
 
 vfx::ResourceGroup::ResourceGroup() {}
 
 vfx::ResourceGroup::~ResourceGroup() {
-    context->freeResourceGroup(this);
+    device->freeResourceGroup(this);
 }
 
 void vfx::ResourceGroup::setBuffer(const Arc<Buffer>& buffer, u64 offset, u32 binding) {
@@ -23,7 +23,7 @@ void vfx::ResourceGroup::setBuffer(const Arc<Buffer>& buffer, u64 offset, u32 bi
         .descriptorType = vk::DescriptorType::eUniformBuffer,
         .pBufferInfo = &descriptor_buffer_info
     };
-    context->device->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr);
+    device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr);
 }
 
 void vfx::ResourceGroup::setTexture(const Arc<Texture>& texture, u32 binding) {
@@ -39,7 +39,7 @@ void vfx::ResourceGroup::setTexture(const Arc<Texture>& texture, u32 binding) {
         .descriptorType = vk::DescriptorType::eSampledImage,
         .pImageInfo = &descriptor_image_info
     };
-    context->device->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr);
+    device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr);
 }
 
 void vfx::ResourceGroup::setSampler(const Arc<Sampler>& sampler, u32 binding) {
@@ -54,7 +54,7 @@ void vfx::ResourceGroup::setSampler(const Arc<Sampler>& sampler, u32 binding) {
         .descriptorType = vk::DescriptorType::eSampler,
         .pImageInfo = &descriptor_image_info
     };
-    context->device->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr);
+    device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr);
 }
 
 void vfx::ResourceGroup::setLabel(const std::string& name) {
@@ -63,12 +63,12 @@ void vfx::ResourceGroup::setLabel(const std::string& name) {
     pool_info.setObject(u64(VkDescriptorPool(pool)));
     pool_info.setPObjectName(name.c_str());
 
-    context->device->debugMarkerSetObjectNameEXT(pool_info);
+    device->handle->debugMarkerSetObjectNameEXT(pool_info);
 
     vk::DebugMarkerObjectNameInfoEXT set_info = {};
     set_info.setObjectType(vk::DebugReportObjectTypeEXT::eDescriptorSet);
     set_info.setObject(u64(VkDescriptorSet(set)));
     set_info.setPObjectName(name.c_str());
 
-    context->device->debugMarkerSetObjectNameEXT(pool_info);
+    device->handle->debugMarkerSetObjectNameEXT(pool_info);
 }

@@ -1,12 +1,12 @@
 #include "texture.hpp"
-#include "context.hpp"
+#include "device.hpp"
 #include "buffer.hpp"
 #include "queue.hpp"
 
 vfx::Sampler::Sampler() {}
 
 vfx::Sampler::~Sampler() {
-    context->freeSampler(this);
+    device->freeSampler(this);
 }
 
 void vfx::Sampler::setLabel(const std::string& name) {
@@ -15,17 +15,17 @@ void vfx::Sampler::setLabel(const std::string& name) {
     info.setObject(u64(VkSampler(handle)));
     info.setPObjectName(name.c_str());
 
-    context->device->debugMarkerSetObjectNameEXT(info);
+    device->handle->debugMarkerSetObjectNameEXT(info);
 }
 
 vfx::Texture::Texture() {}
 
 vfx::Texture::~Texture() {
-    context->freeTexture(this);
+    device->freeTexture(this);
 }
 
 void vfx::Texture::setPixelData(std::span<const glm::u8vec4> pixels) {
-    auto tmp = context->makeBuffer(
+    auto tmp = device->makeBuffer(
         vk::BufferUsageFlagBits::eTransferSrc,
         pixels.size_bytes(), pixels.data(),
         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
@@ -42,7 +42,7 @@ void vfx::Texture::setPixelData(std::span<const glm::u8vec4> pixels) {
         }
     };
 
-    auto queue = context->makeCommandQueue();
+    auto queue = device->makeCommandQueue();
     auto cmd = queue->makeCommandBufferWithUnretainedReferences();
 
     cmd->begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
@@ -92,12 +92,12 @@ void vfx::Texture::setLabel(const std::string& name) {
     image_info.setObject(u64(VkImage(image)));
     image_info.setPObjectName(name.c_str());
 
-    context->device->debugMarkerSetObjectNameEXT(image_info);
+    device->handle->debugMarkerSetObjectNameEXT(image_info);
 
     vk::DebugMarkerObjectNameInfoEXT view_info = {};
     view_info.setObjectType(vk::DebugReportObjectTypeEXT::eImageView);
     view_info.setObject(u64(VkImageView(view)));
     view_info.setPObjectName(name.c_str());
 
-    context->device->debugMarkerSetObjectNameEXT(view_info);
+    device->handle->debugMarkerSetObjectNameEXT(view_info);
 }

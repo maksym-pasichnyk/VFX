@@ -24,8 +24,7 @@ public:
     void setResizable(bool resizable);
 
     auto shouldClose() -> bool;
-
-    auto makeSurface(const Arc<vfx::Context>& context) -> Arc<vfx::Surface>;
+    auto makeSurface(const Arc<vfx::Context>& context) -> vk::UniqueSurfaceKHR;
 
 private:
     void windowDidResize();

@@ -16,7 +16,7 @@ private:
     ModelConstants constants{};
 
 public:
-    explicit GameObject(const Arc<vfx::Context>& context);
+    explicit GameObject(const Arc<vfx::Device>& device);
 
 public:
     void draw(vfx::CommandBuffer* cmd) override;

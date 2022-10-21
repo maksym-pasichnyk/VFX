@@ -1,10 +1,10 @@
 #include "material.hpp"
-#include "context.hpp"
+#include "device.hpp"
 
 vfx::Library::Library() {}
 
 vfx::Library::~Library() {
-    context->freeLibrary(this);
+    device->freeLibrary(this);
 }
 
 auto vfx::Library::makeFunction(std::string name) -> Arc<Function> {
@@ -17,5 +17,5 @@ auto vfx::Library::makeFunction(std::string name) -> Arc<Function> {
 vfx::PipelineState::PipelineState() {}
 
 vfx::PipelineState::~PipelineState() {
-    context->freePipelineState(this);
+    device->freePipelineState(this);
 }

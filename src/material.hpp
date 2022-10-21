@@ -10,12 +10,12 @@
 #include <vulkan/vulkan.hpp>
 
 namespace vfx {
-    struct Context;
+    struct Device;
     struct Function;
 
     struct Library : std::enable_shared_from_this<Library> {
     public:
-        Context* context = {};
+        Device* device = {};
         vk::ShaderModule module = {};
         SpvReflectShaderModule reflect = {};
 
@@ -103,7 +103,7 @@ namespace vfx {
 
     struct PipelineState {
     public:
-        Context* context{};
+        Device* device{};
 //        PipelineStateDescription description{};
 
         vk::Pipeline pipeline{};

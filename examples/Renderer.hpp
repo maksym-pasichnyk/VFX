@@ -13,8 +13,8 @@ struct Renderer {
 
 public:
     Renderer(
-        const Arc<vfx::Context>& context,
-        const Arc<vfx::Swapchain>& swapchain,
+        const Arc<vfx::Device>& device,
+        const Arc<vfx::Layer>& layer,
         const Arc<Window>& window
     );
 
@@ -34,8 +34,9 @@ private:
     void encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable);
 
 public:
-    Arc<vfx::Context> context{};
-    Arc<vfx::Swapchain> swapchain{};
+    Arc<vfx::Device> device{};
+    Arc<vfx::Layer> layer{};
+
     Arc<ImGuiRenderer> imgui{};
 
     Arc<vfx::CommandQueue> commandQueue{};

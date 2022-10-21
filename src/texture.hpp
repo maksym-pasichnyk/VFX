@@ -7,7 +7,7 @@
 #include <vulkan/vulkan.hpp>
 
 namespace vfx {
-    struct Context;
+    struct Device;
     struct TextureDescription {
         vk::Format format = vk::Format::eUndefined;
         u32 width = 0;
@@ -18,7 +18,7 @@ namespace vfx {
 
     struct Sampler {
     public:
-        Context* context{};
+        Device* device{};
         vk::Sampler handle{};
 
     public:
@@ -31,7 +31,7 @@ namespace vfx {
 
     struct Texture {
     public:
-        Context* context{};
+        Device* device{};
         vk::Extent2D size{};
         vk::Format format{};
         vk::Image image{};

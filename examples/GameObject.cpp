@@ -1,7 +1,7 @@
 #include "GameObject.hpp"
 #include "DrawList.hpp"
 
-GameObject::GameObject(const Arc<vfx::Context>& context) {
+GameObject::GameObject(const Arc<vfx::Device>& device) {
     mesh = Arc<Mesh>::alloc();
 
     DrawList drawList{};
@@ -11,7 +11,7 @@ GameObject::GameObject(const Arc<vfx::Context>& context) {
     auto indices = std::span(drawList.indices);
 
     mesh->indexCount = indices.size();
-    mesh->indexBuffer = context->makeBuffer(
+    mesh->indexBuffer = device->makeBuffer(
         vk::BufferUsageFlagBits::eIndexBuffer,
         indices.size_bytes(),
         indices.data(),
@@ -20,7 +20,7 @@ GameObject::GameObject(const Arc<vfx::Context>& context) {
 
     auto vertices = std::span(drawList.vertices);
     mesh->vertexCount = indices.size();
-    mesh->vertexBuffer = context->makeBuffer(
+    mesh->vertexBuffer = device->makeBuffer(
         vk::BufferUsageFlagBits::eVertexBuffer,
         vertices.size_bytes(),
         vertices.data(),

@@ -1,10 +1,8 @@
 #include "pass.hpp"
-#include "context.hpp"
+#include "device.hpp"
 
-vfx::RenderPass::RenderPass() {
-
-}
+vfx::RenderPass::RenderPass() {}
 
 vfx::RenderPass::~RenderPass() {
-    context->freeRenderPass(this);
+    device->freeRenderPass(this);
 }

@@ -34,10 +34,10 @@ namespace vfx {
         AttachmentDescriptionArray attachments{};
     };
 
-    struct Context;
+    struct Device;
     struct RenderPass {
     public:
-        Context* context{};
+        Device* device{};
         vk::RenderPass handle{};
 
     public:

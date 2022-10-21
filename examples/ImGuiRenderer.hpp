@@ -8,7 +8,7 @@ struct ImDrawData;
 struct ImGuiContext;
 struct ImGuiRenderer {
 public:
-    ImGuiRenderer(const Arc<vfx::Context>& context, const Arc<Window>& window);
+    ImGuiRenderer(const Arc<vfx::Device>& device, const Arc<Window>& window);
     ~ImGuiRenderer();
 
 public:
@@ -23,7 +23,7 @@ private:
 
 private:
     ImGuiContext* ctx;
-    Arc<vfx::Context> context{};
+    Arc<vfx::Device> device{};
     Arc<vfx::Sampler> fontSampler{};
     Arc<vfx::Texture> fontTexture{};
     Arc<vfx::PipelineState> pipelineState{};

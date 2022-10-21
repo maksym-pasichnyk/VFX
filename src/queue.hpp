@@ -71,13 +71,13 @@ namespace vfx {
     };
 
     struct Buffer;
-    struct Context;
+    struct Device;
     struct Drawable;
     struct CommandQueue;
     struct PipelineState;
     struct ResourceGroup;
     struct CommandBuffer final {
-        friend Context;
+        friend Device;
         friend CommandQueue;
 
     private:
@@ -96,7 +96,7 @@ namespace vfx {
         std::set<Arc<ResourceGroup>> resourceGroupReferences{};
 
     public:
-        Context* context{};
+        Device* device{};
         CommandQueue* commandQueue{};
 
         vk::UniqueFence fence{};
@@ -137,7 +137,7 @@ namespace vfx {
     };
 
     struct CommandQueue final {
-        friend Context;
+        friend Device;
         friend CommandBuffer;
 
     public:
@@ -149,7 +149,7 @@ namespace vfx {
         auto makeCommandBufferWithUnretainedReferences() -> CommandBuffer*;
 
     private:
-        Context* context{};
+        Device* device{};
 
         vk::Queue handle{};
         vk::CommandPool pool{};

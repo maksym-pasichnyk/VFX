@@ -6,7 +6,7 @@
 #include "imgui_internal.h"
 #include "backends/imgui_impl_glfw.cpp"
 
-ImGuiRenderer::ImGuiRenderer(const Arc<vfx::Context>& context, const Arc<Window>& window) : context(context) {
+ImGuiRenderer::ImGuiRenderer(const Arc<vfx::Device>& device, const Arc<Window>& window) : device(device) {
     IMGUI_CHECKVERSION();
     ctx = ImGui::CreateContext();
 
@@ -74,12 +74,12 @@ void ImGuiRenderer::draw(vfx::CommandBuffer* cmd) {
     mesh->indexCount = data->TotalIdxCount;
     mesh->vertexCount = data->TotalVtxCount;
 
-    mesh->indexBuffer = context->makeBuffer(
+    mesh->indexBuffer = device->makeBuffer(
         vk::BufferUsageFlagBits::eIndexBuffer,
         mesh->indexCount * sizeof(ImDrawIdx),
         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
     );
-    mesh->vertexBuffer = context->makeBuffer(
+    mesh->vertexBuffer = device->makeBuffer(
         vk::BufferUsageFlagBits::eVertexBuffer,
         mesh->vertexCount * sizeof(ImDrawVert),
         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
@@ -152,7 +152,7 @@ void ImGuiRenderer::createFontTexture() {
         .height = u32(height),
         .usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst
     };
-    fontTexture = context->makeTexture(font_texture_description);
+    fontTexture = device->makeTexture(font_texture_description);
 
     auto font_sampler_description = vk::SamplerCreateInfo{
         .magFilter = vk::Filter::eLinear,
@@ -162,7 +162,7 @@ void ImGuiRenderer::createFontTexture() {
         .addressModeV = vk::SamplerAddressMode::eRepeat,
         .addressModeW = vk::SamplerAddressMode::eRepeat
     };
-    fontSampler = context->makeSampler(font_sampler_description);
+    fontSampler = device->makeSampler(font_sampler_description);
     fontTexture->setPixelData(std::span(reinterpret_cast<const glm::u8vec4 *>(pixels), width * height));
     ctx->IO.Fonts->SetTexID(fontTexture.get());
 
@@ -203,14 +203,14 @@ void ImGuiRenderer::createPipelineState() {
 
     description.rasterizationState.lineWidth = 1.0f;
 
-    auto vertexLibrary = context->makeLibrary(Assets::readFile("shaders/imgui.vert.spv"));
-    auto fragmentLibrary = context->makeLibrary(Assets::readFile("shaders/imgui.frag.spv"));
+    auto vertexLibrary = device->makeLibrary(Assets::readFile("shaders/imgui.vert.spv"));
+    auto fragmentLibrary = device->makeLibrary(Assets::readFile("shaders/imgui.frag.spv"));
 
     description.vertexFunction = vertexLibrary->makeFunction("main");
     description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
-    pipelineState = context->makePipelineState(description);
-    resourceGroup = context->makeResourceGroup(pipelineState->descriptorSetLayouts[0], {
+    pipelineState = device->makePipelineState(description);
+    resourceGroup = device->makeResourceGroup(pipelineState->descriptorSetLayouts[0], {
         vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
         vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 1}
     });

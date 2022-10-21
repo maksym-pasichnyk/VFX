@@ -8,8 +8,10 @@
 struct DemoApplication : Application, WindowDelegate {
 private:
     Arc<Window> window{};
+
     Arc<vfx::Context> context{};
-    Arc<vfx::Swapchain> swapchain{};
+    Arc<vfx::Device> device{};
+    Arc<vfx::Layer> layer{};
 
     Arc<Renderer> renderer{};
 
@@ -20,20 +22,21 @@ public:
         window->delegate = this;
 
         setenv("VFX_ENABLE_API_VALIDATION", "1", 1);
-        context = vfx::createSystemDefaultContext();
+        context = Arc<vfx::Context>::alloc();
+        device = Arc<vfx::Device>::alloc(context);
 
-        swapchain = Arc<vfx::Swapchain>::alloc(context);
-        swapchain->surface = window->makeSurface(context);
-        swapchain->colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
-        swapchain->pixelFormat = vk::Format::eB8G8R8A8Unorm;
-        swapchain->displaySyncEnabled = true;
-        swapchain->updateDrawables();
+        layer = Arc<vfx::Layer>::alloc(device);
+        layer->surface = window->makeSurface(context);
+        layer->colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
+        layer->pixelFormat = vk::Format::eB8G8R8A8Unorm;
+        layer->displaySyncEnabled = true;
+        layer->updateDrawables();
 
-        renderer = Arc<Renderer>::alloc(context, swapchain, window);
+        renderer = Arc<Renderer>::alloc(device, layer, window);
     }
 
     ~DemoApplication() override {
-        context->device->waitIdle();
+        device->handle->waitIdle();
     }
 
     void run() {
@@ -59,8 +62,8 @@ public:
 
 public:
     void windowDidResize() override {
-        context->device->waitIdle();
-        swapchain->updateDrawables();
+        device->handle->waitIdle();
+        layer->updateDrawables();
 
         renderer->resize();
         renderer->draw();
