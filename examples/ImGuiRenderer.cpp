@@ -232,12 +232,11 @@ void ImGuiRenderer::setupRenderState(ImDrawData* data, vfx::CommandBuffer* cmd, 
         -(pos * inv_size + 1.0f)
     };
 
-    cmd->handle->pushConstants(
-        pipelineState->pipelineLayout,
+    cmd->pushConstants(
+        pipelineState,
         vk::ShaderStageFlagBits::eVertex,
         0,
         std::span(transform).size_bytes(),
-        transform.data(),
-        device->interface
+        transform.data()
     );
 }

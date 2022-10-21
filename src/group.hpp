@@ -12,9 +12,9 @@ namespace vfx {
     struct Sampler;
     struct ResourceGroup {
     public:
-        Device* device;
-        vk::DescriptorPool pool{};
+        Device* device{};
         vk::DescriptorSet set{};
+        vk::DescriptorPool pool{};
 
     public:
         ResourceGroup();

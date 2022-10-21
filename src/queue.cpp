@@ -9,58 +9,6 @@
 
 #include "spdlog/spdlog.h"
 
-namespace {
-    void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const vfx::RenderingColorAttachmentInfo& in) {
-        auto clearValue = vk::ClearColorValue{
-            .float32 = std::array{
-                in.clearColor.red,
-                in.clearColor.greed,
-                in.clearColor.blue,
-                in.clearColor.alpha
-            }
-        };
-
-        out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
-        out.imageLayout = in.imageLayout;
-        out.resolveMode = in.resolveMode;
-        out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
-        out.resolveImageLayout = in.resolveImageLayout;
-        out.loadOp = in.loadOp;
-        out.storeOp = in.storeOp;
-        out.clearValue.setColor(clearValue);
-    }
-
-    void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const vfx::RenderingDepthAttachmentInfo& in) {
-        auto clear_value = vk::ClearDepthStencilValue {
-            .depth = in.clearDepth
-        };
-
-        out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
-        out.imageLayout = in.imageLayout;
-        out.resolveMode = in.resolveMode;
-        out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
-        out.resolveImageLayout = in.resolveImageLayout;
-        out.loadOp = in.loadOp;
-        out.storeOp = in.storeOp;
-        out.clearValue.setDepthStencil(clear_value);
-    }
-
-    void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const vfx::RenderingStencilAttachmentInfo& in) {
-        auto clearValue = vk::ClearDepthStencilValue {
-            .stencil = in.clearStencil
-        };
-
-        out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
-        out.imageLayout = in.imageLayout;
-        out.resolveMode = in.resolveMode;
-        out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
-        out.resolveImageLayout = in.resolveImageLayout;
-        out.loadOp = in.loadOp;
-        out.storeOp = in.storeOp;
-        out.clearValue.setDepthStencil(clearValue);
-    }
-}
-
 void vfx::CommandBuffer::reset() {
 }
 
@@ -68,6 +16,56 @@ void vfx::CommandBuffer::releaseReferences() {
     bufferReferences.clear();
     textureReferences.clear();
     resourceGroupReferences.clear();
+}
+
+void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const vfx::RenderingColorAttachmentInfo& in) {
+    auto clearValue = vk::ClearColorValue{
+        .float32 = std::array{
+            in.clearColor.red,
+            in.clearColor.greed,
+            in.clearColor.blue,
+            in.clearColor.alpha
+        }
+    };
+
+    out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
+    out.imageLayout = in.imageLayout;
+    out.resolveMode = in.resolveMode;
+    out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
+    out.resolveImageLayout = in.resolveImageLayout;
+    out.loadOp = in.loadOp;
+    out.storeOp = in.storeOp;
+    out.clearValue.setColor(clearValue);
+}
+
+void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const vfx::RenderingDepthAttachmentInfo& in) {
+    auto clear_value = vk::ClearDepthStencilValue {
+        .depth = in.clearDepth
+    };
+
+    out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
+    out.imageLayout = in.imageLayout;
+    out.resolveMode = in.resolveMode;
+    out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
+    out.resolveImageLayout = in.resolveImageLayout;
+    out.loadOp = in.loadOp;
+    out.storeOp = in.storeOp;
+    out.clearValue.setDepthStencil(clear_value);
+}
+
+void vfx::CommandBuffer::fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const vfx::RenderingStencilAttachmentInfo& in) {
+    auto clearValue = vk::ClearDepthStencilValue {
+        .stencil = in.clearStencil
+    };
+
+    out.imageView = in.texture ? in.texture->view : VK_NULL_HANDLE;
+    out.imageLayout = in.imageLayout;
+    out.resolveMode = in.resolveMode;
+    out.resolveImageView = in.resolveTexture ? in.resolveTexture->view : VK_NULL_HANDLE;
+    out.resolveImageLayout = in.resolveImageLayout;
+    out.loadOp = in.loadOp;
+    out.storeOp = in.storeOp;
+    out.clearValue.setDepthStencil(clearValue);
 }
 
 //auto vfx::CommandBuffer::makePipeline(i32 subpass) -> vk::Pipeline {
@@ -202,6 +200,10 @@ void vfx::CommandBuffer::setResourceGroup(const Arc<PipelineState>& state, const
     }
 
     handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, state->pipelineLayout, index, 1, &group->set, 0, nullptr, device->interface);
+}
+
+void vfx::CommandBuffer::pushConstants(const Arc<PipelineState>& state, vk::ShaderStageFlags stageFlags, u32 offset, u32 size, const void* data) {
+    handle->pushConstants(state->pipelineLayout, stageFlags, offset, size, data, device->interface);
 }
 
 //void vfx::CommandBuffer::beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents) {

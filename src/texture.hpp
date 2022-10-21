@@ -7,7 +7,12 @@
 #include <vulkan/vulkan.hpp>
 
 namespace vfx {
+    struct Layer;
     struct Device;
+    struct Drawable;
+    struct CommandQueue;
+    struct ResourceGroup;
+
     struct TextureDescription {
         vk::Format format = vk::Format::eUndefined;
         u32 width = 0;
@@ -17,7 +22,13 @@ namespace vfx {
     };
 
     struct Sampler {
-    public:
+        friend Layer;
+        friend Device;
+        friend Drawable;
+        friend CommandQueue;
+        friend ResourceGroup;
+
+    private:
         Device* device{};
         vk::Sampler handle{};
 

@@ -36,7 +36,7 @@ public:
     }
 
     ~DemoApplication() override {
-        device->handle->waitIdle(device->interface);
+        device->waitIdle();
     }
 
     void run() {
@@ -62,7 +62,7 @@ public:
 
 public:
     void windowDidResize() override {
-        device->handle->waitIdle(device->interface);
+        device->waitIdle();
         layer->updateDrawables();
 
         renderer->resize();

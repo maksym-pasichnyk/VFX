@@ -357,6 +357,10 @@ vfx::Device::~Device() {
     vmaDestroyAllocator(allocator);
 }
 
+void vfx::Device::waitIdle() {
+    handle->waitIdle(interface);
+}
+
 void vfx::Device::select_physical_device(const Arc<Context>& context) {
     gpu = context->instance->enumeratePhysicalDevices(context->interface)[0];
 

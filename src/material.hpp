@@ -104,8 +104,6 @@ namespace vfx {
     struct PipelineState {
     public:
         Device* device{};
-//        PipelineStateDescription description{};
-
         vk::Pipeline pipeline{};
         vk::PipelineLayout pipelineLayout{};
         std::vector<vk::DescriptorSetLayout> descriptorSetLayouts{};

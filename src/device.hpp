@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.hpp>
 
 namespace vfx {
+    struct Layer;
     struct Buffer;
     struct Texture;
     struct Context;
@@ -16,6 +17,7 @@ namespace vfx {
     struct Drawable;
     struct RenderPass;
     struct CommandQueue;
+    struct CommandBuffer;
     struct PipelineState;
     struct ResourceGroup;
     struct TextureDescription;
@@ -49,6 +51,8 @@ namespace vfx {
         void create_memory_allocator(const Arc<Context>& context);
 
     public:
+        void waitIdle();
+
         auto makeRenderPass(const RenderPassDescription& description) -> Arc<RenderPass>;
         void freeRenderPass(RenderPass* pass);
 

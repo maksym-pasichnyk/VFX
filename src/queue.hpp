@@ -106,6 +106,10 @@ namespace vfx {
     private:
         void reset();
         void releaseReferences();
+
+        void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const vfx::RenderingColorAttachmentInfo& in);
+        void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const vfx::RenderingDepthAttachmentInfo& in);
+        void fillAttachmentInfo(vk::RenderingAttachmentInfo& out, const vfx::RenderingStencilAttachmentInfo& in);
 //        auto makePipeline(i32 subpass) -> vk::Pipeline;
 
     public:
@@ -116,6 +120,7 @@ namespace vfx {
         void present(Drawable* drawable);
         void setPipelineState(const Arc<PipelineState>& state);
         void setResourceGroup(const Arc<PipelineState>& state, const Arc<ResourceGroup>& group, u32 index);
+        void pushConstants(const Arc<PipelineState>& state, vk::ShaderStageFlags stageFlags, u32 offset, u32 size, const void* data);
 //        void beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents);
 //        void endRenderPass();
         void beginRendering(const RenderingInfo& description);
