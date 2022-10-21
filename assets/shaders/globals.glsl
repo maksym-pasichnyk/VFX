@@ -1,7 +1,7 @@
 #ifndef VFX_GLOBALS
 #define VFX_GLOBALS
 
-layout(push_constant) uniform Globals {
+layout(set = 0, binding = 0) uniform SceneConstants {
     mat4 ViewMatrix;
     mat4 ProjectionMatrix;
     mat4 ViewProjectionMatrix;
@@ -11,7 +11,9 @@ layout(push_constant) uniform Globals {
 
     ivec2 Resolution;
     float Time;
+};
 
+layout(push_constant) uniform ModelConstants {
     mat4 ModelMatrix;
 };
 

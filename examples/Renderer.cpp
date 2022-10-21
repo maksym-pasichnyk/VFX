@@ -18,6 +18,33 @@ Renderer::Renderer(const Arc<vfx::Context>& context, const Arc<vfx::Swapchain>& 
     createPresentPipelineState();
     updateAttachmentDescriptors();
 
+    sceneConstantsBuffer = context->makeBuffer(vfx::BufferUsage::Constant, sizeof(SceneConstants));
+
+    auto global_buffer_info = vk::DescriptorBufferInfo {
+        .buffer = sceneConstantsBuffer->handle,
+        .offset = 0,
+        .range = sizeof(SceneConstants)
+    };
+
+    context->device->updateDescriptorSets({
+        vk::WriteDescriptorSet{
+            .dstSet = sdfPipelineStateDescriptorSet,
+            .dstBinding = 0,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .pBufferInfo = &global_buffer_info
+        },
+        vk::WriteDescriptorSet{
+            .dstSet = cubePipelineStateDescriptorSet,
+            .dstBinding = 0,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .pBufferInfo = &global_buffer_info
+        }
+    }, {});
+
     gameObject = Arc<GameObject>::alloc(context);
 }
 
@@ -76,13 +103,15 @@ void Renderer::draw() {
 
     f32 aspect = viewport.width / viewport.height;
 
-    globals.Time = Time::timeSinceStart;
-    globals.CameraPosition = glm::vec3(glm::sin(globals.Time) * 3.0f, 3.0f, glm::cos(globals.Time) * 3.0f);
-    globals.ViewMatrix = glm::lookAtLH(globals.CameraPosition, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    globals.ProjectionMatrix = Camera::getInfinityProjectionMatrix(60.0f, aspect, 0.01f);
-    globals.ViewProjectionMatrix = globals.ProjectionMatrix * globals.ViewMatrix;
-    globals.InverseViewProjectionMatrix = glm::inverse(globals.ViewProjectionMatrix);
-    globals.ModelMatrix = glm::mat4(1.0f);
+    sceneConstants.Time = Time::timeSinceStart;
+    sceneConstants.CameraPosition = glm::vec3(glm::sin(sceneConstants.Time) * 3.0f, 3.0f, glm::cos(sceneConstants.Time) * 3.0f);
+    sceneConstants.ViewMatrix = glm::lookAtLH(sceneConstants.CameraPosition, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    sceneConstants.ProjectionMatrix = Camera::getInfinityProjectionMatrix(60.0f, aspect, 0.01f);
+    sceneConstants.ViewProjectionMatrix = sceneConstants.ProjectionMatrix * sceneConstants.ViewMatrix;
+    sceneConstants.InverseViewProjectionMatrix = glm::inverse(sceneConstants.ViewProjectionMatrix);
+    sceneConstantsBuffer->update(&sceneConstants, sizeof(SceneConstants), 0);
+
+    modelConstants.ModelMatrix = glm::mat4(1.0f);
 
     if (example == Example::SDF) {
         auto sdf_rendering_info = vfx::RenderingInfo{};
@@ -100,9 +129,10 @@ void Renderer::draw() {
         sdf_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
         sdf_rendering_info.depthAttachment.clearDepth = 0.0f;
 
+        cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, sdfPipelineState->pipelineLayout, 0, 1, &sdfPipelineStateDescriptorSet, 0, nullptr);
         cmd->setPipelineState(sdfPipelineState);
         cmd->beginRendering(sdf_rendering_info);
-        cmd->handle->pushConstants(sdfPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
+        cmd->handle->pushConstants(sdfPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(ModelConstants), &modelConstants);
         cmd->draw(6, 1, 0, 0);
         cmd->endRendering();
     } else if (example == Example::Cube) {
@@ -121,10 +151,10 @@ void Renderer::draw() {
         cube_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
         cube_rendering_info.depthAttachment.clearDepth = 0.0f;
 
+        cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, cubePipelineState->pipelineLayout, 0, 1, &cubePipelineStateDescriptorSet, 0, nullptr);
         cmd->setPipelineState(cubePipelineState);
         cmd->beginRendering(cube_rendering_info);
-        cmd->handle->pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(Globals), &globals);
-
+        cmd->handle->pushConstants(cubePipelineState->pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(ModelConstants), &modelConstants);
         gameObject->draw(cmd);
 
         cmd->endRendering();
@@ -156,7 +186,7 @@ void Renderer::drawGui() {
     ImGui::Begin("Stats");
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-    std::array<const char*, 2> items = { "SDF", "Cube" };
+    std::array<const char*, 2> items = { "Raymarhing", "Cube" };
 
     i32 item = i32(example);
     if (ImGui::Combo(items[u64(example)], &item, items.data(), items.size())) {
@@ -275,7 +305,7 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
 
     cmd->setScissor(0, colorArea);
     cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Settings), &settings);
-    cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[0], 0, nullptr);
+    cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &presentPipelineStateDescriptorSets[0], 0, nullptr);
     cmd->draw(6, 1, 0, 0);
 
     settings.isDepthAttachment = VK_TRUE;
@@ -285,7 +315,7 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
 
     cmd->setScissor(0, depthArea);
     cmd->handle->pushConstants(presentPipelineState->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Settings), &settings);
-    cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &descriptor_sets[1], 0, nullptr);
+    cmd->handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, presentPipelineState->pipelineLayout, 0, 1, &presentPipelineStateDescriptorSets[1], 0, nullptr);
     cmd->draw(6, 1, 0, 0);
 
     cmd->endRendering();
@@ -338,7 +368,7 @@ void Renderer::createSampler() {
 void Renderer::createAttachments() {
     auto size = swapchain->drawableSize;
 
-    globals.Resolution = vfx::int2(size.width, size.height);
+    sceneConstants.Resolution = vfx::int2(size.width, size.height);
 
     auto color_texture_description = vfx::TextureDescription{
         .format = vk::Format::eR32G32B32A32Sfloat,
@@ -384,6 +414,19 @@ void Renderer::createSDFPipelineState() {
     description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
     sdfPipelineState = context->makePipelineState(description);
+
+    auto pool_sizes = std::array{
+        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1},
+    };
+    auto pool_create_info = vk::DescriptorPoolCreateInfo{};
+    pool_create_info.setMaxSets(1);
+    pool_create_info.setPoolSizes(pool_sizes);
+    sdfPipelineStateDescriptorPool = context->device->createDescriptorPoolUnique(pool_create_info);
+
+    auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
+    ds_allocate_info.setDescriptorPool(*sdfPipelineStateDescriptorPool);
+    ds_allocate_info.setSetLayouts(sdfPipelineState->descriptorSetLayouts);
+    sdfPipelineStateDescriptorSet = context->device->allocateDescriptorSets(ds_allocate_info)[0];
 }
 
 void Renderer::createCubePipelineState() {
@@ -424,6 +467,19 @@ void Renderer::createCubePipelineState() {
     description.fragmentFunction = fragmentLibrary->makeFunction("main");
 
     cubePipelineState = context->makePipelineState(description);
+
+    auto pool_sizes = std::array{
+        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1},
+    };
+    auto pool_create_info = vk::DescriptorPoolCreateInfo{};
+    pool_create_info.setMaxSets(1);
+    pool_create_info.setPoolSizes(pool_sizes);
+    cubePipelineStateDescriptorPool = context->device->createDescriptorPoolUnique(pool_create_info);
+
+    auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
+    ds_allocate_info.setDescriptorPool(*cubePipelineStateDescriptorPool);
+    ds_allocate_info.setSetLayouts(cubePipelineState->descriptorSetLayouts);
+    cubePipelineStateDescriptorSet = context->device->allocateDescriptorSets(ds_allocate_info)[0];
 }
 
 void Renderer::createPresentPipelineState() {
@@ -456,17 +512,17 @@ void Renderer::createPresentPipelineState() {
     auto pool_create_info = vk::DescriptorPoolCreateInfo{};
     pool_create_info.setMaxSets(2);
     pool_create_info.setPoolSizes(pool_sizes);
-    descriptor_pool = context->device->createDescriptorPoolUnique(pool_create_info, nullptr);
+    presentPipelineStateDescriptorPool = context->device->createDescriptorPoolUnique(pool_create_info);
 
-    descriptor_sets.resize(2);
+    presentPipelineStateDescriptorSets.resize(2);
 
     auto ds_allocate_info = vk::DescriptorSetAllocateInfo{};
-    ds_allocate_info.setDescriptorPool(*descriptor_pool);
+    ds_allocate_info.setDescriptorPool(*presentPipelineStateDescriptorPool);
     ds_allocate_info.setSetLayouts(presentPipelineState->descriptorSetLayouts);
-    descriptor_sets[0] = context->device->allocateDescriptorSets(ds_allocate_info)[0];
+    presentPipelineStateDescriptorSets[0] = context->device->allocateDescriptorSets(ds_allocate_info)[0];
 
     ds_allocate_info.setSetLayouts(presentPipelineState->descriptorSetLayouts);
-    descriptor_sets[1] = context->device->allocateDescriptorSets(ds_allocate_info)[0];
+    presentPipelineStateDescriptorSets[1] = context->device->allocateDescriptorSets(ds_allocate_info)[0];
 }
 
 void Renderer::updateAttachmentDescriptors() {
@@ -483,7 +539,7 @@ void Renderer::updateAttachmentDescriptors() {
     };
     context->device->updateDescriptorSets({
         vk::WriteDescriptorSet{
-            .dstSet = descriptor_sets[0],
+            .dstSet = presentPipelineStateDescriptorSets[0],
             .dstBinding = 0,
             .dstArrayElement = 0,
             .descriptorCount = 1,
@@ -491,7 +547,7 @@ void Renderer::updateAttachmentDescriptors() {
             .pImageInfo = &color_image_info
         },
         vk::WriteDescriptorSet{
-            .dstSet = descriptor_sets[0],
+            .dstSet = presentPipelineStateDescriptorSets[0],
             .dstBinding = 1,
             .dstArrayElement = 0,
             .descriptorCount = 1,
@@ -499,7 +555,7 @@ void Renderer::updateAttachmentDescriptors() {
             .pImageInfo = &sampler_image_info
         },
         vk::WriteDescriptorSet{
-            .dstSet = descriptor_sets[1],
+            .dstSet = presentPipelineStateDescriptorSets[1],
             .dstBinding = 0,
             .dstArrayElement = 0,
             .descriptorCount = 1,
@@ -507,7 +563,7 @@ void Renderer::updateAttachmentDescriptors() {
             .pImageInfo = &depth_image_info
         },
         vk::WriteDescriptorSet{
-            .dstSet = descriptor_sets[1],
+            .dstSet = presentPipelineStateDescriptorSets[1],
             .dstBinding = 1,
             .dstArrayElement = 0,
             .descriptorCount = 1,

@@ -70,7 +70,7 @@ namespace vfx {
         void freeSampler(Sampler* sampler);
 
         auto makeBuffer(BufferUsage target, u64 size) -> Arc<Buffer>;
-        auto makeBuffer(BufferUsage target, void* src, u64 size) -> Arc<Buffer>;
+        auto makeBuffer(BufferUsage target, u64 size, const void* data) -> Arc<Buffer>;
         void freeBuffer(Buffer* buffer);
 
         auto makeLibrary(const std::vector<char>& bytes) -> Arc<Library>;

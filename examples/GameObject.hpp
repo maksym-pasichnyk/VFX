@@ -13,6 +13,7 @@ struct Renderable {
 struct GameObject : Renderable {
 private:
     Arc<Mesh> mesh{};
+    ModelConstants constants{};
 
 public:
     explicit GameObject(const Arc<vfx::Context>& context);

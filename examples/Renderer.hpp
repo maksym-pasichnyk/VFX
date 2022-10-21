@@ -11,19 +11,6 @@ struct Renderer {
         Cube
     };
 
-    struct Globals {
-        vfx::float4x4 ViewMatrix;
-        vfx::float4x4 ProjectionMatrix;
-        vfx::float4x4 ViewProjectionMatrix;
-        vfx::float4x4 InverseViewProjectionMatrix;
-        vfx::float3   CameraPosition;
-        vfx::int2     Resolution;
-        vfx::float1   Time;
-
-        // todo: move to per-object data
-        vfx::float4x4 ModelMatrix;
-    };
-
 public:
     Renderer(
         const Arc<vfx::Context>& context,
@@ -60,13 +47,24 @@ public:
     Arc<vfx::Texture> colorAttachmentTexture{};
     Arc<vfx::Texture> depthAttachmentTexture{};
 
+
     // todo: bindless
-    vk::UniqueDescriptorPool descriptor_pool{};
-    std::vector<vk::DescriptorSet> descriptor_sets{};
+    vk::UniqueDescriptorPool sdfPipelineStateDescriptorPool{};
+    vk::DescriptorSet sdfPipelineStateDescriptorSet{};
+
+    vk::UniqueDescriptorPool cubePipelineStateDescriptorPool{};
+    vk::DescriptorSet cubePipelineStateDescriptorSet{};
+
+    vk::UniqueDescriptorPool presentPipelineStateDescriptorPool{};
+    std::vector<vk::DescriptorSet> presentPipelineStateDescriptorSets{};
 
     Arc<GameObject> gameObject{};
 
-    Globals globals{};
+    SceneConstants sceneConstants{};
+    Arc<vfx::Buffer> sceneConstantsBuffer{};
+
+    ModelConstants modelConstants{};
+
     Example example = Example::Cube;
 
     bool enableHDR = true;

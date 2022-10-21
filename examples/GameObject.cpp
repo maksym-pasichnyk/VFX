@@ -13,16 +13,16 @@ GameObject::GameObject(const Arc<vfx::Context>& context) {
     mesh->indexCount = indices.size();
     mesh->indexBuffer = context->makeBuffer(
         vfx::BufferUsage::Index,
-        indices.data(),
-        indices.size_bytes()
+        indices.size_bytes(),
+        indices.data()
     );
 
     auto vertices = std::span(drawList.vertices);
     mesh->vertexCount = indices.size();
     mesh->vertexBuffer = context->makeBuffer(
         vfx::BufferUsage::Vertex,
-        vertices.data(),
-        vertices.size_bytes()
+        vertices.size_bytes(),
+        vertices.data()
     );
 }
 

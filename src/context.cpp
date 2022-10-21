@@ -454,7 +454,7 @@ auto vfx::createSystemDefaultContext() -> Arc<Context> {
     });
 }
 
-vfx::Context::Context(const vfx::ContextDescription& description) {
+vfx::Context::Context(const ContextDescription& description) {
     create_instance(description);
     select_physical_device();
     create_logical_device();
@@ -465,7 +465,7 @@ vfx::Context::~Context() {
     vmaDestroyAllocator(allocator);
 }
 
-void vfx::Context::create_instance(const vfx::ContextDescription& description) {
+void vfx::Context::create_instance(const ContextDescription& description) {
     vk::defaultDispatchLoaderDynamic.init(dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
 
     auto application_info = vk::ApplicationInfo{
@@ -699,7 +699,7 @@ void vfx::Context::create_memory_allocator() {
     vmaCreateAllocator(&allocator_create_info, &allocator);
 }
 
-auto vfx::Context::makeRenderPass(const vfx::RenderPassDescription& description) -> Arc<RenderPass> {
+auto vfx::Context::makeRenderPass(const RenderPassDescription& description) -> Arc<RenderPass> {
     std::vector<vk::SubpassDescription> subpasses{};
     subpasses.resize(description.definitions.size());
 
@@ -738,7 +738,7 @@ void vfx::Context::freeRenderPass(RenderPass* pass) {
     device->destroyRenderPass(pass->handle);
 }
 
-auto vfx::Context::makeTexture(const vfx::TextureDescription& description) -> Arc<Texture> {
+auto vfx::Context::makeTexture(const TextureDescription& description) -> Arc<Texture> {
     const auto image_create_info = static_cast<VkImageCreateInfo>(vk::ImageCreateInfo{
         .imageType = vk::ImageType::e2D,
         .format = description.format,
@@ -803,7 +803,7 @@ void vfx::Context::freeSampler(Sampler* sampler) {
     device->destroySampler(sampler->handle);
 }
 
-auto vfx::Context::makeBuffer(vfx::BufferUsage target, u64 size) -> Arc<Buffer> {
+auto vfx::Context::makeBuffer(BufferUsage target, u64 size) -> Arc<Buffer> {
     const auto buffer_create_info = static_cast<VkBufferCreateInfo>(vk::BufferCreateInfo {
         .size = static_cast<vk::DeviceSize>(size),
         .usage = get_buffer_usage_from_target(target)
@@ -834,9 +834,9 @@ auto vfx::Context::makeBuffer(vfx::BufferUsage target, u64 size) -> Arc<Buffer> 
     return out;
 }
 
-auto vfx::Context::makeBuffer(BufferUsage target, void* src, u64 size) -> Arc<Buffer> {
+auto vfx::Context::makeBuffer(BufferUsage target, u64 size, const void* data) -> Arc<Buffer> {
     auto out = makeBuffer(target, size);
-    out->update(src, size, 0);
+    out->update(data, size, 0);
     return out;
 }
 
@@ -876,6 +876,32 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
 
     struct DescriptorSetDescription {
         std::vector<vk::DescriptorSetLayoutBinding> bindings{};
+
+        /*
+        binding
+        descriptorType
+        descriptorCount
+        stageFlags
+        pImmutableSamplers
+        */
+
+        void add(const vk::DescriptorSetLayoutBinding& inBinding) {
+            for (auto& binding : bindings) {
+                if (canMerge(binding, inBinding)) {
+                    binding.stageFlags |= inBinding.stageFlags;
+                    return;
+                }
+            }
+            bindings.emplace_back(inBinding);
+        }
+
+        static auto canMerge(const vk::DescriptorSetLayoutBinding& first, const vk::DescriptorSetLayoutBinding& second) -> bool {
+            // todo: check immutable samplers
+
+            return first.binding == second.binding
+                && first.descriptorType == second.descriptorType
+                && first.descriptorCount == second.descriptorCount;
+        }
     };
 
     std::vector<vk::PushConstantRange> constant_ranges{};
@@ -921,7 +947,7 @@ auto vfx::Context::makePipelineState(const vfx::PipelineStateDescription& descri
                     .stageFlags = stage_flags,
                     .pImmutableSamplers = nullptr
                 };
-                descriptor_set_descriptions.at(refl_set.set).bindings.emplace_back(binding);
+                descriptor_set_descriptions.at(refl_set.set).add(binding);
             }
         }
     };
