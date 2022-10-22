@@ -22,13 +22,7 @@ namespace vfx {
     };
 
     struct Sampler {
-        friend Layer;
-        friend Device;
-        friend Drawable;
-        friend CommandQueue;
-        friend ResourceGroup;
-
-    private:
+    public:
         Device* device{};
         vk::Sampler handle{};
 
