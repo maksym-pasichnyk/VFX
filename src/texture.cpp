@@ -24,10 +24,10 @@ vfx::Texture::~Texture() {
     device->freeTexture(this);
 }
 
-void vfx::Texture::setPixelData(std::span<const glm::u8vec4> pixels) {
+void vfx::Texture::update(const void* data, u64 _size) {
     auto tmp = device->makeBuffer(
         vk::BufferUsageFlagBits::eTransferSrc,
-        pixels.size_bytes(), pixels.data(),
+        _size, data,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
     );
     const auto region = vk::BufferImageCopy{

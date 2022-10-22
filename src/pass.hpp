@@ -3,7 +3,7 @@
 #include "types.hpp"
 
 #include <vector>
-#include <tl/optional.hpp>
+#include <optional>
 #include <vulkan/vulkan.hpp>
 
 namespace vfx {
@@ -12,7 +12,7 @@ namespace vfx {
         std::vector<vk::AttachmentReference> inputAttachments{};
         std::vector<vk::AttachmentReference> colorAttachments{};
         std::vector<vk::AttachmentReference> resolveAttachments{};
-        tl::optional<vk::AttachmentReference> depthStencilAttachment{};
+        std::optional<vk::AttachmentReference> depthStencilAttachment{};
         std::vector<u32> preserveAttachments{};
     };
 

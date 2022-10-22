@@ -81,7 +81,6 @@ add_library(VFX STATIC
     src/context.cpp
     src/material.cpp
     src/pass.cpp
-    src/glsl.hpp
     src/group.cpp
     src/group.hpp
     src/layer.cpp
@@ -91,13 +90,9 @@ add_library(VFX STATIC
 )
 target_include_directories(VFX PUBLIC src)
 target_link_libraries(VFX PUBLIC
-    glm
     glfw
-    EnTT
-    imgui
     spdlog
     range-v3
-    tl::optional
     Vulkan::Vulkan
     spirv-reflect-static
     VulkanMemoryAllocator
@@ -137,7 +132,13 @@ add_executable(VFX-example
     examples/Mesh.cpp
     examples/Mesh.hpp
 )
-target_link_libraries(VFX-example PRIVATE VFX)
+target_link_libraries(VFX-example PRIVATE
+    glm
+    VFX
+    EnTT
+    imgui
+    tl::optional
+)
 target_compile_shaders(VFX-example
     assets/shaders/sdf.frag
     assets/shaders/sdf.vert

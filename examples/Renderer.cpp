@@ -283,8 +283,8 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
     struct Settings {
         vk::Bool32 isDepthAttachment;
         vk::Bool32 isHDREnabled;
-        vfx::float1 exposure;
-        vfx::float1 gamma;
+        float1 exposure;
+        float1 gamma;
     } settings;
 
     auto colorArea = vk::Rect2D{};
@@ -363,7 +363,7 @@ void Renderer::createSampler() {
 void Renderer::createAttachments() {
     auto size = layer->drawableSize;
 
-    sceneConstants.Resolution = vfx::int2(size.width, size.height);
+    sceneConstants.Resolution = glm::ivec2(size.width, size.height);
 
     auto color_texture_description = vfx::TextureDescription{
         .format = vk::Format::eR32G32B32A32Sfloat,

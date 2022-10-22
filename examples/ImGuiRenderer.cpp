@@ -163,7 +163,7 @@ void ImGuiRenderer::createFontTexture() {
         .addressModeW = vk::SamplerAddressMode::eRepeat
     };
     fontSampler = device->makeSampler(font_sampler_description);
-    fontTexture->setPixelData(std::span(reinterpret_cast<const glm::u8vec4 *>(pixels), width * height));
+    fontTexture->update(pixels, width * height * sizeof(u32));
     ctx->IO.Fonts->SetTexID(fontTexture.get());
 
     resourceGroup->setSampler(fontSampler, 0);

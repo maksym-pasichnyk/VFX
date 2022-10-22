@@ -2,7 +2,6 @@
 
 #include "types.hpp"
 
-#include <glm/vec4.hpp>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 
@@ -49,7 +48,7 @@ namespace vfx {
         ~Texture();
 
     public:
-        void setPixelData(std::span<const glm::u8vec4> pixels);
+        void update(const void* data, u64 _size);
         void setLabel(const std::string& name);
     };
 }
