@@ -107,8 +107,6 @@ void Renderer::draw() {
 //    });
 //    cmd->flushBarriers();
 
-    modelConstants.ModelMatrix = glm::mat4(1.0f);
-
     if (example == Example::SDF) {
         auto sdf_rendering_info = vfx::RenderingInfo{};
         sdf_rendering_info.renderArea = area;
@@ -128,7 +126,6 @@ void Renderer::draw() {
         cmd->setPipelineState(sdfPipelineState);
         cmd->setResourceGroup(sdfPipelineState, sdfResourceGroup, 0);
         cmd->beginRendering(sdf_rendering_info);
-        cmd->pushConstants(sdfPipelineState, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(ModelConstants), &modelConstants);
         cmd->draw(6, 1, 0, 0);
         cmd->endRendering();
     } else if (example == Example::Cube) {
@@ -147,12 +144,14 @@ void Renderer::draw() {
         cube_rendering_info.depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
         cube_rendering_info.depthAttachment.clearDepth = 0.0f;
 
+        ObjectConstants objectConstants{};
+        objectConstants.transform = gameObject->getTransformMatrix();
+
         cmd->setPipelineState(cubePipelineState);
         cmd->setResourceGroup(cubePipelineState, cubeResourceGroup, 0);
         cmd->beginRendering(cube_rendering_info);
-        cmd->pushConstants(cubePipelineState, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(ModelConstants), &modelConstants);
+        cmd->pushConstants(cubePipelineState, vk::ShaderStageFlagBits::eVertex /*| vk::ShaderStageFlagBits::eFragment*/, 0, sizeof(ObjectConstants), &objectConstants);
         gameObject->draw(cmd);
-
         cmd->endRendering();
     }
 
@@ -410,7 +409,7 @@ void Renderer::createSDFPipelineState() {
 
     sdfPipelineState = device->makePipelineState(description);
     sdfResourceGroup = device->makeResourceGroup(sdfPipelineState->descriptorSetLayouts[0], {
-        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1}
+        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 2}
     });
 }
 
@@ -453,7 +452,7 @@ void Renderer::createCubePipelineState() {
 
     cubePipelineState = device->makePipelineState(description);
     cubeResourceGroup = device->makeResourceGroup(cubePipelineState->descriptorSetLayouts[0], {
-        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1}
+        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 2}
     });
 }
 

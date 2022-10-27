@@ -3,8 +3,8 @@
 #include "Core.hpp"
 
 struct Window;
-struct ImGuiRenderer;
 struct GameObject;
+struct ImGuiRenderer;
 struct Renderer {
     enum class Example {
         SDF,
@@ -56,8 +56,6 @@ public:
 
     SceneConstants sceneConstants{};
     Arc<vfx::Buffer> sceneConstantsBuffer{};
-
-    ModelConstants modelConstants{};
 
     Example example = Example::Cube;
 

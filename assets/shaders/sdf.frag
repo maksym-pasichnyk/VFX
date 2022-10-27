@@ -2,6 +2,8 @@
 
 #include "globals.glsl"
 
+layout(set = 0, binding = 0) uniform SceneConstantData { SceneConstants sceneConstants; };
+
 layout(location = 0) out vec4 out_color;
 
 layout(location = 0) in struct {
@@ -253,14 +255,14 @@ vec2 getLight(vec3 point) {
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 uv = 2.0f * fragCoord - 1.0f;
-    vec3 rd = normalize(vec3(InverseViewProjectionMatrix * vec4(uv, 0.0f, 1.0f)));
-    vec3 ro = CameraPosition;
+    vec3 rd = normalize(vec3(sceneConstants.InverseViewProjectionMatrix * vec4(uv, 0.0f, 1.0f)));
+    vec3 ro = sceneConstants.CameraPosition;
 
     vec3 p = ro + rd * render(Ray(ro, rd));
 
     vec2 light = getLight(p);
 
-    vec4 position = ViewProjectionMatrix * vec4(p, 1.0f);
+    vec4 position = sceneConstants.ViewProjectionMatrix * vec4(p, 1.0f);
     float depth = position.z + position.w + 0.01f;
 
     vec3 color = vec3(1.0f / depth) * vec3(1, 0, 0);

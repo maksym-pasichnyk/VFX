@@ -1,7 +1,7 @@
 #ifndef VFX_GLOBALS
 #define VFX_GLOBALS
 
-layout(set = 0, binding = 0) uniform SceneConstants {
+struct SceneConstants {
     mat4 ViewMatrix;
     mat4 ProjectionMatrix;
     mat4 ViewProjectionMatrix;
@@ -13,8 +13,26 @@ layout(set = 0, binding = 0) uniform SceneConstants {
     float Time;
 };
 
-layout(push_constant) uniform ModelConstants {
-    mat4 ModelMatrix;
+struct ObjectConstants {
+    mat4 transform;
 };
+
+struct MaterialConstants {
+    vec4 color;
+    vec3 ambient;
+};
+
+struct LightConstants {
+    vec3 position;
+    vec3 color;
+
+    float brightness;
+    float intensity;
+};
+
+layout(push_constant) uniform ObjectConstantData {
+    ObjectConstants objectConstants;
+};
+
 
 #endif

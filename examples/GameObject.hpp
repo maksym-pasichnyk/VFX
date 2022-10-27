@@ -13,11 +13,14 @@ struct Renderable {
 struct GameObject : Renderable {
 private:
     Arc<Mesh> mesh{};
-    ModelConstants constants{};
+    glm::vec3 position = {};
+    glm::vec3 rotation = {};
+    glm::vec3 scale    = {};
 
 public:
     explicit GameObject(const Arc<vfx::Device>& device);
 
 public:
     void draw(vfx::CommandBuffer* cmd) override;
+    auto getTransformMatrix() const -> glm::mat4x4;
 };

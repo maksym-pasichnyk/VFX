@@ -86,6 +86,19 @@ struct SceneConstants {
     float1   Time;
 };
 
-struct ModelConstants {
-    float4x4 ModelMatrix;
+struct ObjectConstants {
+    float4x4 transform;
+};
+
+struct Material {
+    float4 color;
+    float3 ambient;
+};
+
+struct Light {
+    float3 position;
+    float3 color;
+
+    float brightness;
+    float intensity;
 };
