@@ -86,8 +86,6 @@ void Renderer::draw() {
     f32 aspect = viewport.width / viewport.height;
 
     sceneConstants.Time = Time::timeSinceStart;
-    sceneConstants.CameraPosition = glm::vec3(glm::sin(sceneConstants.Time) * 3.0f, 3.0f, glm::cos(sceneConstants.Time) * 3.0f);
-    sceneConstants.ViewMatrix = glm::lookAtLH(sceneConstants.CameraPosition, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
     sceneConstants.ProjectionMatrix = Camera::getInfinityProjectionMatrix(60.0f, aspect, 0.01f);
     sceneConstants.ViewProjectionMatrix = sceneConstants.ProjectionMatrix * sceneConstants.ViewMatrix;
     sceneConstants.InverseViewProjectionMatrix = glm::inverse(sceneConstants.ViewProjectionMatrix);
@@ -173,6 +171,13 @@ void Renderer::update() {
 void Renderer::resize() {
     createAttachments();
     updateAttachmentDescriptors();
+}
+
+void Renderer::setPositionAndRotation(const glm::vec3& position, const glm::vec3& rotation) {
+    auto orientation = glm::mat4x4(glm::quat(glm::radians(rotation)));
+
+    sceneConstants.CameraPosition = position;
+    sceneConstants.ViewMatrix = glm::inverse(glm::translate(glm::mat4(1.0f), position) * orientation);
 }
 
 void Renderer::drawGui() {
@@ -279,39 +284,17 @@ void Renderer::encodePresent(vfx::CommandBuffer* cmd, vfx::Drawable* drawable) {
     cmd->beginRendering(present_rendering_info);
     cmd->setViewport(0, viewport);
 
-    struct Settings {
-        vk::Bool32 isDepthAttachment;
-        vk::Bool32 isHDREnabled;
-        float1 exposure;
-        float1 gamma;
-    } settings;
-
     auto colorArea = vk::Rect2D{};
     colorArea.setOffset(vk::Offset2D{0, 0});
-    colorArea.setExtent(vk::Extent2D{u32(size.width) / 2, size.height});
+    colorArea.setExtent(size);
 
-    auto depthArea = vk::Rect2D{};
-    depthArea.setOffset(vk::Offset2D{i32(size.width) / 2, 0});
-    depthArea.setExtent(vk::Extent2D{u32(size.width) / 2, size.height});
-
-    settings.isDepthAttachment = VK_FALSE;
-    settings.isHDREnabled      = enableHDR ? VK_TRUE : VK_FALSE;
+    HDRSettings settings{};
     settings.exposure          = exposure;
     settings.gamma             = gamma;
 
     cmd->setScissor(0, colorArea);
-    cmd->pushConstants(presentPipelineState, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Settings), &settings);
+    cmd->pushConstants(presentPipelineState, vk::ShaderStageFlagBits::eFragment, 0, sizeof(HDRSettings), &settings);
     cmd->draw(6, 1, 0, 0);
-
-    settings.isDepthAttachment = VK_TRUE;
-    settings.isHDREnabled      = enableHDR ? VK_TRUE : VK_FALSE;
-    settings.exposure          = exposure;
-    settings.gamma             = gamma;
-
-    cmd->setScissor(0, depthArea);
-    cmd->pushConstants(presentPipelineState, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Settings), &settings);
-    cmd->draw(6, 1, 0, 0);
-
     cmd->endRendering();
 
     auto gui_rendering_info = vfx::RenderingInfo{};

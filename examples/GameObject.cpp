@@ -35,10 +35,6 @@ void GameObject::draw(vfx::CommandBuffer* cmd) {
 }
 
 auto GameObject::getTransformMatrix() const -> glm::mat4x4 {
-    glm::mat4x4 orientation = glm::yawPitchRoll(
-        glm::radians(rotation.y),
-        glm::radians(rotation.x),
-        glm::radians(rotation.z)
-    );
+    auto orientation = glm::mat4x4(glm::quat(glm::radians(rotation)));
     return glm::inverse(glm::translate(glm::mat4(1.0f), position) * orientation);
 }

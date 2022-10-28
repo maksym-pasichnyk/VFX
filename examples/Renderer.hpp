@@ -6,6 +6,11 @@ struct Window;
 struct GameObject;
 struct ImGuiRenderer;
 struct Renderer {
+    struct HDRSettings {
+        float1 exposure;
+        float1 gamma;
+    };
+
     enum class Example {
         SDF,
         Cube
@@ -21,6 +26,8 @@ public:
     void draw();
     void update();
     void resize();
+
+    void setPositionAndRotation(const glm::vec3& position, const glm::vec3& rotation);
 
 private:
     void createSampler();
