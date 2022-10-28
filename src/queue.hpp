@@ -6,6 +6,7 @@
 #include <set>
 #include <tuple>
 #include <vector>
+#include <concepts>
 #include <vulkan/vulkan.hpp>
 
 namespace vfx {
@@ -14,6 +15,19 @@ namespace vfx {
         f32 greed = 0.0f;
         f32 blue  = 0.0f;
         f32 alpha = 0.0f;
+
+        static auto init(f32 r, f32 g, f32 b, f32 a) -> ClearColor {
+            return { r, g, b, a };
+        }
+
+        static auto init(i32 r, i32 g, i32 b, i32 a) -> ClearColor {
+            return {
+                std::clamp(f32(r) / 255.f, 0.f, 1.f),
+                std::clamp(f32(g) / 255.f, 0.f, 1.f),
+                std::clamp(f32(b) / 255.f, 0.f, 1.f),
+                std::clamp(f32(a) / 255.f, 0.f, 1.f)
+            };
+        }
     };
 
     struct Texture;
