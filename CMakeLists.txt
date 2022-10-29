@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 project(VFX)
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 set(GLFW_LIBRARY_TYPE "STATIC")
 
 set(SPIRV_REFLECT_EXAMPLES OFF)
@@ -15,12 +12,8 @@ set(VMA_DYNAMIC_VULKAN_FUNCTIONS ON)
 
 find_package(Vulkan REQUIRED)
 
-add_subdirectory(deps/glm)
 add_subdirectory(deps/glfw)
-add_subdirectory(deps/entt)
 add_subdirectory(deps/spdlog)
-add_subdirectory(deps/range-v3)
-add_subdirectory(deps/optional)
 add_subdirectory(deps/SPIRV-Reflect)
 add_subdirectory(deps/VulkanMemoryAllocator)
 
@@ -45,63 +38,45 @@ function(target_compile_shaders TARGET)
     add_dependencies(${TARGET} ${TARGET}_shaders)
 endfunction()
 
-add_library(imgui STATIC
-    deps/imgui/imgui.h
-    deps/imgui/imgui.cpp
-    deps/imgui/imconfig.h
-    deps/imgui/imgui_draw.cpp
-    deps/imgui/imgui_tables.cpp
-    deps/imgui/imgui_internal.h
-    deps/imgui/imgui_widgets.cpp
-    deps/imgui/misc/cpp/imgui_stdlib.h
-    deps/imgui/misc/cpp/imgui_stdlib.cpp
-)
-set_target_properties(imgui PROPERTIES
+add_library(VFX STATIC
+    src/vfx/types.hpp
+    src/vfx/context.hpp
+    src/vfx/texture.hpp
+    src/vfx/buffer.hpp
+    src/vfx/pass.hpp
+    src/vfx/material.hpp
+    src/vfx/assets.hpp
+    src/vfx/delegate.hpp
+    src/vfx/signal.hpp
+    src/vfx/queue.hpp
+    src/vfx/queue.cpp
+    src/vfx/texture.cpp
+    src/vfx/buffer.cpp
+    src/vfx/context.cpp
+    src/vfx/material.cpp
+    src/vfx/pass.cpp
+    src/vfx/group.cpp
+    src/vfx/group.hpp
+    src/vfx/layer.cpp
+    src/vfx/layer.hpp
+    src/vfx/device.cpp
+    src/vfx/device.hpp
+        src/vfx/vfx.hpp)
+set_target_properties(VFX PROPERTIES
     CXX_EXTENSIONS OFF
-    CXX_STANDARD 20
+    CXX_STANDARD 23
     CXX_STANDARD_REQUIRED ON
 )
-target_include_directories(imgui PUBLIC deps/imgui)
-target_compile_definitions(imgui PUBLIC -DIMGUI_DEFINE_MATH_OPERATORS)
-
-add_library(VFX STATIC
-    src/types.hpp
-    src/context.hpp
-    src/texture.hpp
-    src/buffer.hpp
-    src/pass.hpp
-    src/material.hpp
-    src/assets.hpp
-    src/delegate.hpp
-    src/signal.hpp
-    src/queue.hpp
-    src/queue.cpp
-    src/texture.cpp
-    src/buffer.cpp
-    src/context.cpp
-    src/material.cpp
-    src/pass.cpp
-    src/group.cpp
-    src/group.hpp
-    src/layer.cpp
-    src/layer.hpp
-    src/device.cpp
-    src/device.hpp
-)
-target_include_directories(VFX PUBLIC src)
 target_link_libraries(VFX PUBLIC
     glfw
     spdlog
-    range-v3
     Vulkan::Vulkan
     spirv-reflect-static
     VulkanMemoryAllocator
 )
+target_include_directories(VFX PUBLIC src)
 target_compile_definitions(VFX PUBLIC
     -D_USE_MATH_DEFINES
-    -DGLM_FORCE_XYZW_ONLY
-    -DGLM_FORCE_DEPTH_ZERO_TO_ONE
-    -DGLM_FORCE_DEFAULT_ALIGNED_GENTYPES
     -DVULKAN_HPP_NO_STRUCT_CONSTRUCTORS
     -DVULKAN_HPP_NO_UNION_CONSTRUCTORS
     -DVULKAN_HPP_NO_DEFAULT_DISPATCHER

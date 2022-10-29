@@ -1,12 +1,3 @@
-[submodule "deps/range-v3"]
-	path = deps/range-v3
-	url = https://github.com/ericniebler/range-v3.git
-[submodule "deps/optional"]
-	path = deps/optional
-	url = https://github.com/TartanLlama/optional.git
-[submodule "deps/glm"]
-	path = deps/glm
-	url = https://github.com/g-truc/glm.git
 [submodule "deps/spdlog"]
 	path = deps/spdlog
 	url = https://github.com/gabime/spdlog.git
@@ -16,12 +7,6 @@
 [submodule "deps/VulkanMemoryAllocator"]
 	path = deps/VulkanMemoryAllocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
-[submodule "deps/imgui"]
-	path = deps/imgui
-	url = https://github.com/ocornut/imgui.git
-[submodule "deps/entt"]
-	path = deps/entt
-	url = https://github.com/skypjack/entt.git
 [submodule "deps/SPIRV-Reflect"]
 	path = deps/SPIRV-Reflect
 	url = https://github.com/KhronosGroup/SPIRV-Reflect.git
