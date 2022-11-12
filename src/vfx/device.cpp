@@ -671,21 +671,12 @@ void vfx::Device::freeLibrary(Library* library) {
     spvReflectDestroyShaderModule(&library->reflect);
 }
 
-auto vfx::Device::makePipelineState(const vfx::PipelineStateDescription& description) -> Arc<PipelineState> {
-    auto out = Arc<PipelineState>::alloc();
+auto vfx::Device::makeRenderPipelineState(const vfx::RenderPipelineStateDescription& description) -> Arc<RenderPipelineState> {
+    auto out = Arc<RenderPipelineState>::alloc();
     out->device = this;
-//    out->description = description;
 
     struct DescriptorSetDescription {
         std::vector<vk::DescriptorSetLayoutBinding> bindings{};
-
-        /*
-        binding
-        descriptorType
-        descriptorCount
-        stageFlags
-        pImmutableSamplers
-        */
 
         void add(const vk::DescriptorSetLayoutBinding& inBinding) {
             for (auto& binding : bindings) {
@@ -774,86 +765,200 @@ auto vfx::Device::makePipelineState(const vfx::PipelineStateDescription& descrip
     pipeline_layout_create_info.setPushConstantRanges(constant_ranges);
     out->pipelineLayout = handle->createPipelineLayout(pipeline_layout_create_info, VK_NULL_HANDLE, interface);
 
-    {
-        vk::PipelineViewportStateCreateInfo viewportState = {};
-        viewportState.setViewportCount(1);
-        viewportState.setScissorCount(1);
+    vk::PipelineViewportStateCreateInfo viewportState = {};
+    viewportState.setViewportCount(1);
+    viewportState.setScissorCount(1);
 
-        std::array dynamicStates = {
-            vk::DynamicState::eViewport,
-            vk::DynamicState::eScissor
-        };
+    auto dynamicStates = std::array{
+        vk::DynamicState::eViewport,
+        vk::DynamicState::eScissor
+    };
 
-        vk::PipelineDynamicStateCreateInfo dynamicState = {};
-        dynamicState.setDynamicStates(dynamicStates);
+    vk::PipelineDynamicStateCreateInfo dynamicState = {};
+    dynamicState.setDynamicStates(dynamicStates);
 
-        std::vector<vk::PipelineShaderStageCreateInfo> stages = {};
+    std::vector<vk::PipelineShaderStageCreateInfo> stages = {};
 
-        if (description.vertexFunction) {
-            vk::PipelineShaderStageCreateInfo info{};
-            info.setStage(vk::ShaderStageFlagBits::eVertex);
-            info.setModule(description.vertexFunction->library->module);
-            info.setPName(description.vertexFunction->name.c_str());
-            stages.emplace_back(info);
-        }
-
-        if (description.fragmentFunction) {
-            vk::PipelineShaderStageCreateInfo info{};
-            info.setStage(vk::ShaderStageFlagBits::eFragment);
-            info.setModule(description.fragmentFunction->library->module);
-            info.setPName(description.fragmentFunction->name.c_str());
-            stages.emplace_back(info);
-        }
-
-        vk::PipelineVertexInputStateCreateInfo vertexInputState = {};
-        if (description.vertexDescription.has_value()) {
-            vertexInputState.setVertexBindingDescriptions(description.vertexDescription->layouts.elements);
-            vertexInputState.setVertexAttributeDescriptions(description.vertexDescription->attributes.elements);
-        }
-
-        vk::PipelineColorBlendStateCreateInfo colorBlendState = {};
-        colorBlendState.setAttachments(description.attachments.elements);
-
-        vk::PipelineRenderingCreateInfo rendering = {};
-        rendering.setViewMask(description.viewMask);
-        rendering.setColorAttachmentFormats(description.colorAttachmentFormats.elements);
-        rendering.setDepthAttachmentFormat(description.depthAttachmentFormat);
-        rendering.setStencilAttachmentFormat(description.stencilAttachmentFormat);
-
-        auto pipeline_create_info = vk::GraphicsPipelineCreateInfo{};
-        pipeline_create_info.setPNext(&rendering);
-        pipeline_create_info.setStages(stages);
-        pipeline_create_info.setPVertexInputState(&vertexInputState);
-        pipeline_create_info.setPInputAssemblyState(&description.inputAssemblyState);
-        pipeline_create_info.setPViewportState(&viewportState);
-        pipeline_create_info.setPRasterizationState(&description.rasterizationState);
-        pipeline_create_info.setPMultisampleState(&description.multisampleState);
-        pipeline_create_info.setPDepthStencilState(&description.depthStencilState);
-        pipeline_create_info.setPColorBlendState(&colorBlendState);
-        pipeline_create_info.setPDynamicState(&dynamicState);
-        pipeline_create_info.setLayout(out->pipelineLayout);
-        pipeline_create_info.setRenderPass(VK_NULL_HANDLE);
-        pipeline_create_info.setSubpass(0);
-        pipeline_create_info.setBasePipelineHandle(nullptr);
-        pipeline_create_info.setBasePipelineIndex(0);
-
-        vk::Pipeline pipeline{};
-        std::ignore = handle->createGraphicsPipelines(
-            {},
-            1,
-            &pipeline_create_info,
-            nullptr,
-            &pipeline,
-            interface
-        );
-
-        out->pipeline = pipeline;
+    if (description.vertexFunction) {
+        vk::PipelineShaderStageCreateInfo info{};
+        info.setStage(vk::ShaderStageFlagBits::eVertex);
+        info.setModule(description.vertexFunction->library->module);
+        info.setPName(description.vertexFunction->name.c_str());
+        stages.emplace_back(info);
     }
+
+    if (description.fragmentFunction) {
+        vk::PipelineShaderStageCreateInfo info{};
+        info.setStage(vk::ShaderStageFlagBits::eFragment);
+        info.setModule(description.fragmentFunction->library->module);
+        info.setPName(description.fragmentFunction->name.c_str());
+        stages.emplace_back(info);
+    }
+
+    vk::PipelineVertexInputStateCreateInfo vertexInputState = {};
+    if (description.vertexDescription.has_value()) {
+        vertexInputState.setVertexBindingDescriptions(description.vertexDescription->layouts.elements);
+        vertexInputState.setVertexAttributeDescriptions(description.vertexDescription->attributes.elements);
+    }
+
+    vk::PipelineColorBlendStateCreateInfo colorBlendState = {};
+    colorBlendState.setAttachments(description.attachments.elements);
+
+    vk::PipelineRenderingCreateInfo rendering = {};
+    rendering.setViewMask(description.viewMask);
+    rendering.setColorAttachmentFormats(description.colorAttachmentFormats.elements);
+    rendering.setDepthAttachmentFormat(description.depthAttachmentFormat);
+    rendering.setStencilAttachmentFormat(description.stencilAttachmentFormat);
+
+    auto pipeline_create_info = vk::GraphicsPipelineCreateInfo{};
+    pipeline_create_info.setPNext(&rendering);
+    pipeline_create_info.setStages(stages);
+    pipeline_create_info.setPVertexInputState(&vertexInputState);
+    pipeline_create_info.setPInputAssemblyState(&description.inputAssemblyState);
+    pipeline_create_info.setPViewportState(&viewportState);
+    pipeline_create_info.setPRasterizationState(&description.rasterizationState);
+    pipeline_create_info.setPMultisampleState(&description.multisampleState);
+    pipeline_create_info.setPDepthStencilState(&description.depthStencilState);
+    pipeline_create_info.setPColorBlendState(&colorBlendState);
+    pipeline_create_info.setPDynamicState(&dynamicState);
+    pipeline_create_info.setLayout(out->pipelineLayout);
+    pipeline_create_info.setRenderPass(VK_NULL_HANDLE);
+    pipeline_create_info.setSubpass(0);
+    pipeline_create_info.setBasePipelineHandle(nullptr);
+    pipeline_create_info.setBasePipelineIndex(0);
+
+    std::ignore = handle->createGraphicsPipelines(
+        {},
+        1,
+        &pipeline_create_info,
+        nullptr,
+        &out->pipeline,
+        interface
+    );
 
     return out;
 }
 
-void vfx::Device::freePipelineState(PipelineState* pipelineState) {
+void vfx::Device::freeRenderPipelineState(RenderPipelineState* pipelineState) {
+    for (auto& layout : pipelineState->descriptorSetLayouts) {
+        handle->destroyDescriptorSetLayout(layout, VK_NULL_HANDLE, interface);
+    }
+
+    handle->destroyPipelineLayout(pipelineState->pipelineLayout, VK_NULL_HANDLE, interface);
+    handle->destroyPipeline(pipelineState->pipeline, VK_NULL_HANDLE, interface);
+}
+
+auto vfx::Device::makeComputePipelineState(const Arc<Function>& function) -> Arc<ComputePipelineState> {
+    auto out = Arc<ComputePipelineState>::alloc();
+    out->device = this;
+
+    struct DescriptorSetDescription {
+        std::vector<vk::DescriptorSetLayoutBinding> bindings{};
+
+        void add(const vk::DescriptorSetLayoutBinding& inBinding) {
+            for (auto& binding : bindings) {
+                if (canMerge(binding, inBinding)) {
+                    binding.stageFlags |= inBinding.stageFlags;
+                    return;
+                }
+            }
+            bindings.emplace_back(inBinding);
+        }
+
+        static auto canMerge(const vk::DescriptorSetLayoutBinding& first, const vk::DescriptorSetLayoutBinding& second) -> bool {
+            // todo: check immutable samplers
+
+            return first.binding == second.binding
+                && first.descriptorType == second.descriptorType
+                && first.descriptorCount == second.descriptorCount;
+        }
+    };
+
+    std::vector<vk::PushConstantRange> constant_ranges{};
+    std::vector<DescriptorSetDescription> descriptor_set_descriptions{};
+
+    auto addShaderModule = [&](const Arc<Function>& function) {
+        auto stage_flags = vk::ShaderStageFlagBits(function->library->reflect.shader_stage);
+
+        auto refl_constant_blocks = std::span(
+            function->library->reflect.push_constant_blocks,
+            function->library->reflect.push_constant_block_count
+        );
+
+        constant_ranges.reserve(refl_constant_blocks.size());
+        for (auto& refl_block : refl_constant_blocks) {
+            auto& constant_range = constant_ranges.emplace_back();
+
+            constant_range.setSize(refl_block.size);
+            constant_range.setOffset(refl_block.offset);
+            constant_range.setStageFlags(stage_flags);
+        }
+
+        auto refl_descriptor_sets = std::span(
+            function->library->reflect.descriptor_sets,
+            function->library->reflect.descriptor_set_count
+        );
+
+        for (auto& refl_set : refl_descriptor_sets) {
+            if (refl_set.set >= descriptor_set_descriptions.size()) {
+                descriptor_set_descriptions.resize(refl_set.set + 1);
+            }
+
+            auto refl_descriptor_bindings = std::span(
+                refl_set.bindings,
+                refl_set.binding_count
+            );
+
+            for (auto& refl_binding : refl_descriptor_bindings) {
+                auto binding = vk::DescriptorSetLayoutBinding{
+                    .binding = refl_binding->binding,
+                    .descriptorType = vk::DescriptorType(refl_binding->descriptor_type),
+                    .descriptorCount = refl_binding->count,
+                    .stageFlags = stage_flags,
+                    .pImmutableSamplers = nullptr
+                };
+                descriptor_set_descriptions.at(refl_set.set).add(binding);
+            }
+        }
+    };
+
+    addShaderModule(function);
+
+    out->descriptorSetLayouts.resize(descriptor_set_descriptions.size());
+    for (u32 i = 0; i < out->descriptorSetLayouts.size(); ++i) {
+        auto dsl_create_info = vk::DescriptorSetLayoutCreateInfo{};
+        dsl_create_info.setBindings(descriptor_set_descriptions[i].bindings);
+        out->descriptorSetLayouts[i] = handle->createDescriptorSetLayout(dsl_create_info, VK_NULL_HANDLE, interface);
+    }
+
+    auto pipeline_layout_create_info = vk::PipelineLayoutCreateInfo{};
+    pipeline_layout_create_info.setSetLayouts(out->descriptorSetLayouts);
+    pipeline_layout_create_info.setPushConstantRanges(constant_ranges);
+    out->pipelineLayout = handle->createPipelineLayout(pipeline_layout_create_info, VK_NULL_HANDLE, interface);
+
+    vk::PipelineShaderStageCreateInfo shader_stage_create_info{};
+    shader_stage_create_info.setStage(vk::ShaderStageFlagBits::eCompute);
+    shader_stage_create_info.setModule(function->library->module);
+    shader_stage_create_info.setPName(function->name.c_str());
+
+    auto pipeline_create_info = vk::ComputePipelineCreateInfo{};
+    pipeline_create_info.setStage(shader_stage_create_info);
+    pipeline_create_info.setLayout(out->pipelineLayout);
+    pipeline_create_info.setBasePipelineHandle(nullptr);
+    pipeline_create_info.setBasePipelineIndex(0);
+
+    std::ignore = handle->createComputePipelines(
+        {},
+        1,
+        &pipeline_create_info,
+        nullptr,
+        &out->pipeline,
+        interface
+    );
+    return out;
+}
+
+void vfx::Device::freeComputePipelineState(ComputePipelineState* pipelineState) {
     for (auto& layout : pipelineState->descriptorSetLayouts) {
         handle->destroyDescriptorSetLayout(layout, VK_NULL_HANDLE, interface);
     }

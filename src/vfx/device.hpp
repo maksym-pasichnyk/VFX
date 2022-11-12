@@ -18,11 +18,12 @@ namespace vfx {
     struct RenderPass;
     struct CommandQueue;
     struct CommandBuffer;
-    struct PipelineState;
     struct ResourceGroup;
     struct TextureDescription;
+    struct RenderPipelineState;
+    struct ComputePipelineState;
     struct RenderPassDescription;
-    struct PipelineStateDescription;
+    struct RenderPipelineStateDescription;
 
     struct Device {
     public:
@@ -69,8 +70,11 @@ namespace vfx {
         auto makeLibrary(const std::vector<char>& bytes) -> Arc<Library>;
         void freeLibrary(Library* library);
 
-        auto makePipelineState(const PipelineStateDescription& description) -> Arc<PipelineState>;
-        void freePipelineState(PipelineState* pipelineState);
+        auto makeRenderPipelineState(const RenderPipelineStateDescription& description) -> Arc<RenderPipelineState>;
+        void freeRenderPipelineState(RenderPipelineState* pipelineState);
+
+        auto makeComputePipelineState(const Arc<Function>& function) -> Arc<ComputePipelineState>;
+        void freeComputePipelineState(ComputePipelineState* pipelineState);
 
         auto makeCommandQueue() -> Arc<CommandQueue>;
         void freeCommandQueue(CommandQueue* queue);

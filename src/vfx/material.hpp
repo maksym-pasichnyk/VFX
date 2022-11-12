@@ -32,7 +32,7 @@ namespace vfx {
         std::string  name = {};
     };
 
-    struct PipelineColorBlendAttachmentStateArray {
+    struct RenderPipelineColorBlendAttachmentStateArray {
         std::vector<vk::PipelineColorBlendAttachmentState> elements{};
 
         auto operator[](size_t i) -> vk::PipelineColorBlendAttachmentState& {
@@ -43,7 +43,7 @@ namespace vfx {
         }
     };
 
-    struct PipelineColorAttachmentFormatArray {
+    struct RenderPipelineColorAttachmentFormatArray {
         std::vector<vk::Format> elements = {};
 
         auto operator[](size_t i) -> vk::Format& {
@@ -54,7 +54,7 @@ namespace vfx {
         }
     };
 
-    struct PipelineVertexLayoutDescriptionArray {
+    struct RenderPipelineVertexLayoutDescriptionArray {
         std::vector<vk::VertexInputBindingDescription> elements = {};
 
         auto operator[](size_t i) -> vk::VertexInputBindingDescription& {
@@ -67,7 +67,8 @@ namespace vfx {
             return elements[i];
         }
     };
-    struct PipelineVertexAttributeDescriptionArray {
+
+    struct RenderPipelineVertexAttributeDescriptionArray {
         std::vector<vk::VertexInputAttributeDescription> elements = {};
 
         auto operator[](size_t i) -> vk::VertexInputAttributeDescription& {
@@ -78,17 +79,17 @@ namespace vfx {
         }
     };
 
-    struct PipelineVertexDescription {
-        PipelineVertexLayoutDescriptionArray layouts = {};
-        PipelineVertexAttributeDescriptionArray attributes = {};
+    struct RenderPipelineVertexDescription {
+        RenderPipelineVertexLayoutDescriptionArray layouts = {};
+        RenderPipelineVertexAttributeDescriptionArray attributes = {};
     };
 
-    struct PipelineStateDescription {
+    struct RenderPipelineStateDescription {
         Arc<Function> vertexFunction = {};
         Arc<Function> fragmentFunction = {};
 
         u32 viewMask = {};
-        PipelineColorAttachmentFormatArray colorAttachmentFormats = {};
+        RenderPipelineColorAttachmentFormatArray colorAttachmentFormats = {};
         vk::Format depthAttachmentFormat   = vk::Format::eUndefined;
         vk::Format stencilAttachmentFormat = vk::Format::eUndefined;
 
@@ -97,11 +98,11 @@ namespace vfx {
         vk::PipelineRasterizationStateCreateInfo rasterizationState = {};
         vk::PipelineMultisampleStateCreateInfo multisampleState = {};
         vk::PipelineDepthStencilStateCreateInfo depthStencilState = {};
-        std::optional<PipelineVertexDescription> vertexDescription = {};
-        PipelineColorBlendAttachmentStateArray attachments = {};
+        std::optional<RenderPipelineVertexDescription> vertexDescription = {};
+        RenderPipelineColorBlendAttachmentStateArray attachments = {};
     };
 
-    struct PipelineState {
+    struct RenderPipelineState {
     public:
         Device* device{};
         vk::Pipeline pipeline{};
@@ -109,8 +110,20 @@ namespace vfx {
         std::vector<vk::DescriptorSetLayout> descriptorSetLayouts{};
 
     public:
-        PipelineState();
-        ~PipelineState();
+        RenderPipelineState();
+        ~RenderPipelineState();
+    };
+
+    struct ComputePipelineState {
+    public:
+        Device* device{};
+        vk::Pipeline pipeline{};
+        vk::PipelineLayout pipelineLayout{};
+        std::vector<vk::DescriptorSetLayout> descriptorSetLayouts{};
+
+    public:
+        ComputePipelineState();
+        ~ComputePipelineState();
     };
 
     struct Material {

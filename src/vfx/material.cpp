@@ -14,8 +14,14 @@ auto vfx::Library::makeFunction(std::string name) -> Arc<Function> {
     return out;
 }
 
-vfx::PipelineState::PipelineState() {}
+vfx::RenderPipelineState::RenderPipelineState() {}
 
-vfx::PipelineState::~PipelineState() {
-    device->freePipelineState(this);
+vfx::RenderPipelineState::~RenderPipelineState() {
+    device->freeRenderPipelineState(this);
+}
+
+vfx::ComputePipelineState::ComputePipelineState() {}
+
+vfx::ComputePipelineState::~ComputePipelineState() {
+    device->freeComputePipelineState(this);
 }

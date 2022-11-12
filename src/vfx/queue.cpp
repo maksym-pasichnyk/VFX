@@ -155,6 +155,10 @@ auto vfx::CommandBuffer::getRetainedReferences() const -> bool {
 }
 
 void vfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
+    currentPipeline = nullptr;
+    currentPipelineLayout = nullptr;
+    currentPipelineBindPoint = {};
+
     handle->begin(info, device->interface);
 }
 
@@ -190,19 +194,30 @@ void vfx::CommandBuffer::present(vfx::Drawable* drawable) {
     }
 }
 
-void vfx::CommandBuffer::setPipelineState(const Arc<PipelineState>& state) {
+void vfx::CommandBuffer::setRenderPipelineState(const Arc<RenderPipelineState>& state) {
     handle->bindPipeline(vk::PipelineBindPoint::eGraphics, state->pipeline, device->interface);
+
+    currentPipeline = state->pipeline;
+    currentPipelineLayout = state->pipelineLayout;
+    currentPipelineBindPoint = vk::PipelineBindPoint::eGraphics;
 }
 
-void vfx::CommandBuffer::setResourceGroup(const Arc<PipelineState>& state, const Arc<ResourceGroup>& group, u32 index) {
+void vfx::CommandBuffer::setComputePipelineState(const Arc<ComputePipelineState>& state) {
+    handle->bindPipeline(vk::PipelineBindPoint::eCompute, state->pipeline, device->interface);
+
+    currentPipeline = state->pipeline;
+    currentPipelineLayout = state->pipelineLayout;
+    currentPipelineBindPoint = vk::PipelineBindPoint::eCompute;
+}
+
+void vfx::CommandBuffer::bindResourceGroup(const Arc<ResourceGroup>& group, u32 index) {
     if (retainedReferences) {
         resourceGroupReferences.emplace(group);
     }
-
-    handle->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, state->pipelineLayout, index, 1, &group->set, 0, nullptr, device->interface);
+    handle->bindDescriptorSets(currentPipelineBindPoint, currentPipelineLayout, index, 1, &group->set, 0, nullptr, device->interface);
 }
 
-void vfx::CommandBuffer::pushConstants(const Arc<PipelineState>& state, vk::ShaderStageFlags stageFlags, u32 offset, u32 size, const void* data) {
+void vfx::CommandBuffer::pushConstants(const Arc<RenderPipelineState>& state, vk::ShaderStageFlags stageFlags, u32 offset, u32 size, const void* data) {
     handle->pushConstants(state->pipelineLayout, stageFlags, offset, size, data, device->interface);
 }
 
@@ -273,6 +288,10 @@ void vfx::CommandBuffer::beginRendering(const RenderingInfo& description) {
 
 void vfx::CommandBuffer::endRendering() {
     handle->endRendering(device->interface);
+}
+
+void vfx::CommandBuffer::dispatch(u32 groupCountX, u32 groupCountY, u32 groupCountZ) {
+    handle->dispatch(groupCountX, groupCountY, groupCountZ, device->interface);
 }
 
 void vfx::CommandBuffer::setScissor(u32 firstScissor, const vk::Rect2D& rect) {
