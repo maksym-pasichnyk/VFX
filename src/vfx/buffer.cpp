@@ -7,7 +7,17 @@ vfx::Buffer::~Buffer() {
     device->freeBuffer(this);
 }
 
-void vfx::Buffer::update(const void* src, u64 size, u64 offset) {
+auto vfx::Buffer::map() const -> void* {
+    void* out = nullptr;
+    vmaMapMemory(device->allocator, allocation, &out);
+    return out;
+}
+
+void vfx::Buffer::unmap() const {
+    vmaUnmapMemory(device->allocator, allocation);
+}
+
+void vfx::Buffer::update(const void* src, u64 size, u64 offset) const {
     void* ptr = nullptr;
     vmaMapMemory(device->allocator, allocation, &ptr);
     auto dst = static_cast<std::byte*>(ptr) + offset;
@@ -15,7 +25,7 @@ void vfx::Buffer::update(const void* src, u64 size, u64 offset) {
     vmaUnmapMemory(device->allocator, allocation);
 }
 
-void vfx::Buffer::setLabel(const std::string& name) {
+void vfx::Buffer::setLabel(const std::string& name) const {
     vk::DebugMarkerObjectNameInfoEXT info = {};
     info.setObjectType(vk::DebugReportObjectTypeEXT::eBuffer);
     info.setObject(u64(VkBuffer(handle)));

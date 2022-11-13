@@ -28,7 +28,10 @@ namespace vfx {
         ~Buffer();
 
     public:
-        void update(const void* src, u64 size, u64 offset);
-        void setLabel(const std::string& name);
+        auto map() const -> void*;
+        void unmap() const;
+
+        void update(const void* src, u64 size, u64 offset) const;
+        void setLabel(const std::string& name) const;
     };
 }

@@ -61,7 +61,8 @@ add_library(VFX STATIC
     src/vfx/layer.hpp
     src/vfx/device.cpp
     src/vfx/device.hpp
-        src/vfx/vfx.hpp)
+    src/vfx/vfx.hpp
+)
 set_target_properties(VFX PROPERTIES
     CXX_EXTENSIONS OFF
     CXX_STANDARD 23
@@ -74,7 +75,7 @@ target_link_libraries(VFX PUBLIC
     spirv-reflect-static
     VulkanMemoryAllocator
 )
-target_include_directories(VFX PUBLIC src)
+target_include_directories(VFX PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_definitions(VFX PUBLIC
     -D_USE_MATH_DEFINES
     -DVULKAN_HPP_NO_STRUCT_CONSTRUCTORS

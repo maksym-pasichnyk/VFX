@@ -140,7 +140,7 @@ namespace vfx {
         void setRenderPipelineState(const Arc<RenderPipelineState>& state);
         void setComputePipelineState(const Arc<ComputePipelineState>& state);
         void bindResourceGroup(const Arc<ResourceGroup>& group, u32 index);
-        void pushConstants(const Arc<RenderPipelineState>& state, vk::ShaderStageFlags stageFlags, u32 offset, u32 size, const void* data);
+        void pushConstants(vk::ShaderStageFlags stageFlags, u32 offset, u32 size, const void* data);
 //        void beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents);
 //        void endRenderPass();
         void beginRendering(const RenderingInfo& description);

@@ -217,8 +217,8 @@ void vfx::CommandBuffer::bindResourceGroup(const Arc<ResourceGroup>& group, u32 
     handle->bindDescriptorSets(currentPipelineBindPoint, currentPipelineLayout, index, 1, &group->set, 0, nullptr, device->interface);
 }
 
-void vfx::CommandBuffer::pushConstants(const Arc<RenderPipelineState>& state, vk::ShaderStageFlags stageFlags, u32 offset, u32 size, const void* data) {
-    handle->pushConstants(state->pipelineLayout, stageFlags, offset, size, data, device->interface);
+void vfx::CommandBuffer::pushConstants(vk::ShaderStageFlags stageFlags, u32 offset, u32 size, const void* data) {
+    handle->pushConstants(currentPipelineLayout, stageFlags, offset, size, data, device->interface);
 }
 
 //void vfx::CommandBuffer::beginRenderPass(const vk::RenderPassBeginInfo& info, vk::SubpassContents contents) {

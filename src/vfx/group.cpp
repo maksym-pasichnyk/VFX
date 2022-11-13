@@ -26,6 +26,23 @@ void vfx::ResourceGroup::setBuffer(const Arc<Buffer>& buffer, u64 offset, u32 bi
     device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, device->interface);
 }
 
+void vfx::ResourceGroup::setStorageBuffer(const Arc<Buffer>& buffer, u64 offset, u32 binding) {
+    auto descriptor_buffer_info = vk::DescriptorBufferInfo {
+        .buffer = buffer->handle,
+        .offset = offset,
+        .range = VK_WHOLE_SIZE
+    };
+    auto write_descriptor_set = vk::WriteDescriptorSet{
+        .dstSet = set,
+        .dstBinding = binding,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = vk::DescriptorType::eStorageBuffer,
+        .pBufferInfo = &descriptor_buffer_info
+    };
+    device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, device->interface);
+}
+
 void vfx::ResourceGroup::setTexture(const Arc<Texture>& texture, u32 binding) {
     auto descriptor_image_info = vk::DescriptorImageInfo{
         .imageView = texture->view,
@@ -52,6 +69,22 @@ void vfx::ResourceGroup::setSampler(const Arc<Sampler>& sampler, u32 binding) {
         .dstArrayElement = 0,
         .descriptorCount = 1,
         .descriptorType = vk::DescriptorType::eSampler,
+        .pImageInfo = &descriptor_image_info
+    };
+    device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, device->interface);
+}
+
+void vfx::ResourceGroup::setStorageImage(const Arc<Texture>& texture, u32 binding) {
+    auto descriptor_image_info = vk::DescriptorImageInfo{
+        .imageView = texture->view,
+        .imageLayout = vk::ImageLayout::eGeneral
+    };
+    auto write_descriptor_set = vk::WriteDescriptorSet{
+        .dstSet = set,
+        .dstBinding = binding,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = vk::DescriptorType::eStorageImage,
         .pImageInfo = &descriptor_image_info
     };
     device->handle->updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, device->interface);
