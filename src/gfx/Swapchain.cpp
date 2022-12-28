@@ -30,8 +30,6 @@ void gfx::Swapchain::createDrawables() {
         unique_family_indices.end()
     );
 
-    mDrawableSize = capabilities.currentExtent;
-
     vk::SwapchainCreateInfoKHR swapchain_create_info = {};
     swapchain_create_info.setSurface(vkSurface);
     swapchain_create_info.setMinImageCount(3);
@@ -90,6 +88,10 @@ void gfx::Swapchain::releaseDrawables() {
 
 auto gfx::Swapchain::drawableSize() -> vk::Extent2D {
     return mDrawableSize;
+}
+
+void gfx::Swapchain::setDrawableSize(const vk::Extent2D& drawableSize) {
+    mDrawableSize = drawableSize;
 }
 
 auto gfx::Swapchain::nextDrawable() -> SharedPtr<Drawable> {

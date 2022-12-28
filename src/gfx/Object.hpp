@@ -146,16 +146,15 @@ namespace gfx {
     };
 
     template<typename T>
-    inline auto RetainPtr(T* pObject) -> SharedPtr<T> {
-        SharedPtr<T> shared = {};
-        shared.pObject = pObject->Referencing::retain();
-        return shared;
-    }
-
-    template<typename T>
     inline auto TransferPtr(T* pObject) -> SharedPtr<T> {
         SharedPtr<T> shared = {};
         shared.pObject = pObject;
         return shared;
+    }
+
+    template<typename T>
+    inline auto RetainPtr(T* pObject) -> SharedPtr<T> {
+        pObject->Referencing::retain();
+        return TransferPtr(pObject);
     }
 }

@@ -5,7 +5,6 @@
 #include <vulkan/vulkan.hpp>
 
 namespace gfx {
-    struct Swapchain;
     struct Device;
     struct Texture;
     struct Drawable;
@@ -36,6 +35,7 @@ namespace gfx {
         void releaseDrawables();
         auto nextDrawable() -> SharedPtr<Drawable>;
         auto drawableSize() -> vk::Extent2D;
+        void setDrawableSize(const vk::Extent2D& drawableSize);
         auto pixelFormat() -> vk::Format;
         void setPixelFormat(vk::Format format);
         auto colorSpace() -> vk::ColorSpaceKHR;

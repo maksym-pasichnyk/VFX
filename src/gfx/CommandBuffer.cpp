@@ -66,10 +66,7 @@ void gfx::CommandBuffer::present(const SharedPtr<gfx::Drawable>& drawable) {
 
     vk::Result result = pCommandQueue->vkPresentQueue.presentKHR(present_info, mDevice->vkDispatchLoaderDynamic);
 
-    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
-        mDevice->waitIdle();
-        drawable->pLayer->releaseDrawables();
-    } else if (result != vk::Result::eSuccess) {
+    if (result != vk::Result::eErrorOutOfDateKHR && result != vk::Result::eSuboptimalKHR && result != vk::Result::eSuccess) {
         throw std::runtime_error(vk::to_string(result));
     }
 }

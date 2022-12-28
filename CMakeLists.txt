@@ -47,7 +47,6 @@ PUBLIC
     Vulkan::Vulkan
     VulkanMemoryAllocator
 PRIVATE
-    glfw
     spirv-reflect-static
 )
 target_include_directories(gfx PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -58,6 +57,7 @@ target_compile_definitions(gfx PUBLIC
     -DVK_NO_PROTOTYPES
     -DVK_ENABLE_BETA_EXTENSIONS
     -DVK_USE_PLATFORM_MACOS_MVK
+    -DVK_USE_PLATFORM_METAL_EXT
     -DVULKAN_HPP_NO_STRUCT_CONSTRUCTORS
     -DVULKAN_HPP_NO_UNION_CONSTRUCTORS
     -DVULKAN_HPP_NO_DEFAULT_DISPATCHER
