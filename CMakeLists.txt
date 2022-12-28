@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(VFX)
+project(gfx)
 
 set(GLFW_LIBRARY_TYPE "STATIC")
 
@@ -38,52 +38,29 @@ function(target_compile_shaders TARGET)
     add_dependencies(${TARGET} ${TARGET}_shaders)
 endfunction()
 
-add_library(VFX STATIC
-    src/vfx/types.hpp
-    src/vfx/context.hpp
-    src/vfx/texture.hpp
-    src/vfx/buffer.hpp
-    src/vfx/pass.hpp
-    src/vfx/material.hpp
-    src/vfx/assets.hpp
-    src/vfx/delegate.hpp
-    src/vfx/signal.hpp
-    src/vfx/queue.hpp
-    src/vfx/queue.cpp
-    src/vfx/texture.cpp
-    src/vfx/buffer.cpp
-    src/vfx/context.cpp
-    src/vfx/material.cpp
-    src/vfx/pass.cpp
-    src/vfx/group.cpp
-    src/vfx/group.hpp
-    src/vfx/layer.cpp
-    src/vfx/layer.hpp
-    src/vfx/device.cpp
-    src/vfx/device.hpp
-    src/vfx/vfx.hpp
-)
-set_target_properties(VFX PROPERTIES
-    CXX_EXTENSIONS OFF
-    CXX_STANDARD 23
-    CXX_STANDARD_REQUIRED ON
-)
-target_link_libraries(VFX PUBLIC
+add_library(gfx STATIC src/gfx/Application.hpp src/gfx/Window.hpp src/gfx/Window.cpp src/gfx/Texture.hpp src/gfx/Buffer.hpp src/gfx/ComputePipelineState.hpp src/gfx/CommandQueue.hpp src/gfx/CommandQueue.cpp src/gfx/Texture.cpp src/gfx/Buffer.cpp src/gfx/Application.cpp src/gfx/ComputePipelineState.cpp src/gfx/DescriptorSet.cpp src/gfx/DescriptorSet.hpp src/gfx/Swapchain.cpp src/gfx/Swapchain.hpp src/gfx/Device.cpp src/gfx/Device.hpp src/gfx/Object.hpp src/gfx/Drawable.cpp src/gfx/Drawable.hpp src/gfx/Sampler.cpp src/gfx/Sampler.hpp src/gfx/CommandBuffer.cpp src/gfx/CommandBuffer.hpp src/gfx/Library.cpp src/gfx/Library.hpp src/gfx/Function.hpp src/gfx/Function.cpp src/gfx/RenderPipelineState.cpp src/gfx/RenderPipelineState.hpp src/gfx/GFX.hpp)
+set_target_properties(gfx PROPERTIES CXX_EXTENSIONS OFF CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(gfx
+PUBLIC
     glfw
     spdlog
     Vulkan::Vulkan
-    spirv-reflect-static
     VulkanMemoryAllocator
+PRIVATE
+    glfw
+    spirv-reflect-static
 )
-target_include_directories(VFX PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
-target_compile_definitions(VFX PUBLIC
+target_include_directories(gfx PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_compile_definitions(gfx PUBLIC
     -D_USE_MATH_DEFINES
-    -DVULKAN_HPP_NO_STRUCT_CONSTRUCTORS
-    -DVULKAN_HPP_NO_UNION_CONSTRUCTORS
-    -DVULKAN_HPP_NO_DEFAULT_DISPATCHER
+    -DGLFW_INCLUDE_NONE
+    -DGLFW_INCLUDE_VULKAN
     -DVK_NO_PROTOTYPES
     -DVK_ENABLE_BETA_EXTENSIONS
     -DVK_USE_PLATFORM_MACOS_MVK
-    -DGLFW_INCLUDE_NONE
-    -DGLFW_INCLUDE_VULKAN
+    -DVULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+    -DVULKAN_HPP_NO_UNION_CONSTRUCTORS
+    -DVULKAN_HPP_NO_DEFAULT_DISPATCHER
 )
+
+add_subdirectory(examples)
