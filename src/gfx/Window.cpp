@@ -10,12 +10,13 @@ gfx::Window::Window(SharedPtr<Application> application, int32_t width, int32_t h
     pWindow = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_SetWindowData(pWindow, "this", this);
 
-    SDL_Vulkan_CreateSurface(pWindow, mApplication->vkInstance, reinterpret_cast<VkSurfaceKHR*>(&vkSurface));
+    VkSurfaceKHR vkSurface;
+    SDL_Vulkan_CreateSurface(pWindow, mApplication->vkInstance, &vkSurface);
+
+    mSurface = TransferPtr(new Surface(mApplication, vkSurface));
 }
 
 gfx::Window::~Window() {
-    mSwapchain = {};
-    mApplication->vkInstance.destroySurfaceKHR(vkSurface, nullptr, mApplication->vkDispatchLoaderDynamic);
 }
 
 void gfx::Window::close() {
@@ -42,8 +43,9 @@ void gfx::Window::setResizable(bool resizable) {
 
 void gfx::Window::setSwapchain(SharedPtr<Swapchain> swapchain) {
     mSwapchain = std::move(swapchain);
-    mSwapchain->vkSurface = vkSurface;
+    mSwapchain->releaseDrawables();
     mSwapchain->setDrawableSize(size());
+    mSwapchain->mSurface = mSurface;
 }
 
 auto gfx::Window::swapchain() -> SharedPtr<Swapchain> {

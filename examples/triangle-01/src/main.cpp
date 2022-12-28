@@ -60,6 +60,7 @@ public:
 
 private:
     bool mApplicationRunning = {};
+
     gfx::SharedPtr<Renderer> mRenderer;
     gfx::SharedPtr<gfx::Device> mDevice;
     gfx::SharedPtr<gfx::Window> mWindow;

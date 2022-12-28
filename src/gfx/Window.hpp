@@ -8,6 +8,7 @@ struct SDL_Window;
 
 namespace gfx {
     struct Window;
+    struct Surface;
     struct Swapchain;
     struct Application;
 
@@ -28,9 +29,7 @@ namespace gfx {
 
     private:
         SDL_Window* pWindow = {};
-        vk::SurfaceKHR vkSurface = {};
-        vk::SwapchainKHR vkSwapchain = {};
-
+        SharedPtr<Surface> mSurface = {};
         SharedPtr<Swapchain> mSwapchain = {};
         SharedPtr<Application> mApplication = {};
         SharedPtr<WindowDelegate> mDelegate = {};

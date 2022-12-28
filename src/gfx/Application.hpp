@@ -11,10 +11,12 @@
 namespace gfx {
     struct Device;
     struct Window;
+    struct Surface;
 
     struct Application final : Referencing<Application> {
         friend Device;
         friend Window;
+        friend Surface;
 
     private:
         vk::Instance vkInstance = {};

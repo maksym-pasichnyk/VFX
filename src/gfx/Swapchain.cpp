@@ -8,6 +8,14 @@
 
 #include <set>
 
+gfx::Surface::Surface(SharedPtr<gfx::Application> application, vk::SurfaceKHR surface)
+: mApplication(std::move(application))
+, vkSurface(surface) {}
+
+gfx::Surface::~Surface() {
+    mApplication->vkInstance.destroySurfaceKHR(vkSurface, nullptr, mApplication->vkDispatchLoaderDynamic);
+}
+
 gfx::Swapchain::Swapchain(SharedPtr<Device> device) : mDevice(std::move(device)) {}
 
 gfx::Swapchain::~Swapchain() {
@@ -19,12 +27,11 @@ gfx::Swapchain::~Swapchain() {
 }
 
 void gfx::Swapchain::createDrawables() {
-    vk::SurfaceCapabilitiesKHR capabilities = mDevice->vkPhysicalDevice.getSurfaceCapabilitiesKHR(vkSurface, mDevice->vkDispatchLoaderDynamic);
+    vk::SurfaceCapabilitiesKHR capabilities = mDevice->vkPhysicalDevice.getSurfaceCapabilitiesKHR(mSurface->vkSurface, mDevice->vkDispatchLoaderDynamic);
 
     auto unique_family_indices = std::set<uint32_t>{
         mDevice->vkGraphicsQueueFamilyIndex,
-        mDevice->vkPresentQueueFamilyIndex,
-        mDevice->vkComputeQueueFamilyIndex
+        mDevice->vkPresentQueueFamilyIndex
     };
 
     auto queue_family_indices = std::vector<uint32_t>(
@@ -33,7 +40,7 @@ void gfx::Swapchain::createDrawables() {
     );
 
     vk::SwapchainCreateInfoKHR swapchain_create_info = {};
-    swapchain_create_info.setSurface(vkSurface);
+    swapchain_create_info.setSurface(mSurface->vkSurface);
     swapchain_create_info.setMinImageCount(3);
     swapchain_create_info.setImageFormat(mPixelFormat);
     swapchain_create_info.setImageColorSpace(mColorSpace);
