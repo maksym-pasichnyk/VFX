@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 project(gfx)
 
-set(GLFW_LIBRARY_TYPE "STATIC")
-
 set(SPIRV_REFLECT_EXAMPLES OFF)
 set(SPIRV_REFLECT_EXECUTABLE OFF)
 set(SPIRV_REFLECT_STATIC_LIB ON)
@@ -10,9 +8,9 @@ set(SPIRV_REFLECT_STATIC_LIB ON)
 set(VMA_STATIC_VULKAN_FUNCTIONS OFF)
 set(VMA_DYNAMIC_VULKAN_FUNCTIONS ON)
 
+find_package(SDL2 REQUIRED)
 find_package(Vulkan REQUIRED)
 
-add_subdirectory(deps/glfw)
 add_subdirectory(deps/spdlog)
 add_subdirectory(deps/SPIRV-Reflect)
 add_subdirectory(deps/VulkanMemoryAllocator)
@@ -42,18 +40,16 @@ add_library(gfx STATIC src/gfx/Application.hpp src/gfx/Window.hpp src/gfx/Window
 set_target_properties(gfx PROPERTIES CXX_EXTENSIONS OFF CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(gfx
 PUBLIC
-    glfw
     spdlog
     Vulkan::Vulkan
+    ${SDL2_LIBRARIES}
     VulkanMemoryAllocator
 PRIVATE
     spirv-reflect-static
 )
-target_include_directories(gfx PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_include_directories(gfx PUBLIC "${SDL2_INCLUDE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_definitions(gfx PUBLIC
     -D_USE_MATH_DEFINES
-    -DGLFW_INCLUDE_NONE
-    -DGLFW_INCLUDE_VULKAN
     -DVK_NO_PROTOTYPES
     -DVK_ENABLE_BETA_EXTENSIONS
     -DVK_USE_PLATFORM_MACOS_MVK

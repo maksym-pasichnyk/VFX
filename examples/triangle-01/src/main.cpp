@@ -2,46 +2,67 @@
 
 #include "Renderer.hpp"
 
-#include "GLFW/glfw3.h"
+#include "SDL_events.h"
+#include "spdlog/spdlog.h"
 
-struct Game : gfx::WindowDelegate {
+struct Game : gfx::Referencing<Game> {
 public:
     Game() {
         mApplication = gfx::Application::alloc();
         mDevice = mApplication->devices().front();
-        mWindow = gfx::Window::alloc(mApplication, 800, 600);
-        mWindow->setTitle("Triangle-01");
-        mWindow->setDelegate(gfx::RetainPtr(this));
+
         mSwapchain = gfx::Swapchain::alloc(mDevice);
-        mSwapchain->setSurface(mWindow->surface());
-        mSwapchain->setDrawableSize(mWindow->size());
         mSwapchain->setColorSpace(vk::ColorSpaceKHR::eSrgbNonlinear);
         mSwapchain->setPixelFormat(vk::Format::eB8G8R8A8Unorm);
+
+        mWindow = gfx::Window::alloc(mApplication, 800, 600);
+        mWindow->setTitle("Triangle-01-1");
+        mWindow->setResizable(true);
+        mWindow->setSwapchain(mSwapchain);
 
         mRenderer = gfx::TransferPtr(new Renderer(mDevice));
     }
 
 public:
     void run() {
-        while (!mWindow->shouldClose()) {
-            glfwPollEvents();
+        mApplicationRunning = true;
+        while (mApplicationRunning) {
+            pollEvents();
 
-            mRenderer->draw(mSwapchain);
+            mRenderer->draw(mWindow->swapchain());
         }
     }
 
-public:
-    void windowDidResize() override {
-        mDevice->waitIdle();
-
-        mSwapchain->setDrawableSize(mWindow->size());
-        mSwapchain->releaseDrawables();
+    void pollEvents() {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            switch (event.type) {
+                case SDL_QUIT:
+                    mApplicationRunning = false;
+                    break;
+                case SDL_WINDOWEVENT: {
+                    auto pSDLWindow = SDL_GetWindowFromID(event.window.windowID);
+                    auto pGFXWindow = static_cast<gfx::Window*>(SDL_GetWindowData(pSDLWindow, "this"));
+                    if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                        pGFXWindow->windowDidResize();
+                    } else if (event.window.event == SDL_WINDOWEVENT_ENTER) {
+                        pGFXWindow->windowMouseEnter();
+                    } else if (event.window.event == SDL_WINDOWEVENT_LEAVE) {
+                        pGFXWindow->windowMouseExit();
+                    } else if (event.window.event == SDL_WINDOWEVENT_CLOSE) {
+                        pGFXWindow->windowShouldClose();
+                    }
+                    break;
+                }
+            }
+        }
     }
 
 private:
+    bool mApplicationRunning = {};
     gfx::SharedPtr<Renderer> mRenderer;
-    gfx::SharedPtr<gfx::Window> mWindow;
     gfx::SharedPtr<gfx::Device> mDevice;
+    gfx::SharedPtr<gfx::Window> mWindow;
     gfx::SharedPtr<gfx::Swapchain> mSwapchain;
     gfx::SharedPtr<gfx::Application> mApplication;
 };

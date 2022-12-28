@@ -6,22 +6,26 @@
 
 namespace gfx {
     struct Device;
+    struct Window;
     struct Texture;
     struct Drawable;
     struct CommandBuffer;
 
     struct Swapchain final : Referencing<Swapchain> {
+        friend Window;
         friend CommandBuffer;
 
     private:
         SharedPtr<Device> mDevice;
+        std::vector<SharedPtr<Drawable>> mDrawables = {};
+
         vk::SurfaceKHR vkSurface = {};
         vk::SwapchainKHR vkSwapchain = {};
-        std::vector<SharedPtr<Drawable>> mDrawables = {};
 
         vk::Format mPixelFormat = {};
         vk::Extent2D mDrawableSize = {};
         vk::ColorSpaceKHR mColorSpace = {};
+
         bool mDisplaySyncEnabled = {};
 
     private:
@@ -33,6 +37,7 @@ namespace gfx {
 
     public:
         void releaseDrawables();
+        auto device() -> SharedPtr<Device>;
         auto nextDrawable() -> SharedPtr<Drawable>;
         auto drawableSize() -> vk::Extent2D;
         void setDrawableSize(const vk::Extent2D& drawableSize);
@@ -40,8 +45,6 @@ namespace gfx {
         void setPixelFormat(vk::Format format);
         auto colorSpace() -> vk::ColorSpaceKHR;
         void setColorSpace(vk::ColorSpaceKHR colorSpace);
-        auto surface() -> vk::SurfaceKHR;
-        void setSurface(vk::SurfaceKHR surface);
         auto displaySyncEnabled() -> bool;
         void setDisplaySyncEnabled(bool displaySyncEnabled);
 

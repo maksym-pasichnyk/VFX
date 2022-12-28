@@ -1,72 +1,35 @@
 #include "Window.hpp"
+#include "Device.hpp"
+#include "Swapchain.hpp"
 #include "Application.hpp"
 
-#include "GLFW/glfw3.h"
-#include "spdlog/spdlog.h"
+#include "SDL_video.h"
+#include "SDL_vulkan.h"
 
 gfx::Window::Window(SharedPtr<Application> application, int32_t width, int32_t height) : mApplication(std::move(application)) {
-    glfwInit();
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    pWindow = glfwCreateWindow(width, height, "", nullptr, nullptr);
-    glfwCreateWindowSurface(mApplication->vkInstance, static_cast<GLFWwindow*>(pWindow), nullptr, reinterpret_cast<VkSurfaceKHR*>(&vkSurface));
+    pWindow = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI);
+    SDL_SetWindowData(pWindow, "this", this);
 
-    glfwSetWindowUserPointer(static_cast<GLFWwindow*>(pWindow), this);
-    glfwSetFramebufferSizeCallback(static_cast<GLFWwindow*>(pWindow), [](GLFWwindow* window, int32_t width, int32_t height) {
-        auto thiz = static_cast<Window*>(glfwGetWindowUserPointer(window));
-        thiz->windowDidResize();
-    });
-    glfwSetWindowCloseCallback(static_cast<GLFWwindow*>(pWindow), [](GLFWwindow* window) {
-        auto thiz = static_cast<Window*>(glfwGetWindowUserPointer(window));
-        thiz->windowShouldClose();
-    });
-    glfwSetKeyCallback(static_cast<GLFWwindow*>(pWindow), [](GLFWwindow* window, int32_t keycode, int32_t scancode, int32_t action, int32_t mods) {
-        auto thiz = static_cast<Window*>(glfwGetWindowUserPointer(window));
-        thiz->windowKeyEvent(keycode, scancode, action, mods);
-    });
-    glfwSetMouseButtonCallback(static_cast<GLFWwindow*>(pWindow), [](GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
-        auto thiz = static_cast<Window*>(glfwGetWindowUserPointer(window));
-        thiz->windowMouseEvent(button, action, mods);
-    });
-    glfwSetCursorPosCallback(static_cast<GLFWwindow*>(pWindow), [](GLFWwindow* window, double_t x, double_t y) {
-        auto thiz = static_cast<Window*>(glfwGetWindowUserPointer(window));
-        thiz->windowCursorEvent(x, y);
-    });
-    glfwSetCursorEnterCallback(static_cast<GLFWwindow*>(pWindow), [](GLFWwindow* window, int32_t entered) {
-        auto thiz = static_cast<Window*>(glfwGetWindowUserPointer(window));
-        if (entered == GLFW_FALSE) {
-            thiz->windowMouseEnter();
-        } else {
-            thiz->windowMouseExit();
-        }
-    });
+    SDL_Vulkan_CreateSurface(pWindow, mApplication->vkInstance, reinterpret_cast<VkSurfaceKHR*>(&vkSurface));
 }
 
 gfx::Window::~Window() {
+    mSwapchain = {};
     mApplication->vkInstance.destroySurfaceKHR(vkSurface, nullptr, mApplication->vkDispatchLoaderDynamic);
-    glfwDestroyWindow(static_cast<GLFWwindow*>(pWindow));
-    glfwTerminate();
 }
 
 void gfx::Window::close() {
-    glfwSetWindowShouldClose(static_cast<GLFWwindow*>(pWindow), GLFW_TRUE);
-}
-
-auto gfx::Window::shouldClose() -> bool {
-    return glfwWindowShouldClose(static_cast<GLFWwindow*>(pWindow)) != GLFW_FALSE;
+    SDL_DestroyWindow(pWindow);
 }
 
 auto gfx::Window::size() -> vk::Extent2D {
     int width, height;
-    glfwGetFramebufferSize(pWindow, &width, &height);
+    SDL_Vulkan_GetDrawableSize(pWindow, &width, &height);
     return {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 }
 
-auto gfx::Window::surface() -> vk::SurfaceKHR {
-    return vkSurface;
-}
-
 void gfx::Window::setTitle(const std::string& title) {
-    glfwSetWindowTitle(static_cast<GLFWwindow*>(pWindow), title.c_str());
+    SDL_SetWindowTitle(pWindow, title.c_str());
 }
 
 void gfx::Window::setDelegate(SharedPtr<WindowDelegate> delegate) {
@@ -74,42 +37,70 @@ void gfx::Window::setDelegate(SharedPtr<WindowDelegate> delegate) {
 }
 
 void gfx::Window::setResizable(bool resizable) {
-    glfwSetWindowAttrib(static_cast<GLFWwindow*>(pWindow), GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
+    SDL_SetWindowResizable(pWindow, resizable ? SDL_TRUE : SDL_FALSE);
+}
+
+void gfx::Window::setSwapchain(SharedPtr<Swapchain> swapchain) {
+    mSwapchain = std::move(swapchain);
+    mSwapchain->vkSurface = vkSurface;
+    mSwapchain->setDrawableSize(size());
+}
+
+auto gfx::Window::swapchain() -> SharedPtr<Swapchain> {
+    return mSwapchain;
+}
+
+auto gfx::Window::getWindowNumber() -> uint32_t {
+    return SDL_GetWindowID(pWindow);
 }
 
 void gfx::Window::windowDidResize() {
+    if (mSwapchain) {
+        mSwapchain->mDevice->waitIdle();
+        mSwapchain->setDrawableSize(size());
+        mSwapchain->releaseDrawables();
+    }
+
     if (mDelegate) {
-        mDelegate->windowDidResize();
+        mDelegate->windowDidResize(RetainPtr(this));
     }
 }
+
 void gfx::Window::windowShouldClose() {
     if (mDelegate) {
-        mDelegate->windowShouldClose();
+        if (mDelegate->windowShouldClose(RetainPtr(this))) {
+            close();
+        }
     }
 }
+
 void gfx::Window::windowKeyEvent(int32_t keycode, int32_t scancode, int32_t action, int32_t mods) {
     if (mDelegate) {
-        mDelegate->windowKeyEvent(keycode, scancode, action, mods);
+        mDelegate->windowKeyEvent(RetainPtr(this), keycode, scancode, action, mods);
     }
 }
+
 void gfx::Window::windowMouseEvent(int32_t button, int32_t action, int32_t mods) {
     if (mDelegate) {
-        mDelegate->windowMouseEvent(button, action, mods);
+        mDelegate->windowMouseEvent(RetainPtr(this), button, action, mods);
     }
 }
+
 void gfx::Window::windowCursorEvent(double_t x, double_t y) {
     if (mDelegate) {
-        mDelegate->windowCursorEvent(x, y);
+        mDelegate->windowCursorEvent(RetainPtr(this), x, y);
     }
 }
+
 void gfx::Window::windowMouseEnter() {
     if (mDelegate) {
-        mDelegate->windowMouseEnter();
+        mDelegate->windowMouseEnter(RetainPtr(this));
     }
 }
+
 void gfx::Window::windowMouseExit() {
     if (mDelegate) {
-        mDelegate->windowMouseExit();
+        mDelegate->windowMouseExit(RetainPtr(this));
     }
 }
 
