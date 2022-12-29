@@ -13,7 +13,7 @@ namespace gfx {
     struct RenderPipelineState;
     struct ComputePipelineState;
 
-    struct Library final : Referencing<Library> {
+    struct Library final : Referencing {
         friend Device;
         friend Function;
         friend RenderPipelineState;

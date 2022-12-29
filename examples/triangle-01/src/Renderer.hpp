@@ -2,7 +2,7 @@
 
 #include "gfx/GFX.hpp"
 
-struct Renderer : gfx::Referencing<Renderer> {
+struct Renderer : gfx::Referencing {
 public:
     explicit Renderer(gfx::SharedPtr<gfx::Device> device);
     ~Renderer() override = default;

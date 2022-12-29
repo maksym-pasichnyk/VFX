@@ -201,7 +201,7 @@ namespace gfx {
         }
     };
 
-    struct CommandBuffer final : Referencing<CommandBuffer> {
+    struct CommandBuffer final : Referencing {
         friend Device;
         friend Texture;
         friend CommandQueue;
@@ -253,6 +253,6 @@ namespace gfx {
 
     };
 
-    struct RenderCommandEncoder final : Referencing<RenderCommandEncoder> {
+    struct RenderCommandEncoder final : Referencing {
     };
 }

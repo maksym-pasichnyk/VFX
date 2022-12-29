@@ -6,7 +6,7 @@ namespace gfx {
     struct Texture;
     struct Swapchain;
     struct CommandBuffer;
-    struct Drawable final : Referencing<Drawable> {
+    struct Drawable final : Referencing {
         friend Swapchain;
         friend CommandBuffer;
 

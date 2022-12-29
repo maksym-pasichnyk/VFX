@@ -8,7 +8,7 @@
 namespace gfx {
     struct Device;
     struct Function;
-    struct ComputePipelineState final : Referencing<ComputePipelineState> {
+    struct ComputePipelineState final : Referencing {
         friend Device;
 
     public:

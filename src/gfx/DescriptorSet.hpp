@@ -11,7 +11,7 @@ namespace gfx {
     struct Texture;
     struct Sampler;
     struct CommandBuffer;
-    struct DescriptorSet final : Referencing<DescriptorSet> {
+    struct DescriptorSet final : Referencing {
         friend Device;
         friend CommandBuffer;
 

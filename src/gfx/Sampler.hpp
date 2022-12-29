@@ -10,7 +10,7 @@ namespace gfx {
     struct DescriptorSet;
     struct RenderCommandEncoder;
 
-    struct Sampler final : Referencing<Sampler> {
+    struct Sampler final : Referencing {
         friend Device;
         friend CommandBuffer;
         friend DescriptorSet;

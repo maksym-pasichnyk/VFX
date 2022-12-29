@@ -13,7 +13,7 @@ namespace gfx {
     struct Application;
     struct CommandBuffer;
 
-    struct Surface final : Referencing<Surface> {
+    struct Surface final : Referencing {
         friend Window;
         friend Swapchain;
 
@@ -26,7 +26,7 @@ namespace gfx {
         ~Surface() override;
     };
 
-    struct Swapchain final : Referencing<Swapchain> {
+    struct Swapchain final : Referencing {
         friend Window;
         friend CommandBuffer;
 

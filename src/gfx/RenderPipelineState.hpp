@@ -99,7 +99,7 @@ namespace gfx {
         }
     };
 
-    struct RenderPipelineState final : Referencing<RenderPipelineState> {
+    struct RenderPipelineState final : Referencing {
         friend Device;
 
     public:

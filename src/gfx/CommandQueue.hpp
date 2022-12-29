@@ -19,7 +19,7 @@ namespace gfx {
     struct RenderPipelineState;
     struct ComputePipelineState;
 
-    struct CommandQueue final : Referencing<CommandQueue> {
+    struct CommandQueue final : Referencing {
         friend Device;
         friend CommandBuffer;
         friend RenderCommandEncoder;

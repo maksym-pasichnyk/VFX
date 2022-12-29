@@ -13,7 +13,7 @@ namespace gfx {
     struct Window;
     struct Surface;
 
-    struct Application final : Referencing<Application> {
+    struct Application final : Referencing {
         friend Device;
         friend Window;
         friend Surface;

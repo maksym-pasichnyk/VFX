@@ -23,7 +23,7 @@ namespace gfx {
     struct RenderCommandEncoder;
     struct RenderPipelineStateDescription;
 
-    struct Device final : Referencing<Device> {
+    struct Device final : Referencing {
         friend Buffer;
         friend Texture;
         friend Sampler;

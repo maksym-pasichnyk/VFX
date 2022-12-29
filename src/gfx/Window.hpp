@@ -12,7 +12,7 @@ namespace gfx {
     struct Swapchain;
     struct Application;
 
-    struct WindowDelegate : Referencing<WindowDelegate> {
+    struct WindowDelegate : Referencing {
         virtual void windowDidResize(const SharedPtr<Window>& sender) {}
         virtual auto windowShouldClose(const SharedPtr<Window>& sender) -> bool {
             return true;
@@ -24,7 +24,7 @@ namespace gfx {
         virtual void windowMouseExit(const SharedPtr<Window>& sender) {}
     };
 
-    struct Window final : Referencing<Window> {
+    struct Window final : Referencing {
         friend Application;
 
     private:

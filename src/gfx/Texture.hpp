@@ -22,7 +22,7 @@ namespace gfx {
         vk::ComponentMapping components = {};
     };
 
-    struct Texture final : Referencing<Texture> {
+    struct Texture final : Referencing {
         friend Swapchain;
         friend Device;
         friend DescriptorSet;

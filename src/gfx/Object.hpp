@@ -4,7 +4,6 @@
 #include <typeinfo>
 
 namespace gfx {
-    template <class Class, class Base = class Object>
     class Referencing {
     public:
         Referencing() : counter(1) {
@@ -14,9 +13,8 @@ namespace gfx {
 //            fprintf(stdout, "Deallocate %s at %p\n", typeid(Class).name(), this);
         }
 
-        auto retain() -> Class* {
+        void retain() {
             counter += 1;
-            return static_cast<Class*>(this);
         }
 
         void release() {

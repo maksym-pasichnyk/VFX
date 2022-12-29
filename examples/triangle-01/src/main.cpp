@@ -5,7 +5,7 @@
 #include "SDL_events.h"
 #include "spdlog/spdlog.h"
 
-struct Game : gfx::Referencing<Game> {
+struct Game : gfx::Referencing {
 public:
     Game() {
         mApplication = gfx::Application::alloc();
