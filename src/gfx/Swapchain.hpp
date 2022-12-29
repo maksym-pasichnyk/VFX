@@ -43,7 +43,7 @@ namespace gfx {
         bool mDisplaySyncEnabled = {};
 
     private:
-        explicit Swapchain(SharedPtr<Device> device);
+        explicit Swapchain(SharedPtr<Surface> surface);
         ~Swapchain() override;
 
     private:
@@ -51,6 +51,7 @@ namespace gfx {
 
     public:
         void releaseDrawables();
+        void setDevice(SharedPtr<Device> device);
         auto device() -> SharedPtr<Device>;
         auto nextDrawable() -> SharedPtr<Drawable>;
         auto drawableSize() -> vk::Extent2D;
@@ -61,8 +62,5 @@ namespace gfx {
         void setColorSpace(vk::ColorSpaceKHR colorSpace);
         auto displaySyncEnabled() -> bool;
         void setDisplaySyncEnabled(bool displaySyncEnabled);
-
-    public:
-        static auto alloc(SharedPtr<Device> device) -> SharedPtr<Swapchain>;
     };
 }

@@ -11,14 +11,14 @@ public:
         mApplication = gfx::Application::alloc();
         mDevice = mApplication->devices().front();
 
-        mSwapchain = gfx::Swapchain::alloc(mDevice);
-        mSwapchain->setColorSpace(vk::ColorSpaceKHR::eSrgbNonlinear);
-        mSwapchain->setPixelFormat(vk::Format::eB8G8R8A8Unorm);
-
         mWindow = gfx::Window::alloc(mApplication, 800, 600);
         mWindow->setTitle("Triangle-01-1");
         mWindow->setResizable(true);
-        mWindow->setSwapchain(mSwapchain);
+
+        mSwapchain = mWindow->swapchain();
+        mSwapchain->setDevice(mDevice);
+        mSwapchain->setColorSpace(vk::ColorSpaceKHR::eSrgbNonlinear);
+        mSwapchain->setPixelFormat(vk::Format::eB8G8R8A8Unorm);
 
         mRenderer = gfx::TransferPtr(new Renderer(mDevice));
     }
@@ -29,7 +29,7 @@ public:
         while (mApplicationRunning) {
             pollEvents();
 
-            mRenderer->draw(mWindow->swapchain());
+            mRenderer->draw(mSwapchain);
         }
     }
 

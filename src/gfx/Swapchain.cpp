@@ -16,7 +16,7 @@ gfx::Surface::~Surface() {
     mApplication->vkInstance.destroySurfaceKHR(vkSurface, nullptr, mApplication->vkDispatchLoaderDynamic);
 }
 
-gfx::Swapchain::Swapchain(SharedPtr<Device> device) : mDevice(std::move(device)) {}
+gfx::Swapchain::Swapchain(SharedPtr<Surface> surface) : mSurface(std::move(surface)) {}
 
 gfx::Swapchain::~Swapchain() {
     releaseDrawables();
@@ -95,6 +95,10 @@ auto gfx::Swapchain::device() -> SharedPtr<Device> {
     return mDevice;
 }
 
+void gfx::Swapchain::setDevice(SharedPtr<Device> device) {
+    mDevice = std::move(device);
+}
+
 void gfx::Swapchain::releaseDrawables() {
     mDrawables.clear();
 }
@@ -154,8 +158,4 @@ auto gfx::Swapchain::displaySyncEnabled() -> bool {
 
 void gfx::Swapchain::setDisplaySyncEnabled(bool displaySyncEnabled) {
     mDisplaySyncEnabled = displaySyncEnabled;
-}
-
-auto gfx::Swapchain::alloc(SharedPtr<Device> device) -> SharedPtr<Swapchain> {
-    return TransferPtr(new Swapchain(std::move(device)));
 }

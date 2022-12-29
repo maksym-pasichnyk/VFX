@@ -44,7 +44,6 @@ namespace gfx {
         void setTitle(const std::string& title);
         void setDelegate(SharedPtr<WindowDelegate> delegate);
         void setResizable(bool resizable);
-        void setSwapchain(SharedPtr<Swapchain> swapchain);
         auto swapchain() -> SharedPtr<Swapchain>;
         auto getWindowNumber() -> uint32_t;
 
