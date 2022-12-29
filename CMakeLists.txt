@@ -1,19 +1,32 @@
 cmake_minimum_required(VERSION 3.21)
 project(gfx)
 
-set(SPIRV_REFLECT_EXAMPLES OFF)
-set(SPIRV_REFLECT_EXECUTABLE OFF)
-set(SPIRV_REFLECT_STATIC_LIB ON)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0135 NEW)
 
 set(VMA_STATIC_VULKAN_FUNCTIONS OFF)
 set(VMA_DYNAMIC_VULKAN_FUNCTIONS ON)
 
+set(SPIRV_REFLECT_EXAMPLES OFF)
+set(SPIRV_REFLECT_EXECUTABLE OFF)
+set(SPIRV_REFLECT_STATIC_LIB ON)
+
+include(FetchContent)
+
 find_package(SDL2 REQUIRED)
 find_package(Vulkan REQUIRED)
 
-add_subdirectory(deps/spdlog)
-add_subdirectory(deps/SPIRV-Reflect)
-add_subdirectory(deps/VulkanMemoryAllocator)
+set(VMA_VERSION 3.0.1)
+FetchContent_Declare(VulkanMemoryAllocator URL "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/v${VMA_VERSION}.zip" DOWNLOAD_EXTRACT_TIMESTAMP ON)
+FetchContent_MakeAvailable(VulkanMemoryAllocator)
+
+set(SPDLOG_VERSION 1.11.0)
+FetchContent_Declare(spdlog URL "https://github.com/gabime/spdlog/archive/v${SPDLOG_VERSION}.zip" DOWNLOAD_EXTRACT_TIMESTAMP ON)
+FetchContent_MakeAvailable(spdlog)
+
+set(SPIRV_REFLECT_VERSION 1.3.236.0)
+FetchContent_Declare(SPIRV-Reflect URL "https://github.com/KhronosGroup/SPIRV-Reflect/archive/refs/tags/sdk-${SPIRV_REFLECT_VERSION}.zip" DOWNLOAD_EXTRACT_TIMESTAMP ON)
+FetchContent_MakeAvailable(SPIRV-Reflect)
 
 function(target_compile_shaders TARGET)
     set(SPIRV_BINARY_FILES)
