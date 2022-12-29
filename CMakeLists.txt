@@ -44,7 +44,7 @@ PUBLIC
     Vulkan::Vulkan
     ${SDL2_LIBRARIES}
     VulkanMemoryAllocator
-PRIVATE
+#PRIVATE
     spirv-reflect-static
 )
 target_include_directories(gfx PUBLIC "${SDL2_INCLUDE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/src")

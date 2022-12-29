@@ -106,7 +106,7 @@ namespace gfx {
         SharedPtr<Device> mDevice;
         vk::Pipeline vkPipeline = {};
         vk::PipelineLayout vkPipelineLayout = {};
-        std::vector<vk::DescriptorSetLayout> vkDescriptorSetLayoutArray = {};
+        std::vector<vk::DescriptorSetLayout> vkDescriptorSetLayouts = {};
 
     private:
         explicit RenderPipelineState(SharedPtr<Device> device, const RenderPipelineStateDescription& description);

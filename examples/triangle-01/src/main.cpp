@@ -12,7 +12,7 @@ public:
         mDevice = mApplication->devices().front();
 
         mWindow = gfx::Window::alloc(mApplication, 800, 600);
-        mWindow->setTitle("Triangle-01-1");
+        mWindow->setTitle("Triangle-01");
         mWindow->setResizable(true);
 
         mSwapchain = mWindow->swapchain();

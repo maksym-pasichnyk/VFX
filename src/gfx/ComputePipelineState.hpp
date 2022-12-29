@@ -15,10 +15,10 @@ namespace gfx {
         SharedPtr<Device> mDevice;
         vk::Pipeline vkPipeline = {};
         vk::PipelineLayout vkPipelineLayout = {};
-        std::vector<vk::DescriptorSetLayout> vkDescriptorSetLayoutArray = {};
+        std::vector<vk::DescriptorSetLayout> vkDescriptorSetLayouts = {};
 
     private:
-        explicit ComputePipelineState(SharedPtr<Device> device, SharedPtr<Function> function);
+        explicit ComputePipelineState(SharedPtr<Device> device, const SharedPtr<Function>& function);
         ~ComputePipelineState() override;
     };
 }

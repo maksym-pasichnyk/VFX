@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Object.hpp"
+#include "spirv_reflect.h"
 
 #include <string>
 
@@ -16,8 +17,9 @@ namespace gfx {
         friend ComputePipelineState;
 
     private:
-        SharedPtr<Library> mLibrary;
         std::string mFunctionName;
+        SharedPtr<Library> mLibrary;
+        SpvReflectEntryPoint* mEntryPoint = {};
 
     private:
         explicit Function(SharedPtr<Library> library, std::string name);

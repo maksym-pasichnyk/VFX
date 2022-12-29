@@ -5,90 +5,67 @@
 
 #include <spirv_reflect.h>
 
-gfx::ComputePipelineState::ComputePipelineState(SharedPtr<Device> device, SharedPtr<Function> function) : mDevice(std::move(device)) {
-    struct DescriptorSetDescription {
-        std::vector<vk::DescriptorSetLayoutBinding> bindings{};
+struct DescriptorSetLayoutCreateInfo {
+    std::vector<vk::DescriptorSetLayoutBinding> bindings = {};
 
-        void add(const vk::DescriptorSetLayoutBinding& inBinding) {
-            for (auto& binding : bindings) {
-                if (canMerge(binding, inBinding)) {
-                    binding.stageFlags |= inBinding.stageFlags;
-                    return;
-                }
+    void emplace(const vk::DescriptorSetLayoutBinding& other) {
+        for (auto& binding : bindings) {
+            if (binding.binding != other.binding) {
+                continue;
             }
-            bindings.emplace_back(inBinding);
-        }
-
-        static auto canMerge(const vk::DescriptorSetLayoutBinding& first, const vk::DescriptorSetLayoutBinding& second) -> bool {
-            // todo: check immutable samplers
-
-            return first.binding == second.binding
-                && first.descriptorType == second.descriptorType
-                && first.descriptorCount == second.descriptorCount;
-        }
-    };
-
-    std::vector<vk::PushConstantRange> constant_ranges = {};
-    std::vector<DescriptorSetDescription> descriptor_set_descriptions = {};
-
-    auto addShaderModule = [&](const SharedPtr<Function>& function) {
-        auto stage_flags = vk::ShaderStageFlagBits(function->mLibrary->spvReflectShaderModule->shader_stage);
-
-        auto refl_constant_blocks = std::span(
-            function->mLibrary->spvReflectShaderModule->push_constant_blocks,
-            function->mLibrary->spvReflectShaderModule->push_constant_block_count
-        );
-
-        constant_ranges.reserve(refl_constant_blocks.size());
-        for (auto& refl_block : refl_constant_blocks) {
-            auto& constant_range = constant_ranges.emplace_back();
-
-            constant_range.setSize(refl_block.size);
-            constant_range.setOffset(refl_block.offset);
-            constant_range.setStageFlags(stage_flags);
-        }
-
-        auto refl_descriptor_sets = std::span(
-            function->mLibrary->spvReflectShaderModule->descriptor_sets,
-            function->mLibrary->spvReflectShaderModule->descriptor_set_count
-        );
-
-        for (auto& refl_set : refl_descriptor_sets) {
-            if (refl_set.set >= descriptor_set_descriptions.size()) {
-                descriptor_set_descriptions.resize(refl_set.set + 1);
+            if (binding.descriptorType != other.descriptorType) {
+                continue;
             }
-
-            auto refl_descriptor_bindings = std::span(
-                refl_set.bindings,
-                refl_set.binding_count
-            );
-
-            for (auto& refl_binding : refl_descriptor_bindings) {
-                auto binding = vk::DescriptorSetLayoutBinding{
-                    .binding = refl_binding->binding,
-                    .descriptorType = vk::DescriptorType(refl_binding->descriptor_type),
-                    .descriptorCount = refl_binding->count,
-                    .stageFlags = stage_flags,
-                    .pImmutableSamplers = nullptr
-                };
-                descriptor_set_descriptions.at(refl_set.set).add(binding);
+            if (binding.descriptorCount != other.descriptorCount) {
+                continue;
             }
+            binding.stageFlags |= other.stageFlags;
+            return;
         }
-    };
+        bindings.emplace_back(other);
+    }
+};
 
-    addShaderModule(function);
+gfx::ComputePipelineState::ComputePipelineState(SharedPtr<Device> device, const SharedPtr<Function>& function) : mDevice(std::move(device)) {
+    std::vector<vk::PushConstantRange> push_constant_ranges = {};
+    std::vector<DescriptorSetLayoutCreateInfo> descriptor_sets = {};
 
-    vkDescriptorSetLayoutArray.resize(descriptor_set_descriptions.size());
-    for (uint32_t i = 0; i < vkDescriptorSetLayoutArray.size(); ++i) {
-        auto dsl_create_info = vk::DescriptorSetLayoutCreateInfo{};
-        dsl_create_info.setBindings(descriptor_set_descriptions[i].bindings);
-        vkDescriptorSetLayoutArray[i] = mDevice->vkDevice.createDescriptorSetLayout(dsl_create_info, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
+    for (auto& i : std::span(function->mEntryPoint->used_push_constants, function->mEntryPoint->used_push_constant_count)) {
+        vk::PushConstantRange push_constant_range = {};
+        push_constant_range.setSize(function->mLibrary->mSpvReflectShaderModule.push_constant_blocks[i].size);
+        push_constant_range.setOffset(function->mLibrary->mSpvReflectShaderModule.push_constant_blocks[i].offset);
+        push_constant_range.setStageFlags(vk::ShaderStageFlags(function->mEntryPoint->shader_stage));
+    }
+
+    for (auto& sds : std::span(function->mEntryPoint->descriptor_sets, function->mEntryPoint->descriptor_set_count)) {
+        if (sds.set >= descriptor_sets.size()) {
+            descriptor_sets.resize(sds.set + 1);
+        }
+
+        for (auto& sb : std::span(sds.bindings, sds.binding_count)) {
+            vk::DescriptorSetLayoutBinding binding = {};
+            binding.setBinding(sb->binding);
+            binding.setDescriptorType(vk::DescriptorType(sb->descriptor_type));
+            binding.setDescriptorCount(sb->count);
+            binding.setStageFlags(vk::ShaderStageFlags(function->mEntryPoint->shader_stage));
+            binding.setPImmutableSamplers(nullptr);
+
+            descriptor_sets[sds.set].emplace(binding);
+        }
+    }
+
+    vkDescriptorSetLayouts.resize(descriptor_sets.size());
+    for (uint32_t i = 0; i < descriptor_sets.size(); ++i) {
+        vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {};
+        descriptor_set_layout_create_info.setBindings(descriptor_sets[i].bindings);
+
+        vkDescriptorSetLayouts[i] = mDevice->vkDevice.createDescriptorSetLayout(descriptor_set_layout_create_info, nullptr, mDevice->vkDispatchLoaderDynamic);
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_create_info = {};
-    pipeline_layout_create_info.setSetLayouts(vkDescriptorSetLayoutArray);
-    pipeline_layout_create_info.setPushConstantRanges(constant_ranges);
-    vkPipelineLayout = mDevice->vkDevice.createPipelineLayout(pipeline_layout_create_info, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
+    pipeline_layout_create_info.setSetLayouts(vkDescriptorSetLayouts);
+    pipeline_layout_create_info.setPushConstantRanges(push_constant_ranges);
+    vkPipelineLayout = mDevice->vkDevice.createPipelineLayout(pipeline_layout_create_info, nullptr, mDevice->vkDispatchLoaderDynamic);
 
     vk::PipelineShaderStageCreateInfo shader_stage_create_info{};
     shader_stage_create_info.setStage(vk::ShaderStageFlagBits::eCompute);
@@ -112,10 +89,10 @@ gfx::ComputePipelineState::ComputePipelineState(SharedPtr<Device> device, Shared
 }
 
 gfx::ComputePipelineState::~ComputePipelineState() {
-    for (auto& layout : vkDescriptorSetLayoutArray) {
-        mDevice->vkDevice.destroyDescriptorSetLayout(layout, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
+    for (auto& layout : vkDescriptorSetLayouts) {
+        mDevice->vkDevice.destroyDescriptorSetLayout(layout, nullptr, mDevice->vkDispatchLoaderDynamic);
     }
 
-    mDevice->vkDevice.destroyPipelineLayout(vkPipelineLayout, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
-    mDevice->vkDevice.destroyPipeline(vkPipeline, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
+    mDevice->vkDevice.destroyPipelineLayout(vkPipelineLayout, nullptr, mDevice->vkDispatchLoaderDynamic);
+    mDevice->vkDevice.destroyPipeline(vkPipeline, nullptr, mDevice->vkDispatchLoaderDynamic);
 }

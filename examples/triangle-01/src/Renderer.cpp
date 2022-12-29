@@ -56,8 +56,8 @@ void Renderer::buildShaders() {
     auto pVertexLibrary = mDevice->newLibrary(Assets::readFile("shaders/default.vert.spv"));
     auto pFragmentLibrary = mDevice->newLibrary(Assets::readFile("shaders/default.frag.spv"));
 
-    auto pVertexFunction = pVertexLibrary->makeFunction("main");
-    auto pFragmentFunction = pFragmentLibrary->makeFunction("main");
+    auto pVertexFunction = pVertexLibrary->newFunction("main");
+    auto pFragmentFunction = pFragmentLibrary->newFunction("main");
 
     gfx::RenderPipelineStateDescription description = {};
 
@@ -68,7 +68,7 @@ void Renderer::buildShaders() {
     description.setFragmentFunction(pFragmentFunction);
 
     mRenderPipelineState = mDevice->newRenderPipelineState(description);
-    mDescriptorSet = mDevice->newDescriptorSet(mRenderPipelineState->vkDescriptorSetLayoutArray[0], {
+    mDescriptorSet = mDevice->newDescriptorSet(mRenderPipelineState->vkDescriptorSetLayouts[0], {
         vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1}
     });
 }
