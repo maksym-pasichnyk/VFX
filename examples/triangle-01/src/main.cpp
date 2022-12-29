@@ -19,6 +19,7 @@ public:
         mSwapchain->setDevice(mDevice);
         mSwapchain->setColorSpace(vk::ColorSpaceKHR::eSrgbNonlinear);
         mSwapchain->setPixelFormat(vk::Format::eB8G8R8A8Unorm);
+        mSwapchain->setDisplaySyncEnabled(true);
 
         mRenderer = gfx::TransferPtr(new Renderer(mDevice));
     }

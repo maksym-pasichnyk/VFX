@@ -41,7 +41,7 @@ void gfx::Swapchain::createDrawables() {
 
     vk::SwapchainCreateInfoKHR swapchain_create_info = {};
     swapchain_create_info.setSurface(mSurface->vkSurface);
-    swapchain_create_info.setMinImageCount(3);
+    swapchain_create_info.setMinImageCount(mMaximumDrawableCount);
     swapchain_create_info.setImageFormat(mPixelFormat);
     swapchain_create_info.setImageColorSpace(mColorSpace);
     swapchain_create_info.setImageExtent(mDrawableSize);
@@ -55,7 +55,7 @@ void gfx::Swapchain::createDrawables() {
     }
     swapchain_create_info.setPreTransform(capabilities.currentTransform);
     swapchain_create_info.setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);
-    swapchain_create_info.setPresentMode(vk::PresentModeKHR::eFifo);
+    swapchain_create_info.setPresentMode(mDisplaySyncEnabled ? vk::PresentModeKHR::eFifo : vk::PresentModeKHR::eImmediate);
     swapchain_create_info.setClipped(true);
     swapchain_create_info.setOldSwapchain(vkSwapchain);
 
@@ -158,4 +158,12 @@ auto gfx::Swapchain::displaySyncEnabled() -> bool {
 
 void gfx::Swapchain::setDisplaySyncEnabled(bool displaySyncEnabled) {
     mDisplaySyncEnabled = displaySyncEnabled;
+}
+
+auto gfx::Swapchain::maximumDrawableCount() -> uint32_t {
+    return mMaximumDrawableCount;
+}
+
+void gfx::Swapchain::setMaximumDrawableCount(uint32_t maximumDrawableCount) {
+    mMaximumDrawableCount = maximumDrawableCount;
 }

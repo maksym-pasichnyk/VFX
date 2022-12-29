@@ -41,6 +41,7 @@ namespace gfx {
         vk::ColorSpaceKHR mColorSpace = {};
 
         bool mDisplaySyncEnabled = {};
+        uint32_t mMaximumDrawableCount = 3;
 
     private:
         explicit Swapchain(SharedPtr<Surface> surface);
@@ -62,5 +63,7 @@ namespace gfx {
         void setColorSpace(vk::ColorSpaceKHR colorSpace);
         auto displaySyncEnabled() -> bool;
         void setDisplaySyncEnabled(bool displaySyncEnabled);
+        auto maximumDrawableCount() -> uint32_t;
+        void setMaximumDrawableCount(uint32_t maximumDrawableCount);
     };
 }
