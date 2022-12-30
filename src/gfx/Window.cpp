@@ -52,6 +52,10 @@ auto gfx::Window::getWindowNumber() -> uint32_t {
     return SDL_GetWindowID(pWindow);
 }
 
+auto gfx::Window::native() -> SDL_Window* {
+    return pWindow;
+}
+
 void gfx::Window::windowDidResize() {
     if (mSwapchain) {
         mSwapchain->mDevice->waitIdle();

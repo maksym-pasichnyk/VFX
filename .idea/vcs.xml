@@ -2,9 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/deps/SPIRV-Reflect" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/deps/VulkanMemoryAllocator" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/deps/glfw" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/deps/spdlog" vcs="Git" />
   </component>
 </project>

@@ -354,11 +354,8 @@ gfx::Texture::~Texture() {
 }
 
 void gfx::Texture::replaceRegion(const void* data, uint64_t size) {
-    auto StorageBuffer = mDevice->newBuffer(
-        vk::BufferUsageFlagBits::eTransferSrc,
-        size, data,
-        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
-    );
+    auto StorageBuffer = mDevice->newBuffer(vk::BufferUsageFlagBits::eTransferSrc, data, size, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT);
+
     vk::BufferImageCopy buffer_image_copy = {};
     buffer_image_copy.setImageExtent(vkExtent);
     buffer_image_copy.imageSubresource.setAspectMask(vkImageSubresourceRange.aspectMask);

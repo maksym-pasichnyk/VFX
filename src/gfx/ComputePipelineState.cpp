@@ -30,11 +30,12 @@ gfx::ComputePipelineState::ComputePipelineState(SharedPtr<Device> device, const 
     std::vector<vk::PushConstantRange> push_constant_ranges = {};
     std::vector<DescriptorSetLayoutCreateInfo> descriptor_sets = {};
 
-    for (auto& i : std::span(function->mEntryPoint->used_push_constants, function->mEntryPoint->used_push_constant_count)) {
+    for (auto& pcb : std::span(function->mLibrary->mSpvReflectShaderModule.push_constant_blocks, function->mLibrary->mSpvReflectShaderModule.push_constant_block_count)) {
         vk::PushConstantRange push_constant_range = {};
-        push_constant_range.setSize(function->mLibrary->mSpvReflectShaderModule.push_constant_blocks[i].size);
-        push_constant_range.setOffset(function->mLibrary->mSpvReflectShaderModule.push_constant_blocks[i].offset);
+        push_constant_range.setSize(pcb.size);
+        push_constant_range.setOffset(pcb.offset);
         push_constant_range.setStageFlags(vk::ShaderStageFlags(function->mEntryPoint->shader_stage));
+        push_constant_ranges.emplace_back(push_constant_range);
     }
 
     for (auto& sds : std::span(function->mEntryPoint->descriptor_sets, function->mEntryPoint->descriptor_set_count)) {

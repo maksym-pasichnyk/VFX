@@ -46,6 +46,7 @@ namespace gfx {
         void setResizable(bool resizable);
         auto swapchain() -> SharedPtr<Swapchain>;
         auto getWindowNumber() -> uint32_t;
+        auto native() -> SDL_Window*;
 
     public:
         void windowDidResize();

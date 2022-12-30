@@ -98,11 +98,11 @@ VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT
         "VUID-vkCmdBindPipeline-pipeline-06197"
     };
 
-    for (const char* msg : skip) {
-        if (strstr(pCallbackData->pMessage, msg) != nullptr) {
-            return VK_FALSE;
-        }
-    }
+//    for (const char* msg : skip) {
+//        if (strstr(pCallbackData->pMessage, msg) != nullptr) {
+//            return VK_FALSE;
+//        }
+//    }
 
     if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
         spdlog::debug("{}", pCallbackData->pMessage);

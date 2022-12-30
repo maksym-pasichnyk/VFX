@@ -9,10 +9,6 @@ layout(binding = 0) readonly buffer VertexInput {
 	Vertex[] vertices;
 };
 
-//out gl_PerVertex {
-//	vec4 gl_Position;
-//};
-
 layout(location = 0) out struct {
 	vec3 color;
 } vs_out;

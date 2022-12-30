@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gfx/GFX.hpp"
+#include "GuiRenderer.hpp"
 
 struct Renderer : gfx::Referencing {
 public:
@@ -15,10 +16,9 @@ private:
     void buildBuffers();
 
 private:
+    gfx::SharedPtr<GuiRenderer> mGuiRenderer;
+
     gfx::SharedPtr<gfx::Device> mDevice;
-    gfx::SharedPtr<gfx::Buffer> mVertexBuffer;
     gfx::SharedPtr<gfx::CommandQueue> mCommandQueue;
     gfx::SharedPtr<gfx::CommandBuffer> mCommandBuffer;
-    gfx::SharedPtr<gfx::DescriptorSet> mDescriptorSet;
-    gfx::SharedPtr<gfx::RenderPipelineState> mRenderPipelineState;
 };

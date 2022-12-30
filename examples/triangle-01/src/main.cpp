@@ -1,6 +1,7 @@
 #define VMA_IMPLEMENTATION
 
 #include "Renderer.hpp"
+#include "GuiRenderer.hpp"
 
 #include "SDL_events.h"
 #include "spdlog/spdlog.h"

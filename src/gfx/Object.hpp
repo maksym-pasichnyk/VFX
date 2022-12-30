@@ -92,7 +92,7 @@ namespace gfx {
 
         template<typename U>
         auto operator=(const SharedPtr<U>& other) -> SharedPtr<T>& {
-            if (pObject != other.pObject) {
+            if (pObject != other.get()) {
                 if (pObject != nullptr) {
                     pObject->Referencing::release();
                 }
@@ -117,7 +117,7 @@ namespace gfx {
 
         template<typename U>
         auto operator=(SharedPtr<U>&& other) -> SharedPtr<T>& {
-            if (pObject != other.pObject) {
+            if (pObject != other.get()) {
                 if (pObject != nullptr) {
                     pObject->Referencing::release();
                 }
@@ -138,6 +138,8 @@ namespace gfx {
         constexpr auto operator*() const noexcept -> T& {
             return *pObject;
         }
+
+        auto operator<=>(const SharedPtr<T>& other) const = default;
 
     private:
         T* pObject = nullptr;

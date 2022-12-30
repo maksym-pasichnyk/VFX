@@ -33,18 +33,27 @@ function(target_compile_shaders TARGET)
 
     foreach(SOURCE_FILE ${ARGN})
 #        get_filename_component(FILE_NAME ${SOURCE_FILE} NAME)
+#        set(OUTPUT_FILE "${PROJECT_BINARY_DIR}/shaders/${FILE_NAME}.spv")
 
-        set(SPIRV "${SOURCE_FILE}.spv")
+        set(OUTPUT_FILE "${SOURCE_FILE}.spv")
         add_custom_command(
-            OUTPUT ${SPIRV}
-#            COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/shaders"
-            COMMAND glslc ${SOURCE_FILE} -o ${SPIRV}
+            OUTPUT ${OUTPUT_FILE}
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/shaders/"
+            COMMAND glslc ${SOURCE_FILE} -o ${OUTPUT_FILE}
             DEPENDS ${SOURCE_FILE}
-            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         )
-        list(APPEND SPIRV_BINARY_FILES ${SPIRV})
+        list(APPEND SPIRV_BINARY_FILES ${OUTPUT_FILE})
     endforeach()
 
+#    set(SPIRV_MODULE "${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.spv")
+#    add_custom_command(
+#        OUTPUT ${SPIRV_MODULE}
+#        COMMAND spirv-link -o ${SPIRV_MODULE} ${SPIRV_BINARY_FILES}
+#        DEPENDS ${SPIRV_BINARY_FILES}
+#        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+#    )
+
+#    add_custom_target(${TARGET}_shaders DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.spv")
     add_custom_target(${TARGET}_shaders DEPENDS ${SPIRV_BINARY_FILES})
     add_dependencies(${TARGET} ${TARGET}_shaders)
 endfunction()
@@ -56,9 +65,8 @@ PUBLIC
     spdlog
     Vulkan::Vulkan
     ${SDL2_LIBRARIES}
-    VulkanMemoryAllocator
-#PRIVATE
     spirv-reflect-static
+    VulkanMemoryAllocator
 )
 target_include_directories(gfx PUBLIC "${SDL2_INCLUDE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_definitions(gfx PUBLIC

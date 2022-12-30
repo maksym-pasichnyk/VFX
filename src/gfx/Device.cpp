@@ -159,10 +159,10 @@ auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAlloca
     return TransferPtr(new Buffer(RetainPtr(this), buffer_create_info, allocation_create_info));
 }
 
-auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, const void* data, VmaAllocationCreateFlags options) -> SharedPtr<Buffer> {
+auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, VmaAllocationCreateFlags options) -> SharedPtr<Buffer> {
     // todo: use transfer operation if buffer is not mappable
     auto id = newBuffer(usage, size, options);
-    std::memcpy(id->contents(), data, size);
+    std::memcpy(id->contents(), pointer, size);
     id->didModifyRange(0, size);
     return id;
 }

@@ -63,7 +63,7 @@ namespace gfx {
         auto newTexture(const TextureDescription& description) -> SharedPtr<Texture>;
         auto newSampler(const vk::SamplerCreateInfo& info) -> SharedPtr<Sampler>;
         auto newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAllocationCreateFlags options = 0) -> SharedPtr<Buffer>;
-        auto newBuffer(vk::BufferUsageFlags usage, uint64_t size, const void* data, VmaAllocationCreateFlags options = 0) -> SharedPtr<Buffer>;
+        auto newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, VmaAllocationCreateFlags options = 0) -> SharedPtr<Buffer>;
         auto newLibrary(const std::vector<char>& bytes) -> SharedPtr<Library>;
         auto newRenderPipelineState(const RenderPipelineStateDescription& description) -> SharedPtr<RenderPipelineState>;
         auto newComputePipelineState(const SharedPtr<Function>& function) -> SharedPtr<ComputePipelineState>;
