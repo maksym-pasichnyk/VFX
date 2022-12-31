@@ -10,12 +10,10 @@ public:
 
 public:
     void draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain);
+    void setScreenSize(const vk::Extent2D& size);
 
 private:
-    void buildShaders();
-    void buildBuffers();
-
-private:
+    gfx::SharedPtr<UIContext> mUIContext;
     gfx::SharedPtr<GuiRenderer> mGuiRenderer;
 
     gfx::SharedPtr<gfx::Device> mDevice;

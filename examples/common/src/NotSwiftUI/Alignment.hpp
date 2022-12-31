@@ -1,6 +1,7 @@
 #pragma once
 
-#include "UIContext.hpp"
+#include "UISize.hpp"
+#include "UIPoint.hpp"
 
 struct VerticalAlignment {
     auto (*defaultValue)(const UISize& size) -> float_t;

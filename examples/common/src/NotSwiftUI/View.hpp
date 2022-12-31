@@ -1,98 +1,382 @@
 #pragma once
 
 #include "UIContext.hpp"
-#include "Alignment.hpp"
 
+#include "Iter.hpp"
+#include "fmt/format.h"
+
+#include <numbers>
+#include <numeric>
 #include <optional>
-
-using ProposedViewSize = UISize;
+#include <algorithm>
 
 struct Border;
+struct Overlay;
+struct FixedSize;
 struct FixedFrame;
+struct FlexibleFrame;
+struct ForegroundColor;
+
+struct ProposedSize {
+    std::optional<float_t> width = {};
+    std::optional<float_t> height = {};
+
+    explicit ProposedSize(std::optional<float_t> width, std::optional<float_t> height) : width(width), height(height) {}
+    explicit ProposedSize(const UISize& size) : width(size.width), height(size.height) {}
+
+    auto orMax() const -> UISize {
+        return UISize(width.value_or(std::numeric_limits<float_t>::max()), height.value_or(std::numeric_limits<float_t>::max()));
+    }
+
+    auto orDefault(float_t defaultWidth, float_t defaultHeight) const -> UISize {
+        return UISize(width.value_or(defaultWidth), height.value_or(defaultHeight));
+    }
+};
 
 struct View : gfx::Referencing {
-    virtual auto size(const ProposedViewSize& proposed) -> UISize {
-        return {proposed.width, proposed.height};
-    }
-    virtual void draw(const gfx::SharedPtr<UIContext>& context, const UIPoint& origin, const ProposedViewSize& proposed) {}
+    auto size(const ProposedSize& proposed) -> UISize;
+    void draw(const gfx::SharedPtr<UIContext>& context, const UISize& size);
+    auto frame(std::optional<float_t> width, std::optional<float_t> height, Alignment alignment = Alignment::center()) -> gfx::SharedPtr<FixedFrame>;
+    auto frame(std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment = Alignment::center()) -> gfx::SharedPtr<FlexibleFrame>;
+    auto border(const UIColor& color, float_t width) -> gfx::SharedPtr<View>;
+    auto overlay(gfx::SharedPtr<View> overlay) -> gfx::SharedPtr<Overlay>;
+    auto fixedSize(bool horizontal, bool vertical) -> gfx::SharedPtr<FixedSize>;
+    auto foregroundColor(const UIColor& color) -> gfx::SharedPtr<ForegroundColor>;
 
-    auto frame(float_t width, float_t height, Alignment alignment = Alignment::center()) -> gfx::SharedPtr<FixedFrame>;
-    auto border(UIColor color, float_t width) -> gfx::SharedPtr<Border>;
+    virtual auto body() -> gfx::SharedPtr<View> {
+        return gfx::RetainPtr(this);
+    }
+    virtual auto _size(const ProposedSize& proposed) -> UISize {
+        throw std::runtime_error("FatalError");
+    }
+    virtual void _draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) {
+        throw std::runtime_error("FatalError");
+    }
 };
 
-struct Rectangle : View {
-    void draw(const gfx::SharedPtr<UIContext>& context, const UIPoint& origin, const ProposedViewSize& proposed) override {
-        float_t x0 = origin.x;
-        float_t y0 = origin.y;
-        float_t x1 = origin.x + proposed.width;
-        float_t y1 = origin.y + proposed.height;
-        context->draw_list.AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1), ImColor(1.0F, 1.0F, 1.0F, 1.0F));
+struct Shape : View {
+    auto body() -> gfx::SharedPtr<View> override;
+
+    virtual void draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) = 0;
+};
+
+struct Circle : Shape {
+    void draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) override {
+        float_t halfSize = std::min(size.width, size.height) * 0.5F;
+        float_t dx = size.width * 0.5F - halfSize;
+        float_t dy = size.height * 0.5F - halfSize;
+
+        context->saveState();
+        context->translateBy(dx, dy);
+        context->drawCircleFilled(halfSize);
+        context->restoreState();
     }
 };
 
-struct Border : View {
-    UIColor mColor = {};
-    float_t mWidth = {};
-    gfx::SharedPtr<View> mContent = {};
+struct Border : Shape {
+private:
+    float_t width;
 
-    auto size(const ProposedViewSize &proposed) -> UISize override {
-        return mContent->size(proposed);
+public:
+    explicit Border(float_t width) : width(width) {}
+
+    void draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) override {
+        context->drawRect(size, width);
+    }
+};
+
+struct Rectangle : Shape {
+    void draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) override {
+        context->drawRectFilled(size);
+    }
+};
+
+template<std::derived_from<Shape> T>
+struct ShapeView : View {
+private:
+    gfx::SharedPtr<T> shape;
+
+public:
+    explicit ShapeView(gfx::SharedPtr<T> shape) : shape(std::move(shape)) {}
+
+public:
+    auto _size(const ProposedSize &proposed) -> UISize override {
+        return proposed.orDefault(10.0F, 10.0F);
     }
 
-    void draw(const gfx::SharedPtr<UIContext>& context, const UIPoint& origin, const ProposedViewSize& proposed) override {
-        mContent->draw(context, origin, proposed);
-
-        float_t x0 = origin.x;
-        float_t y0 = origin.y;
-        float_t x1 = origin.x + proposed.width;
-        float_t y1 = origin.y + proposed.height;
-        context->draw_list.AddRect(ImVec2(x0, y0), ImVec2(x1, y1), ImColor(mColor.r, mColor.g, mColor.b, mColor.a), 0.0F, 0, mWidth);
+    void _draw(const gfx::SharedPtr<UIContext> &context, const UISize &size) override {
+        shape->draw(context, size);
     }
 };
 
 struct FixedFrame : View {
-    std::optional<float_t> mWidth = {};
-    std::optional<float_t> mHeight = {};
-    gfx::SharedPtr<View> mContent = {};
-    Alignment mAlignment = Alignment::center();
+private:
+    gfx::SharedPtr<View> content;
+    std::optional<float_t> width;
+    std::optional<float_t> height;
+    Alignment alignment;
 
-    auto size(const ProposedViewSize& proposed) -> UISize override {
-        float_t width = mWidth.value_or(proposed.width);
-        float_t height = mHeight.value_or(proposed.height);
+public:
+    explicit FixedFrame(gfx::SharedPtr<View> content, std::optional<float_t> width, std::optional<float_t> height, Alignment alignment)
+    : content(std::move(content)), width(width), height(height), alignment(alignment) {}
 
-        auto childSize = mContent->size({width, height});
-        return UISize{
-            mWidth.value_or(childSize.width),
-            mHeight.value_or(childSize.height)
-        };
+    auto _size(const ProposedSize& proposed) -> UISize override {
+        auto cgSize = proposed.orMax();
+        auto childSize = content->size(ProposedSize(width.value_or(cgSize.width), height.value_or(cgSize.height)));
+        return UISize(width.value_or(childSize.width), height.value_or(childSize.height));
     }
 
-    void draw(const gfx::SharedPtr<UIContext>& context, const UIPoint& origin, const ProposedViewSize& proposed) override {
-        auto childSize = mContent->size(proposed);
+    void _draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) override {
+        auto childSize = content->size(ProposedSize(size));
 
-        UIPoint selfPoint = mAlignment.point(proposed);
-        UIPoint childPoint = mAlignment.point(childSize);
-
-        UIPoint point = origin;
-        point.x += selfPoint.x - childPoint.x;
-        point.y += selfPoint.y - childPoint.y;
-        mContent->draw(context, point, childSize);
+        context->saveState();
+        context->align(childSize, size, alignment);
+        content->draw(context, childSize);
+        context->restoreState();
     }
 };
 
-auto View::frame(float_t width, float_t height, Alignment alignment) -> gfx::SharedPtr<FixedFrame> {
-    auto view = gfx::TransferPtr(new FixedFrame());
-    view->mContent = gfx::RetainPtr(this);
-    view->mWidth = width;
-    view->mHeight = height;
-    view->mAlignment = alignment;
-    return view;
+struct FlexibleFrame : View {
+private:
+    gfx::SharedPtr<View> content;
+    std::optional<float_t> minWidth;
+    std::optional<float_t> idealWidth;
+    std::optional<float_t> maxWidth;
+    std::optional<float_t> minHeight;
+    std::optional<float_t> idealHeight;
+    std::optional<float_t> maxHeight;
+    Alignment alignment;
+
+public:
+    explicit FlexibleFrame(gfx::SharedPtr<View> content, std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment)
+    : content(std::move(content))
+    , minWidth(minWidth)
+    , idealWidth(idealWidth)
+    , maxWidth(maxWidth)
+    , minHeight(minHeight)
+    , idealHeight(idealHeight)
+    , maxHeight(maxHeight)
+    , alignment(alignment) {}
+
+    auto _size(const ProposedSize& p) -> UISize override {
+        auto proposed = ProposedSize(p.width ?: idealWidth, p.height ?: idealHeight).orDefault(10.0F, 10.0F);
+        if (minWidth.has_value()) {
+            proposed.width = std::max(*minWidth, proposed.width);
+        }
+        if (maxWidth.has_value()) {
+            proposed.width = std::min(*maxWidth, proposed.width);
+        }
+        if (minHeight.has_value()) {
+            proposed.height = std::max(*minHeight, proposed.height);
+        }
+        if (maxHeight.has_value()) {
+            proposed.height = std::min(*maxHeight, proposed.height);
+        }
+
+        auto size = content->size(ProposedSize(proposed));
+        if (minWidth.has_value()) {
+            size.width = std::max(*minWidth, std::min(size.width, proposed.width));
+        }
+        if (maxWidth.has_value()) {
+            size.width = std::min(*maxWidth, std::max(size.width, proposed.width));
+        }
+        if (minHeight.has_value()) {
+            size.height = std::max(*minHeight, std::min(size.height, proposed.height));
+        }
+        if (maxHeight.has_value()) {
+            size.height = std::min(*maxHeight, std::max(size.height, proposed.height));
+        }
+        return size;
+    }
+
+    void _draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) override {
+        auto childSize = content->size(ProposedSize(size));
+
+        context->saveState();
+        context->align(childSize, size, alignment);
+        content->draw(context, childSize);
+        context->restoreState();
+    }
+};
+
+struct Overlay : View {
+private:
+    gfx::SharedPtr<View> content;
+    gfx::SharedPtr<View> overlay;
+
+public:
+    explicit Overlay(gfx::SharedPtr<View> content, gfx::SharedPtr<View> overlay) : content(std::move(content)), overlay(std::move(overlay)) {}
+
+    auto _size(const ProposedSize& proposed) -> UISize override {
+        return content->size(proposed);
+    }
+
+    void _draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) override {
+        content->draw(context, size);
+
+        auto childSize = overlay->size(ProposedSize(size));
+        context->saveState();
+        context->align(childSize, size, Alignment::center());
+        overlay->draw(context, childSize);
+        context->restoreState();
+    }
+};
+
+struct FixedSize : View {
+private:
+    gfx::SharedPtr<View> content;
+    bool horizontal;
+    bool vertical;
+
+public:
+    explicit FixedSize(gfx::SharedPtr<View> content, bool horizontal, bool vertical)
+    : content(std::move(content)), horizontal(horizontal), vertical(vertical) {}
+
+    void _draw(const gfx::SharedPtr<UIContext> &context, const UISize &size) override {
+        content->draw(context, size);
+    }
+
+    auto _size(const ProposedSize &proposed) -> UISize override {
+        auto p = proposed;
+        if (horizontal) {
+            p.width = std::nullopt;
+        }
+        if (vertical) {
+            p.height = std::nullopt;
+        }
+        return content->size(p);
+    }
+};
+
+struct HStack : View {
+private:
+    std::vector<gfx::SharedPtr<View>> children;
+    VerticalAlignment alignment;
+    std::optional<float_t> spacing;
+
+    std::vector<UISize> sizes = {};
+
+public:
+    explicit HStack(std::vector<gfx::SharedPtr<View>> children, VerticalAlignment alignment = VerticalAlignment::center(), std::optional<float_t> spacing = {})
+    : alignment(alignment), children(std::move(children)), spacing(spacing) {}
+
+    void _draw(const gfx::SharedPtr<UIContext> &context, const UISize &size) override {
+        float_t stackY = alignment.defaultValue(size);
+        float_t currentX = 0.0F;
+
+        for (size_t i = 0; i < children.size(); ++i) {
+            auto childSize = sizes[i];
+            float_t currentY = alignment.defaultValue(childSize);
+
+            context->saveState();
+            context->translateBy(currentX, stackY - currentY);
+            children[i]->draw(context, childSize);
+            context->restoreState();
+
+            currentX += childSize.width;
+        }
+    }
+
+    auto _size(const ProposedSize &proposed) -> UISize override {
+        layout(proposed);
+
+        float_t width = ranges::accumulate(sizes, 0.0F, [](auto $0, auto $1) -> float_t {
+            return $0 + $1.width;
+        });
+        float_t height = ranges::accumulate(sizes, 0.0F, [](auto $0, auto $1) {
+            return std::max($0, $1.height);
+        });
+        return UISize(width, height);
+    }
+
+    void layout(const ProposedSize &proposed) {
+        auto flexibility = cxx::iter(children)
+            .map([&](auto& child) {
+                auto lower = child->size(ProposedSize(0, proposed.height));
+                auto upper = child->size(ProposedSize(std::numeric_limits<float_t>::max(), proposed.height));
+                return upper.width - lower.width;
+            })
+            .collect();
+
+        auto remainingIndices = cxx::iter(ranges::views::indices(children.size())).collect();
+        ranges::sort(remainingIndices, [&](auto $0, auto $1) {
+            return flexibility[$0] < flexibility[$1];
+        });
+
+        auto remainingWidth = proposed.width.value();
+
+        sizes.resize(children.size(), UISize(0, 0));
+        while (!remainingIndices.empty()) {
+            auto width = remainingWidth / float_t(remainingIndices.size());
+
+            size_t idx = remainingIndices.front();
+            remainingIndices.erase(remainingIndices.begin());
+
+            auto childSize = children[idx]->size(ProposedSize(width, proposed.height));
+            sizes[idx] = childSize;
+
+            remainingWidth -= childSize.width;
+            if (remainingWidth < 0) {
+                remainingWidth = 0;
+            }
+        }
+    }
+};
+
+inline auto View::frame(std::optional<float_t> width, std::optional<float_t> height, Alignment alignment) -> gfx::SharedPtr<FixedFrame> {
+    return gfx::TransferPtr(new FixedFrame(gfx::RetainPtr(this), width, height, alignment));
 }
 
-auto View::border(UIColor color, float_t width) -> gfx::SharedPtr<Border> {
-    auto view = gfx::TransferPtr(new Border());
-    view->mContent = gfx::RetainPtr(this);
-    view->mWidth = width;
-    view->mColor = color;
-    return view;
+inline auto View::frame(std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment) -> gfx::SharedPtr<FlexibleFrame> {
+    return gfx::TransferPtr(new FlexibleFrame(gfx::RetainPtr(this), minWidth, idealWidth, maxWidth, minHeight, idealHeight, maxHeight, alignment));
 }
+
+inline auto View::border(const UIColor& color, float_t width) -> gfx::SharedPtr<View> {
+    return overlay(gfx::TransferPtr(new Border(width))->foregroundColor(color));
+}
+
+inline auto View::overlay(gfx::SharedPtr<View> overlay) -> gfx::SharedPtr<Overlay> {
+    return gfx::TransferPtr(new Overlay(gfx::RetainPtr(this), overlay));
+}
+
+inline auto View::fixedSize(bool horizontal, bool vertical) -> gfx::SharedPtr<FixedSize> {
+    return gfx::TransferPtr(new FixedSize(gfx::RetainPtr(this), horizontal, vertical));
+}
+
+struct ForegroundColor : View {
+private:
+    gfx::SharedPtr<View> content;
+    UIColor color;
+
+public:
+    explicit ForegroundColor(gfx::SharedPtr<View> content, const UIColor& color) : content(content), color(color) {}
+
+public:
+    void _draw(const gfx::SharedPtr<UIContext> &context, const UISize &size) override {
+        context->saveState();
+        context->setFillColor(color);
+        content->draw(context, size);
+        context->restoreState();
+    }
+
+    auto _size(const ProposedSize &proposed) -> UISize override {
+        return content->size(proposed);
+    }
+};
+
+inline auto View::foregroundColor(const UIColor& color) -> gfx::SharedPtr<ForegroundColor> {
+    return gfx::TransferPtr(new ForegroundColor(gfx::RetainPtr(this), color));
+}
+
+inline auto View::size(const ProposedSize& proposed) -> UISize {
+    return body()->_size(proposed);
+}
+
+inline void View::draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) {
+    return body()->_draw(context, size);
+}
+
+inline auto Shape::body() -> gfx::SharedPtr<View> {
+    return gfx::TransferPtr(new ShapeView(gfx::RetainPtr(this)));
+}
+

@@ -7,10 +7,10 @@ namespace gfx {
     class Referencing {
     public:
         Referencing() : counter(1) {
-//            fprintf(stdout, "Allocate %s at %p\n", typeid(Class).name(), this);
+//            fprintf(stdout, "Allocate %p\n", this);
         }
         virtual ~Referencing() {
-//            fprintf(stdout, "Deallocate %s at %p\n", typeid(Class).name(), this);
+//            fprintf(stdout, "Deallocate %p\n", this);
         }
 
         void retain() {

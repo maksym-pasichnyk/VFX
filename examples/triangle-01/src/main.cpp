@@ -7,6 +7,19 @@
 #include "spdlog/spdlog.h"
 
 struct Game : gfx::Referencing {
+private:
+    struct WindowDelegate : gfx::WindowDelegate {
+    private:
+        Game* pGame;
+
+    public:
+        explicit WindowDelegate(Game* pGame) : pGame(pGame) {}
+
+        void windowDidResize(const gfx::SharedPtr<gfx::Window> &sender) override {
+            pGame->screenResized(sender->size());
+        }
+    };
+
 public:
     Game() {
         mApplication = gfx::Application::alloc();
@@ -15,6 +28,7 @@ public:
         mWindow = gfx::Window::alloc(mApplication, 800, 600);
         mWindow->setTitle("Triangle-01");
         mWindow->setResizable(true);
+        mWindow->setDelegate(gfx::TransferPtr(new WindowDelegate(this)));
 
         mSwapchain = mWindow->swapchain();
         mSwapchain->setDevice(mDevice);
@@ -23,6 +37,7 @@ public:
         mSwapchain->setDisplaySyncEnabled(true);
 
         mRenderer = gfx::TransferPtr(new Renderer(mDevice));
+        mRenderer->setScreenSize(mWindow->size());
     }
 
 public:
@@ -58,6 +73,11 @@ public:
                 }
             }
         }
+    }
+
+private:
+    void screenResized(const vk::Extent2D& size) {
+        mRenderer->setScreenSize(size);
     }
 
 private:

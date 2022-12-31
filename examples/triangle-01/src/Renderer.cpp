@@ -1,6 +1,5 @@
 #include "Renderer.hpp"
 
-#include "simd.hpp"
 #include "Assets.hpp"
 
 Renderer::Renderer(gfx::SharedPtr<gfx::Device> device) : mDevice(std::move(device)) {
@@ -8,9 +7,6 @@ Renderer::Renderer(gfx::SharedPtr<gfx::Device> device) : mDevice(std::move(devic
     mCommandBuffer = mCommandQueue->commandBuffer();
 
     mGuiRenderer = gfx::TransferPtr(new GuiRenderer(mDevice));
-
-    buildShaders();
-    buildBuffers();
 }
 
 void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
@@ -38,9 +34,6 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
     mCommandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
     mCommandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-//    mCommandBuffer->setRenderPipelineState(mRenderPipelineState);
-//    mCommandBuffer->bindDescriptorSet(mDescriptorSet, 0);
-
     mCommandBuffer->beginRendering(rendering_info);
     mCommandBuffer->setScissor(0, rendering_area);
     mCommandBuffer->setViewport(0, rendering_viewport);
@@ -56,41 +49,7 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
     mCommandBuffer->waitUntilCompleted();
 }
 
-void Renderer::buildShaders() {
-//    auto pVertexLibrary = mDevice->newLibrary(Assets::readFile("shaders/default.vert.spv"));
-//    auto pFragmentLibrary = mDevice->newLibrary(Assets::readFile("shaders/default.frag.spv"));
-//
-//    auto pVertexFunction = pVertexLibrary->newFunction("main");
-//    auto pFragmentFunction = pFragmentLibrary->newFunction("main");
-//
-//    gfx::RenderPipelineStateDescription description = {};
-//
-//    description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-//    description.attachments[0].setBlendEnable(false);
-//
-//    description.setVertexFunction(pVertexFunction);
-//    description.setFragmentFunction(pFragmentFunction);
-//
-//    mRenderPipelineState = mDevice->newRenderPipelineState(description);
-//    mDescriptorSet = mDevice->newDescriptorSet(mRenderPipelineState->vkDescriptorSetLayouts[0], {
-//        vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1}
-//    });
+void Renderer::setScreenSize(const vk::Extent2D& size) {
+    mGuiRenderer->setScreenSize(size);
 }
 
-void Renderer::buildBuffers() {
-//    struct Vertex {
-//        simd::float3 position;
-//        simd::float3 color;
-//    };
-//
-//    Vertex vertices[] = {
-//        {{-0.8F, +0.8F, +0.0F}, {1.0F, 0.0F, 0.0F}},
-//        {{+0.0F, -0.8F, +0.0F}, {0.0F, 1.0F, 0.0F}},
-//        {{+0.8F, +0.8F, +0.0F}, {0.0F, 0.0F, 1.0F}}
-//    };
-//
-//    mVertexBuffer = mDevice->newBuffer(vk::BufferUsageFlagBits::eStorageBuffer, sizeof(vertices), VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-//    std::memcpy(mVertexBuffer->contents(), vertices, sizeof(vertices));
-//    mVertexBuffer->didModifyRange(0, mVertexBuffer->length());
-//    mDescriptorSet->setStorageBuffer(mVertexBuffer, 0, 0);
-}
