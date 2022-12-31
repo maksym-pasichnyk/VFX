@@ -38,7 +38,7 @@ function(target_compile_shaders TARGET)
         set(OUTPUT_FILE "${SOURCE_FILE}.spv")
         add_custom_command(
             OUTPUT ${OUTPUT_FILE}
-            COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/shaders/"
+#            COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/shaders/"
             COMMAND glslc ${SOURCE_FILE} -o ${OUTPUT_FILE}
             DEPENDS ${SOURCE_FILE}
         )

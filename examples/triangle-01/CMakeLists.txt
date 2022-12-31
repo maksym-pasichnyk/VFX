@@ -3,8 +3,6 @@ set_target_properties(triangle-01 PROPERTIES CXX_EXTENSIONS OFF CXX_STANDARD 23 
 target_link_libraries(triangle-01 PRIVATE common gfx)
 
 target_compile_shaders(triangle-01
-    "${CMAKE_SOURCE_DIR}/assets/shaders/gui.frag"
-    "${CMAKE_SOURCE_DIR}/assets/shaders/gui.vert"
     "${CMAKE_SOURCE_DIR}/assets/shaders/default.frag"
     "${CMAKE_SOURCE_DIR}/assets/shaders/default.vert"
 )

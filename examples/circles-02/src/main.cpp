@@ -25,7 +25,7 @@ public:
         mDevice = mApplication->devices().front();
 
         mWindow = gfx::Window::alloc(mApplication, 800, 600);
-        mWindow->setTitle("Triangle-01");
+        mWindow->setTitle("Circles-02");
         mWindow->setResizable(true);
         mWindow->setDelegate(gfx::TransferPtr(new WindowDelegate(this)));
 
