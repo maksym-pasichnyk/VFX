@@ -54,14 +54,23 @@ void GuiRenderer::draw(const gfx::SharedPtr<gfx::CommandBuffer>& cmd) {
 
     auto view =
         gfx::TransferPtr(new HStack({
-            gfx::TransferPtr(new Rectangle())
-                ->frame(std::nullopt, 50)
-                ->border(UIColor(1, 0, 0, 1), 4),
-            gfx::TransferPtr(new Circle())
-                ->border(UIColor(0, 1, 0, 1), 4),
-            gfx::TransferPtr(new Rectangle())
-                ->frame(std::nullopt, 50)
-                ->border(UIColor(0, 0, 1, 1), 4),
+            gfx::TransferPtr(new VStack({
+                gfx::TransferPtr(new HStack({
+                    gfx::TransferPtr(new Circle()),
+                    gfx::TransferPtr(new Circle()),
+                    gfx::TransferPtr(new Circle()),
+                })),
+                gfx::TransferPtr(new HStack({
+                    gfx::TransferPtr(new Circle()),
+                    gfx::TransferPtr(new Circle()),
+                    gfx::TransferPtr(new Circle()),
+                })),
+                gfx::TransferPtr(new HStack({
+                    gfx::TransferPtr(new Circle()),
+                    gfx::TransferPtr(new Circle()),
+                    gfx::TransferPtr(new Circle()),
+                })),
+            })),
         }))
         ->border(UIColor(1, 1, 1, 0.25F), 4);
 

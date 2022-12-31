@@ -258,7 +258,7 @@ private:
 
 public:
     explicit HStack(std::vector<gfx::SharedPtr<View>> children, VerticalAlignment alignment = VerticalAlignment::center(), std::optional<float_t> spacing = {})
-    : alignment(alignment), children(std::move(children)), spacing(spacing) {}
+    : children(std::move(children)), alignment(alignment), spacing(spacing) {}
 
     void _draw(const gfx::SharedPtr<UIContext> &context, const UISize &size) override {
         float_t stackY = alignment.defaultValue(size);
@@ -318,6 +318,82 @@ public:
             remainingWidth -= childSize.width;
             if (remainingWidth < 0) {
                 remainingWidth = 0;
+            }
+        }
+    }
+};
+
+struct VStack : View {
+private:
+    std::vector<gfx::SharedPtr<View>> children;
+    HorizontalAlignment alignment;
+    std::optional<float_t> spacing;
+
+    std::vector<UISize> sizes = {};
+
+public:
+    explicit VStack(std::vector<gfx::SharedPtr<View>> children, HorizontalAlignment alignment = HorizontalAlignment::center(), std::optional<float_t> spacing = {})
+    : children(std::move(children)), alignment(alignment), spacing(spacing) {}
+
+private:
+    void _draw(const gfx::SharedPtr<UIContext> &context, const UISize &size) override {
+        float_t stackX = alignment.defaultValue(size);
+        float_t currentY = 0.0F;
+
+        for (size_t i = 0; i < children.size(); ++i) {
+            auto childSize = sizes[i];
+            float_t currentX = alignment.defaultValue(childSize);
+
+            context->saveState();
+            context->translateBy(stackX - currentX, currentY);
+            children[i]->draw(context, childSize);
+            context->restoreState();
+
+            currentY += childSize.height;
+        }
+    }
+
+    auto _size(const ProposedSize &proposed) -> UISize override {
+        layout(proposed);
+
+        float_t width = ranges::accumulate(sizes, 0.0F, [](auto $0, auto $1) -> float_t {
+            return std::max($0, $1.width);
+        });
+        float_t height = ranges::accumulate(sizes, 0.0F, [](auto $0, auto $1) {
+            return $0 + $1.height;
+        });
+        return UISize(width, height);
+    }
+
+    void layout(const ProposedSize &proposed) {
+        auto flexibility = cxx::iter(children)
+            .map([&](auto& child) {
+                auto lower = child->size(ProposedSize(proposed.width, 0));
+                auto upper = child->size(ProposedSize(proposed.width, std::numeric_limits<float_t>::max()));
+                return upper.height - lower.height;
+            })
+            .collect();
+
+        auto remainingIndices = cxx::iter(ranges::views::indices(children.size())).collect();
+        ranges::sort(remainingIndices, [&](auto $0, auto $1) {
+            return flexibility[$0] < flexibility[$1];
+        });
+
+        auto remainingHeight = proposed.height.value();
+
+        sizes.resize(children.size(), UISize(0, 0));
+        while (!remainingIndices.empty()) {
+            auto height = remainingHeight / float_t(remainingIndices.size());
+
+            size_t idx = remainingIndices.front();
+            remainingIndices.erase(remainingIndices.begin());
+
+            auto childSize = children[idx]->size(ProposedSize(proposed.width, height));
+            sizes[idx] = childSize;
+
+            remainingHeight -= childSize.height;
+            if (remainingHeight < 0) {
+                remainingHeight = 0;
             }
         }
     }
