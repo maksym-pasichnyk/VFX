@@ -2,7 +2,7 @@
 
 #include "Renderer.hpp"
 
-#include <SDL_timer.h>
+#include <chrono>
 #include <SDL_events.h>
 
 #include "spdlog/spdlog.h"
@@ -43,17 +43,20 @@ public:
 
 public:
     void run() {
-        uint32_t prevTicksPassed;
-        uint32_t currTicksPassed = SDL_GetTicks();
+        using std::chrono::steady_clock;
+        using as_seconds = std::chrono::duration<float_t, std::chrono::seconds::period>;
+
+        steady_clock::time_point timePointA = steady_clock::now();
+        steady_clock::time_point timePointB;
 
         running = true;
         while (running) {
             pollEvents();
 
-            prevTicksPassed = currTicksPassed;
-            currTicksPassed = SDL_GetTicks();
+            timePointB = timePointA;
+            timePointA = steady_clock::now();
 
-            float_t dt = static_cast<float_t>(currTicksPassed - prevTicksPassed) / 1000.0F;
+            float_t dt = as_seconds(timePointA - timePointB).count();
 
             renderer->update(dt);
             renderer->draw(swapchain);
