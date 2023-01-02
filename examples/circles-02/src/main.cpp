@@ -21,31 +21,31 @@ private:
 
 public:
     Game() {
-        mApplication = gfx::Application::alloc();
-        mDevice = mApplication->devices().front();
+        application = gfx::Application::alloc();
+        device = application->devices().front();
 
-        mWindow = gfx::Window::alloc(mApplication, 800, 600);
-        mWindow->setTitle("Circles-02");
-        mWindow->setResizable(true);
-        mWindow->setDelegate(gfx::TransferPtr(new WindowDelegate(this)));
+        window = gfx::Window::alloc(application, 800, 600);
+        window->setTitle("Circles-02");
+        window->setResizable(true);
+        window->setDelegate(gfx::TransferPtr(new WindowDelegate(this)));
 
-        mSwapchain = mWindow->swapchain();
-        mSwapchain->setDevice(mDevice);
-        mSwapchain->setColorSpace(vk::ColorSpaceKHR::eSrgbNonlinear);
-        mSwapchain->setPixelFormat(vk::Format::eB8G8R8A8Unorm);
-        mSwapchain->setDisplaySyncEnabled(true);
+        swapchain = window->swapchain();
+        swapchain->setDevice(device);
+        swapchain->setColorSpace(vk::ColorSpaceKHR::eSrgbNonlinear);
+        swapchain->setPixelFormat(vk::Format::eB8G8R8A8Unorm);
+        swapchain->setDisplaySyncEnabled(true);
 
-        mRenderer = gfx::TransferPtr(new Renderer(mDevice));
-        mRenderer->setScreenSize(mWindow->size());
+        renderer = gfx::TransferPtr(new Renderer(device));
+        renderer->screenResized(window->size());
     }
 
 public:
     void run() {
-        mApplicationRunning = true;
-        while (mApplicationRunning) {
+        running = true;
+        while (running) {
             pollEvents();
 
-            mRenderer->draw(mSwapchain);
+            renderer->draw(swapchain);
         }
     }
 
@@ -54,7 +54,7 @@ public:
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
                 case SDL_QUIT:
-                    mApplicationRunning = false;
+                    running = false;
                     break;
                 case SDL_WINDOWEVENT: {
                     auto pSDLWindow = SDL_GetWindowFromID(event.window.windowID);
@@ -76,17 +76,17 @@ public:
 
 private:
     void screenResized(const vk::Extent2D& size) {
-        mRenderer->setScreenSize(size);
+        renderer->screenResized(size);
     }
 
 private:
-    bool mApplicationRunning = {};
+    bool running = {};
 
-    gfx::SharedPtr<Renderer> mRenderer;
-    gfx::SharedPtr<gfx::Device> mDevice;
-    gfx::SharedPtr<gfx::Window> mWindow;
-    gfx::SharedPtr<gfx::Swapchain> mSwapchain;
-    gfx::SharedPtr<gfx::Application> mApplication;
+    gfx::SharedPtr<Renderer> renderer;
+    gfx::SharedPtr<gfx::Device> device;
+    gfx::SharedPtr<gfx::Window> window;
+    gfx::SharedPtr<gfx::Swapchain> swapchain;
+    gfx::SharedPtr<gfx::Application> application;
 };
 
 auto main() -> int32_t {

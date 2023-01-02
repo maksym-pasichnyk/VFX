@@ -2,11 +2,11 @@
 
 #include "Assets.hpp"
 
-Renderer::Renderer(gfx::SharedPtr<gfx::Device> device) : mDevice(std::move(device)) {
-    mCommandQueue = mDevice->newCommandQueue();
-    mCommandBuffer = mCommandQueue->commandBuffer();
+Renderer::Renderer(gfx::SharedPtr<gfx::Device> device) : device(std::move(device)) {
+    commandQueue = device->newCommandQueue();
+    commandBuffer = commandQueue->commandBuffer();
 
-    mGuiRenderer = gfx::TransferPtr(new GuiRenderer(mDevice));
+    mGuiRenderer = gfx::TransferPtr(new GuiRenderer(device));
 }
 
 void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
@@ -31,25 +31,25 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
     rendering_info.colorAttachments()[0].setLoadOp(vk::AttachmentLoadOp::eClear);
     rendering_info.colorAttachments()[0].setStoreOp(vk::AttachmentStoreOp::eStore);
 
-    mCommandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-    mCommandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+    commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+    commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-    mCommandBuffer->beginRendering(rendering_info);
-    mCommandBuffer->setScissor(0, rendering_area);
-    mCommandBuffer->setViewport(0, rendering_viewport);
+    commandBuffer->beginRendering(rendering_info);
+    commandBuffer->setScissor(0, rendering_area);
+    commandBuffer->setViewport(0, rendering_viewport);
 
-    mGuiRenderer->draw(mCommandBuffer);
+    mGuiRenderer->draw(commandBuffer);
 
-    mCommandBuffer->endRendering();
+    commandBuffer->endRendering();
 
-    mCommandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
-    mCommandBuffer->end();
-    mCommandBuffer->submit();
-    mCommandBuffer->present(drawable);
-    mCommandBuffer->waitUntilCompleted();
+    commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+    commandBuffer->end();
+    commandBuffer->submit();
+    commandBuffer->present(drawable);
+    commandBuffer->waitUntilCompleted();
 }
 
-void Renderer::setScreenSize(const vk::Extent2D& size) {
+void Renderer::screenResized(const vk::Extent2D& size) {
     mGuiRenderer->setScreenSize(size);
 }
 

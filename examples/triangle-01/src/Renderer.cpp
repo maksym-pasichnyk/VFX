@@ -3,17 +3,17 @@
 #include "Assets.hpp"
 #include "simd.hpp"
 
-Renderer::Renderer(gfx::SharedPtr<gfx::Device> device) : mDevice(std::move(device)) {
-    mCommandQueue = mDevice->newCommandQueue();
-    mCommandBuffer = mCommandQueue->commandBuffer();
+Renderer::Renderer(gfx::SharedPtr<gfx::Device> device) : device(std::move(device)) {
+    commandQueue = device->newCommandQueue();
+    commandBuffer = commandQueue->commandBuffer();
 
     buildShaders();
     buildBuffers();
 }
 
 void Renderer::buildShaders() {
-    auto pVertexLibrary = mDevice->newLibrary(Assets::readFile("shaders/default.vert.spv"));
-    auto pFragmentLibrary = mDevice->newLibrary(Assets::readFile("shaders/default.frag.spv"));
+    auto pVertexLibrary = device->newLibrary(Assets::readFile("shaders/default.vert.spv"));
+    auto pFragmentLibrary = device->newLibrary(Assets::readFile("shaders/default.frag.spv"));
 
     auto pVertexFunction = pVertexLibrary->newFunction("main");
     auto pFragmentFunction = pFragmentLibrary->newFunction("main");
@@ -26,8 +26,8 @@ void Renderer::buildShaders() {
     description.setVertexFunction(pVertexFunction);
     description.setFragmentFunction(pFragmentFunction);
 
-    mRenderPipelineState = mDevice->newRenderPipelineState(description);
-    mDescriptorSet = mDevice->newDescriptorSet(mRenderPipelineState->vkDescriptorSetLayouts[0], {
+    renderPipelineState = device->newRenderPipelineState(description);
+    descriptorSet = device->newDescriptorSet(renderPipelineState->vkDescriptorSetLayouts[0], {
         vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1}
     });
 }
@@ -44,10 +44,10 @@ void Renderer::buildBuffers() {
         {{+0.8F, +0.8F, +0.0F}, {0.0F, 0.0F, 1.0F}}
     };
 
-    mVertexBuffer = mDevice->newBuffer(vk::BufferUsageFlagBits::eStorageBuffer, sizeof(vertices), VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-    std::memcpy(mVertexBuffer->contents(), vertices, sizeof(vertices));
-    mVertexBuffer->didModifyRange(0, mVertexBuffer->length());
-    mDescriptorSet->setStorageBuffer(mVertexBuffer, 0, 0);
+    vertexBuffer = device->newBuffer(vk::BufferUsageFlagBits::eStorageBuffer, sizeof(vertices), VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+    std::memcpy(vertexBuffer->contents(), vertices, sizeof(vertices));
+    vertexBuffer->didModifyRange(0, vertexBuffer->length());
+    descriptorSet->setStorageBuffer(vertexBuffer, 0, 0);
 }
 
 void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
@@ -72,25 +72,25 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
     rendering_info.colorAttachments()[0].setLoadOp(vk::AttachmentLoadOp::eClear);
     rendering_info.colorAttachments()[0].setStoreOp(vk::AttachmentStoreOp::eStore);
 
-    mCommandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-    mCommandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+    commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+    commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-    mCommandBuffer->setRenderPipelineState(mRenderPipelineState);
-    mCommandBuffer->bindDescriptorSet(mDescriptorSet, 0);
+    commandBuffer->setRenderPipelineState(renderPipelineState);
+    commandBuffer->bindDescriptorSet(descriptorSet, 0);
 
-    mCommandBuffer->beginRendering(rendering_info);
-    mCommandBuffer->setScissor(0, rendering_area);
-    mCommandBuffer->setViewport(0, rendering_viewport);
+    commandBuffer->beginRendering(rendering_info);
+    commandBuffer->setScissor(0, rendering_area);
+    commandBuffer->setViewport(0, rendering_viewport);
 
-    mCommandBuffer->draw(3, 1, 0, 0);
-    mCommandBuffer->endRendering();
+    commandBuffer->draw(3, 1, 0, 0);
+    commandBuffer->endRendering();
 
-    mCommandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
-    mCommandBuffer->end();
-    mCommandBuffer->submit();
-    mCommandBuffer->present(drawable);
-    mCommandBuffer->waitUntilCompleted();
+    commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+    commandBuffer->end();
+    commandBuffer->submit();
+    commandBuffer->present(drawable);
+    commandBuffer->waitUntilCompleted();
 }
 
-void Renderer::setScreenSize(const vk::Extent2D& size) {}
+void Renderer::screenResized(const vk::Extent2D& size) {}
 

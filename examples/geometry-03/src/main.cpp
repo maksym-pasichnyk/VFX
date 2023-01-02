@@ -2,7 +2,9 @@
 
 #include "Renderer.hpp"
 
-#include "SDL_events.h"
+#include <SDL_timer.h>
+#include <SDL_events.h>
+
 #include "spdlog/spdlog.h"
 
 struct Game : gfx::Referencing {
@@ -25,7 +27,7 @@ public:
         device = application->devices().front();
 
         window = gfx::Window::alloc(application, 800, 600);
-        window->setTitle("Triangle-01");
+        window->setTitle("Geometry-03");
         window->setResizable(true);
         window->setDelegate(gfx::TransferPtr(new WindowDelegate(this)));
 
@@ -41,10 +43,19 @@ public:
 
 public:
     void run() {
+        uint32_t prevTicksPassed;
+        uint32_t currTicksPassed = SDL_GetTicks();
+
         running = true;
         while (running) {
             pollEvents();
 
+            prevTicksPassed = currTicksPassed;
+            currTicksPassed = SDL_GetTicks();
+
+            float_t dt = static_cast<float_t>(currTicksPassed - prevTicksPassed) / 1000.0F;
+
+            renderer->update(dt);
             renderer->draw(swapchain);
         }
     }
