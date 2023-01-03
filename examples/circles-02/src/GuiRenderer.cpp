@@ -79,14 +79,14 @@ void GuiRenderer::draw(const gfx::SharedPtr<gfx::CommandBuffer>& cmd) {
 
     mIndexBuffer = mDevice->newBuffer(
         vk::BufferUsageFlagBits::eIndexBuffer,
-        ctx->mDrawList.IdxBuffer.Data,
-        ctx->mDrawList.IdxBuffer.size_in_bytes(),
+        ctx->drawList().IdxBuffer.Data,
+        ctx->drawList().IdxBuffer.size_in_bytes(),
         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
     mVertexBuffer = mDevice->newBuffer(
         vk::BufferUsageFlagBits::eVertexBuffer,
-        ctx->mDrawList.VtxBuffer.Data,
-        ctx->mDrawList.VtxBuffer.size_in_bytes(),
+        ctx->drawList().VtxBuffer.Data,
+        ctx->drawList().VtxBuffer.size_in_bytes(),
         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
     GuiShaderData gui_shader_data = {};
@@ -97,8 +97,8 @@ void GuiRenderer::draw(const gfx::SharedPtr<gfx::CommandBuffer>& cmd) {
     cmd->bindVertexBuffer(0, mVertexBuffer, 0);
     cmd->bindIndexBuffer(mIndexBuffer, 0, vk::IndexType::eUint16);
 
-    for (size_t i = 0; i < ctx->mDrawList.CmdBuffer.Size; ++i) {
-        cmd->drawIndexed(ctx->mDrawList.CmdBuffer[i].ElemCount, 1, ctx->mDrawList.CmdBuffer[i].IdxOffset, ctx->mDrawList.CmdBuffer[i].VtxOffset, 0);
+    for (size_t i = 0; i < ctx->drawList().CmdBuffer.Size; ++i) {
+        cmd->drawIndexed(ctx->drawList().CmdBuffer[i].ElemCount, 1, ctx->drawList().CmdBuffer[i].IdxOffset, ctx->drawList().CmdBuffer[i].VtxOffset, 0);
     }
 }
 

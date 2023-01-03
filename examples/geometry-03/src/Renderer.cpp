@@ -1,32 +1,22 @@
 #include "Renderer.hpp"
 
+#include "Iter.hpp"
+#include "Mesh.hpp"
+#include "Skin.hpp"
+#include "Node.hpp"
+#include "Scene.hpp"
 #include "Assets.hpp"
+#include "Animation.hpp"
 
-#include "glm/glm.hpp"
-#include "glm/ext.hpp"
 #include "tiny_gltf.h"
+#include "fmt/format.h"
 
 #include <chrono>
 #include <SDL_timer.h>
 
-struct Vertex {
-    alignas(16) glm::vec3 position;
-    alignas(16) glm::vec4 color;
-};
-
 struct ShaderData {
     alignas(16) glm::mat4x4 g_proj_matrix;
     alignas(16) glm::mat4x4 g_view_matrix;
-};
-
-struct Primitive {
-    uint32_t baseIndex;
-    uint32_t baseVertex;
-    uint32_t numIndices;
-    uint32_t numVertices;
-
-    explicit Primitive(uint32_t baseIndex, uint32_t baseVertex, uint32_t numIndices, uint32_t numVertices)
-    : baseIndex(baseIndex), baseVertex(baseVertex), numIndices(numIndices), numVertices(numVertices) {}
 };
 
 inline auto perspective(float_t fovy, float_t aspect, float_t zNear, float_t zFar) -> glm::mat4x4 {
@@ -46,10 +36,6 @@ inline auto perspective(float_t fovy, float_t aspect, float_t zNear, float_t zFa
     };
 }
 
-glm::mat4x4 g_proj_matrix;
-glm::mat4x4 g_view_matrix;
-std::vector<Primitive> primitives = {};
-
 Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(device_)) {
     commandQueue = device->newCommandQueue();
     commandBuffer = commandQueue->commandBuffer();
@@ -59,8 +45,8 @@ Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(devic
 }
 
 void Renderer::buildShaders() {
-    auto vertexLibrary = device->newLibrary(Assets::readFile("shaders/shader.vert.spv"));
-    auto fragmentLibrary = device->newLibrary(Assets::readFile("shaders/shader.frag.spv"));
+    auto vertexLibrary = device->newLibrary(Assets::readFile("shaders/geometry.vert.spv"));
+    auto fragmentLibrary = device->newLibrary(Assets::readFile("shaders/geometry.frag.spv"));
 
     auto vertexFunction = vertexLibrary->newFunction("main");
     auto fragmentFunction = fragmentLibrary->newFunction("main");
@@ -105,32 +91,35 @@ void Renderer::buildBuffers() {
         throw std::runtime_error("Failed to load gltf file!");
     }
 
-    std::vector<Vertex> vertices = {};
-    std::vector<uint32_t> indices = {};
-
     for (auto& mesh : model.meshes) {
+        std::vector<Vertex> vertices = {};
+        std::vector<uint32_t> indices = {};
+        std::vector<Primitive> primitives = {};
+        std::vector<glm::u32vec4> joints = {};
+        std::vector<glm::f32vec4> weights = {};
+
         for (auto& primitive : mesh.primitives) {
             std::vector<glm::vec3> positions = {};
             std::vector<glm::vec2> texcoords = {};
 
-            uint32_t numIndices = 0;
-            uint32_t numVertices = 0;
             uint32_t baseIndex = 0;
             uint32_t baseVertex = 0;
+            uint32_t numIndices = 0;
+            uint32_t numVertices = 0;
 
             for (const auto& [name, attrib] : primitive.attributes) {
-                auto& accessor = model.accessors[size_t(attrib)];
-                auto& bufferView = model.bufferViews[size_t(accessor.bufferView)];
-                auto& buffer = model.buffers[size_t(bufferView.buffer)];
+                auto& accessor = model.accessors[attrib];
+                auto& bufferView = model.bufferViews[accessor.bufferView];
+                auto& buffer = model.buffers[bufferView.buffer];
                 auto stride = accessor.ByteStride(bufferView);
-                auto data = buffer.data.data() + accessor.byteOffset + bufferView.byteOffset;
+                auto* data = buffer.data.data() + accessor.byteOffset + bufferView.byteOffset;
 
                 if (name == "POSITION") {
                     assert(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
                     positions.reserve(accessor.count);
                     for (size_t i = 0; i < accessor.count; ++i) {
                         glm::vec3 position;
-                        std::memcpy(&position, data + i * size_t(stride), sizeof(glm::vec3));
+                        std::memcpy(&position, data + i * stride, sizeof(glm::vec3));
                         positions.emplace_back(position);
                     }
                 } else if (name == "TEXCOORD_0") {
@@ -138,45 +127,39 @@ void Renderer::buildBuffers() {
                     texcoords.reserve(accessor.count);
                     for (size_t i = 0; i < accessor.count; ++i) {
                         glm::vec2 texcoord;
-                        std::memcpy(&texcoord, data + i * size_t(stride), sizeof(glm::vec2));
+                        std::memcpy(&texcoord, data + i * stride, sizeof(glm::vec2));
                         texcoords.emplace_back(texcoord);
                     }
                 } else if (name == "JOINTS_0") {
                     assert(accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
-//                    joints.reserve(accessor.count);
-//                    for (size_t i = 0; i < accessor.count; ++i) {
-//                        u16 joint0;
-//                        u16 joint1;
-//                        u16 joint2;
-//                        u16 joint3;
-//                        std::memcpy(&joint0, data + i * size_t(stride) + sizeof(u16) * 0, sizeof(u16));
-//                        std::memcpy(&joint1, data + i * size_t(stride) + sizeof(u16) * 1, sizeof(u16));
-//                        std::memcpy(&joint2, data + i * size_t(stride) + sizeof(u16) * 2, sizeof(u16));
-//                        std::memcpy(&joint3, data + i * size_t(stride) + sizeof(u16) * 3, sizeof(u16));
-//                        joints.emplace_back(std::array{u32(joint0), u32(joint1), u32(joint2), u32(joint3)});
-//                    }
+                    joints.reserve(accessor.count);
+                    for (size_t i = 0; i < accessor.count; ++i) {
+                        glm::u16vec4 joint;
+                        std::memcpy(&joint, data + i * stride, sizeof(glm::u16vec4));
+                        joints.emplace_back(joint);
+                    }
                 } else if (name == "WEIGHTS_0") {
                     assert(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
                     assert(stride == 16);
-//                    weights.reserve(accessor.count);
-//                    for (size_t i = 0; i < accessor.count; ++i) {
-//                        std::array<f32, 4> weight{};
-//                        std::memcpy(&weight, data + i * size_t(stride), sizeof(std::array<f32, 4>));
-//                        weights.emplace_back(weight);
-//                    }
+                    weights.reserve(accessor.count);
+                    for (size_t i = 0; i < accessor.count; ++i) {
+                        glm::f32vec4 weight;
+                        std::memcpy(&weight, data + i * stride, sizeof(glm::f32vec4));
+                        weights.emplace_back(weight);
+                    }
                 }
             }
 
             if (primitive.indices >= 0) {
-                auto& accessor = model.accessors[size_t(primitive.indices)];
-                auto& bufferView = model.bufferViews[size_t(accessor.bufferView)];
-                auto& buffer = model.buffers[size_t(bufferView.buffer)];
+                auto& accessor = model.accessors[primitive.indices];
+                auto& bufferView = model.bufferViews[accessor.bufferView];
+                auto& buffer = model.buffers[bufferView.buffer];
                 auto stride = accessor.ByteStride(bufferView);
-                auto data = buffer.data.data() + accessor.byteOffset + bufferView.byteOffset;
+                auto* data = buffer.data.data() + accessor.byteOffset + bufferView.byteOffset;
                 indices.reserve(accessor.count);
                 for (size_t i = 0; i < accessor.count; ++i) {
                     uint32_t index;
-                    std::memcpy(&index, data + i * size_t(stride), sizeof(uint32_t));
+                    std::memcpy(&index, data + i * stride, sizeof(uint32_t));
                     indices.emplace_back(index);
                 }
                 numIndices += accessor.count;
@@ -193,9 +176,149 @@ void Renderer::buildBuffers() {
 
             primitives.emplace_back(baseIndex, baseVertex, numIndices, numVertices);
         }
+
+        auto gfxMesh = gfx::TransferPtr(new Mesh(std::move(vertices), std::move(indices), std::move(primitives), std::move(joints), std::move(weights)));
+        gfxMesh->uploadMeshData(device);
+        meshes.emplace_back(std::move(gfxMesh));
     }
 
-    vertexBuffer = device->newBuffer(vk::BufferUsageFlagBits::eVertexBuffer, vertices.data(), vertices.size() * sizeof(Vertex), VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+    for (auto& skin : model.skins) {
+        std::vector<glm::mat4x4> inverseBindMatrices = {};
+
+        if (skin.inverseBindMatrices >= 0) {
+            auto& accessor = model.accessors[skin.inverseBindMatrices];
+            auto& bufferView = model.bufferViews[accessor.bufferView];
+            auto& buffer = model.buffers[bufferView.buffer];
+            auto stride = accessor.ByteStride(bufferView);
+            auto* data = buffer.data.data() + accessor.byteOffset + bufferView.byteOffset;
+
+            for (size_t i = 0; i < accessor.count; ++i) {
+                glm::mat4x4 inverseBindMatrix;
+                std::memcpy(&inverseBindMatrix, data + i * stride, sizeof(glm::mat4x4));
+                inverseBindMatrices.emplace_back(inverseBindMatrix);
+            }
+        }
+
+        skins.emplace_back(gfx::TransferPtr(new Skin(skin.skeleton, skin.joints, std::move(inverseBindMatrices))));
+    }
+
+    std::vector<gfx::SharedPtr<Node>> nodes = {};
+
+    for (auto& node : model.nodes) {
+        glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);
+        glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        glm::vec3 scale = glm::vec3(1.0f, 1.0f, 1.0f);
+
+        if (!node.translation.empty()) {
+            assert(node.translation.size() == 3);
+            auto x = static_cast<float_t>(node.translation[0]);
+            auto y = static_cast<float_t>(node.translation[1]);
+            auto z = static_cast<float_t>(node.translation[2]);
+            position = glm::vec3(x, y, z);
+        }
+        if (!node.rotation.empty()) {
+            assert(node.rotation.size() == 4);
+            auto x = static_cast<float_t>(node.rotation[0]);
+            auto y = static_cast<float_t>(node.rotation[1]);
+            auto z = static_cast<float_t>(node.rotation[2]);
+            auto w = static_cast<float_t>(node.rotation[3]);
+            rotation = glm::quat(w, x, y, z);
+        }
+        if (!node.scale.empty()) {
+            assert(node.scale.size() == 3);
+            auto x = static_cast<float_t>(node.scale[0]);
+            auto y = static_cast<float_t>(node.scale[1]);
+            auto z = static_cast<float_t>(node.scale[2]);
+            scale = glm::vec3(x, y, z);
+        }
+        gfx::SharedPtr<Skin> skin = {};
+        if (node.skin >= 0) {
+            skin = skins.at(node.skin);
+        }
+        gfx::SharedPtr<Mesh> mesh = {};
+        if (node.mesh >= 0) {
+            mesh = meshes.at(node.mesh);
+        }
+        nodes.emplace_back(gfx::TransferPtr(new Node(std::move(skin), std::move(mesh), position, rotation, scale)));
+    }
+
+    for (size_t i = 0; i < model.nodes.size(); ++i) {
+        for (size_t child : model.nodes.at(i).children) {
+            nodes.at(child)->setParent(nodes.at(i));
+        }
+    }
+
+    for (auto& scene : model.scenes) {
+        scenes.emplace_back(gfx::TransferPtr(new Scene(cxx::iter(scene.nodes).map([&](int i) { return nodes[i]; }).collect())));
+    }
+
+    for (auto& animation : model.animations) {
+        float_t start = std::numeric_limits<float_t>::max();
+        float_t end = std::numeric_limits<float_t>::min();
+
+        std::vector<AnimationSampler> samplers = {};
+        std::vector<AnimationChannel> channels = {};
+
+        for (const auto& sampler : animation.samplers) {
+            auto inputs = [&] {
+                std::vector<float_t> inputs = {};
+                auto& accessor = model.accessors[sampler.input];
+                auto& bufferView = model.bufferViews[accessor.bufferView];
+                auto& buffer = model.buffers[bufferView.buffer];
+                auto stride = accessor.ByteStride(bufferView);
+                auto* data = buffer.data.data() + accessor.byteOffset + bufferView.byteOffset;
+
+                for (size_t i = 0; i < accessor.count; ++i) {
+                    float_t input;
+                    std::memcpy(&input, data + i * stride, sizeof(float_t));
+
+                    if (input < start) {
+                        start = input;
+                    }
+                    if (input > end) {
+                        end = input;
+                    }
+                    inputs.emplace_back(input);
+                }
+                return inputs;
+            }();
+
+            auto outputs = [&] {
+                std::vector<glm::f32vec4> outputs = {};
+                auto& accessor = model.accessors[sampler.output];
+                auto& bufferView = model.bufferViews[accessor.bufferView];
+                auto& buffer = model.buffers[bufferView.buffer];
+                auto stride = accessor.ByteStride(bufferView);
+                auto* data = buffer.data.data() + accessor.byteOffset + bufferView.byteOffset;
+
+                if (accessor.type == TINYGLTF_TYPE_VEC3) {
+                    for (size_t i = 0; i < accessor.count; ++i) {
+                        glm::vec3 output;
+                        std::memcpy(&output, data + i * stride, sizeof(glm::vec3));
+                        outputs.emplace_back(output, 0.0F);
+                    }
+                } else if (accessor.type == TINYGLTF_TYPE_VEC4) {
+                    for (size_t i = 0; i < accessor.count; ++i) {
+                        glm::vec4 output;
+                        std::memcpy(&output, data + i * stride, sizeof(glm::vec4));
+                        outputs.emplace_back(output);
+                    }
+                } else {
+                    fmt::print(stderr, "Unknown output type {}\n", accessor.type);
+                }
+
+                return outputs;
+            }();
+
+            samplers.emplace_back(sampler.interpolation, std::move(inputs), std::move(outputs));
+        }
+
+        for (const auto& channel : animation.channels) {
+            channels.emplace_back(channel.target_path, channel.sampler, channel.target_node);
+        }
+
+        animations.emplace_back(gfx::TransferPtr(new Animation(animation.name, std::move(samplers), std::move(channels), start, end)));
+    }
 }
 
 void Renderer::update(float_t dt) {
@@ -244,11 +367,7 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
     commandBuffer->beginRendering(rendering_info);
     commandBuffer->setScissor(0, rendering_area);
     commandBuffer->setViewport(0, rendering_viewport);
-
-    commandBuffer->bindVertexBuffer(0, vertexBuffer, 0);
-    for (auto& primitive : primitives) {
-        commandBuffer->draw(primitive.numVertices, 1, primitive.baseVertex, 0);
-    }
+    meshes.front()->draw(commandBuffer);
     commandBuffer->endRendering();
 
     commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
@@ -261,6 +380,5 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
 void Renderer::screenResized(const vk::Extent2D& size) {
     auto x = static_cast<float_t>(size.width);
     auto y = static_cast<float_t>(size.height);
-    screenSize = simd::float2{x, y};
+    screenSize = glm::f32vec2(x, y);
 }
-

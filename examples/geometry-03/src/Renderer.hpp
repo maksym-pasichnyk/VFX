@@ -1,8 +1,13 @@
 #pragma once
 
 #include "gfx/GFX.hpp"
-#include "../../circles-02/src/GuiRenderer.hpp"
-#include "simd.hpp"
+#include "glm/glm.hpp"
+
+struct Node;
+struct Skin;
+struct Mesh;
+struct Scene;
+struct Animation;
 
 struct Renderer : gfx::Referencing {
 public:
@@ -19,10 +24,16 @@ public:
     void screenResized(const vk::Extent2D& size);
 
 private:
-    simd::float2 screenSize = {};
+    glm::f32vec2 screenSize = {};
+    glm::mat4x4 g_proj_matrix = {};
+    glm::mat4x4 g_view_matrix = {};
+
+    std::vector<gfx::SharedPtr<Skin>> skins = {};
+    std::vector<gfx::SharedPtr<Mesh>> meshes = {};
+    std::vector<gfx::SharedPtr<Scene>> scenes = {};
+    std::vector<gfx::SharedPtr<Animation>> animations = {};
 
     gfx::SharedPtr<gfx::Device> device;
-    gfx::SharedPtr<gfx::Buffer> vertexBuffer;
     gfx::SharedPtr<gfx::CommandQueue> commandQueue;
     gfx::SharedPtr<gfx::CommandBuffer> commandBuffer;
     gfx::SharedPtr<gfx::RenderPipelineState> renderPipelineState;

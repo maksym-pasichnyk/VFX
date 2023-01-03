@@ -11,6 +11,7 @@
 #include "imgui_internal.h"
 
 struct UIContext : gfx::Referencing {
+private:
     struct State {
         float_t x = 0.0F;
         float_t y = 0.0F;
@@ -23,8 +24,14 @@ struct UIContext : gfx::Referencing {
     State mCurrentState = {};
     std::deque<State> mSavedStates = {};
 
+public:
     explicit UIContext() : mDrawList(&mDrawListSharedData) {
         mDrawList._ResetForNewFrame();
+    }
+
+public:
+    auto drawList() -> const ImDrawList& {
+        return mDrawList;
     }
 
     void setFillColor(const UIColor& color) {

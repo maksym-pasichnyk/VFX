@@ -2,7 +2,7 @@
 
 #include "Assets.hpp"
 
-Renderer::Renderer(gfx::SharedPtr<gfx::Device> device) : device(std::move(device)) {
+Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(device_)) {
     commandQueue = device->newCommandQueue();
     commandBuffer = commandQueue->commandBuffer();
 
