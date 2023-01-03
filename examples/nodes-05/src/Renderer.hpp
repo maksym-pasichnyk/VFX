@@ -2,7 +2,8 @@
 
 #include "gfx/GFX.hpp"
 #include "UIRenderer.hpp"
-#include "NotSwiftUI/UISize.hpp"
+
+struct UINodeEditor;
 
 struct Renderer : gfx::Referencing {
 public:
@@ -17,6 +18,7 @@ private:
     UISize mScreenSize;
 
     gfx::SharedPtr<UIContext> mUIContext;
+    gfx::SharedPtr<UINodeEditor> mNodeEditor;
     gfx::SharedPtr<UIRenderer> mGuiRenderer;
 
     gfx::SharedPtr<gfx::Device> device;

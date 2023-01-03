@@ -21,7 +21,7 @@ FetchContent_MakeAvailable(glm)
 add_library(imgui STATIC "${imgui_SOURCE_DIR}/imconfig.h" "${imgui_SOURCE_DIR}/imgui.cpp" "${imgui_SOURCE_DIR}/imgui.h" "${imgui_SOURCE_DIR}/imgui_demo.cpp" "${imgui_SOURCE_DIR}/imgui_draw.cpp" "${imgui_SOURCE_DIR}/imgui_internal.h" "${imgui_SOURCE_DIR}/imgui_tables.cpp" "${imgui_SOURCE_DIR}/imgui_widgets.cpp" "${imgui_SOURCE_DIR}/imstb_rectpack.h" "${imgui_SOURCE_DIR}/imstb_textedit.h" "${imgui_SOURCE_DIR}/imstb_truetype.h")
 set_target_properties(imgui PROPERTIES CXX_EXTENSIONS OFF CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
 
-add_library(common STATIC src/Assets.hpp src/Delegate.hpp src/Signal.hpp src/simd.hpp src/NotSwiftUI/UIContext.hpp src/NotSwiftUI/Alignment.hpp src/NotSwiftUI/View.hpp src/NotSwiftUI/UISize.hpp src/NotSwiftUI/UIPoint.hpp src/NotSwiftUI/UIColor.hpp src/Iter.hpp src/common.cpp src/Primitive.hpp src/Skin.hpp src/Node.hpp src/Mesh.hpp src/Scene.hpp src/Animation.hpp)
+add_library(common STATIC src/Assets.hpp src/Delegate.hpp src/Signal.hpp src/simd.hpp src/NotSwiftUI/UIContext.hpp src/NotSwiftUI/Alignment.hpp src/NotSwiftUI/View.hpp src/NotSwiftUI/UISize.hpp src/NotSwiftUI/UIPoint.hpp src/NotSwiftUI/UIColor.hpp src/Iter.hpp src/common.cpp src/Primitive.hpp src/Skin.hpp src/Node.hpp src/Mesh.hpp src/Scene.hpp src/Animation.hpp src/UIRenderer.hpp src/UIRenderer.cpp)
 set_target_properties(common PROPERTIES CXX_EXTENSIONS OFF CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
 target_compile_options(common PUBLIC -fenable-matrix -Wno-nullability-completeness)
 target_link_libraries(common PUBLIC gfx fmt glm imgui range-v3 tinygltf)

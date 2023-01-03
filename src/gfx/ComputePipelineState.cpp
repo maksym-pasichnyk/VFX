@@ -38,7 +38,7 @@ gfx::ComputePipelineState::ComputePipelineState(SharedPtr<Device> device, const 
         push_constant_ranges.emplace_back(push_constant_range);
     }
 
-    for (auto& sds : std::span(function->mEntryPoint->descriptor_sets, function->mEntryPoint->descriptor_set_count)) {
+    for (auto& sds : std::span(function->mLibrary->mSpvReflectShaderModule.descriptor_sets, function->mLibrary->mSpvReflectShaderModule.descriptor_set_count)) {
         if (sds.set >= descriptor_sets.size()) {
             descriptor_sets.resize(sds.set + 1);
         }

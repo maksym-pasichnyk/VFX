@@ -6,7 +6,7 @@ Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(devic
     commandQueue = device->newCommandQueue();
     commandBuffer = commandQueue->commandBuffer();
 
-    mGuiRenderer = gfx::TransferPtr(new GuiRenderer(device));
+    mGuiRenderer = gfx::TransferPtr(new UIRenderer(device));
 }
 
 void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
@@ -38,6 +38,34 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
     commandBuffer->setScissor(0, rendering_area);
     commandBuffer->setViewport(0, rendering_viewport);
 
+    auto ctx = gfx::TransferPtr(new UIContext(mGuiRenderer->drawList()));
+
+    static auto view =
+        gfx::TransferPtr(new HStack({
+            gfx::TransferPtr(new VStack({
+                gfx::TransferPtr(new HStack({
+                    gfx::TransferPtr(new Circle()),
+                    gfx::TransferPtr(new Circle()),
+                    gfx::TransferPtr(new Circle()),
+                })),
+                gfx::TransferPtr(new HStack({
+                    gfx::TransferPtr(new Circle()),
+                    gfx::TransferPtr(new Circle()),
+                    gfx::TransferPtr(new Circle()),
+                })),
+                gfx::TransferPtr(new HStack({
+                    gfx::TransferPtr(new Circle()),
+                    gfx::TransferPtr(new Circle()),
+                    gfx::TransferPtr(new Circle()),
+                })),
+            })),
+        }))
+        ->border(UIColor(1, 1, 1, 0.25F), 4);
+
+    auto body = view->frame(mScreenSize.width, mScreenSize.height);
+
+    mGuiRenderer->resetForNewFrame();
+    body->draw(ctx, mScreenSize);
     mGuiRenderer->draw(commandBuffer);
 
     commandBuffer->endRendering();
@@ -50,6 +78,7 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
 }
 
 void Renderer::screenResized(const vk::Extent2D& size) {
-    mGuiRenderer->setScreenSize(size);
+    mScreenSize = UISize(static_cast<float_t>(size.width), static_cast<float_t>(size.height));
+    mGuiRenderer->setScreenSize(mScreenSize);
 }
 

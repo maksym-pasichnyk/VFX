@@ -18,20 +18,17 @@ private:
         UIColor fillColor = UIColor(1.0F, 1.0F, 1.0F, 1.0F);
     };
 
-    ImDrawListSharedData mDrawListSharedData = {};
-    ImDrawList mDrawList;
+    ImDrawList* pDrawList;
 
     State mCurrentState = {};
     std::deque<State> mSavedStates = {};
 
 public:
-    explicit UIContext() : mDrawList(&mDrawListSharedData) {
-        mDrawList._ResetForNewFrame();
-    }
+    explicit UIContext(ImDrawList* drawList) : pDrawList(drawList) {}
 
 public:
-    auto drawList() -> const ImDrawList& {
-        return mDrawList;
+    auto drawList() -> ImDrawList* {
+        return pDrawList;
     }
 
     void setFillColor(const UIColor& color) {
@@ -52,12 +49,7 @@ public:
         mCurrentState.y += y;
     }
 
-    void drawRect(const UISize& size, float_t width) {
-        float_t x0 = mCurrentState.x;
-        float_t y0 = mCurrentState.y;
-        float_t x1 = mCurrentState.x + size.width;
-        float_t y1 = mCurrentState.y + size.height;
-
+    void drawRect(const UISize& size, float_t width, float_t rounding = 0.0F) {
         ImU32 imColor = static_cast<ImU32>(ImColor(
             mCurrentState.fillColor.r,
             mCurrentState.fillColor.g,
@@ -65,13 +57,14 @@ public:
             mCurrentState.fillColor.a
         ));
 
-        mDrawList.AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + width, y1), imColor, 0.0F, 0);
-        mDrawList.AddRectFilled(ImVec2(x0, y1 - width), ImVec2(x1 - width, y1), imColor, 0.0F, 0);
-        mDrawList.AddRectFilled(ImVec2(x0 + width, y0), ImVec2(x1, y0 + width), imColor, 0.0F, 0);
-        mDrawList.AddRectFilled(ImVec2(x1 - width, y0 + width), ImVec2(x1, y1), imColor, 0.0F, 0);
+        float_t x0 = mCurrentState.x;
+        float_t y0 = mCurrentState.y;
+        float_t x1 = mCurrentState.x + size.width;
+        float_t y1 = mCurrentState.y + size.height;
+        pDrawList->AddRect(ImVec2(x0, y0), ImVec2(x1, y1), imColor, rounding, 0, width);
     }
 
-    void drawRectFilled(const UISize& size) {
+    void drawRectFilled(const UISize& size, float_t rounding = 0.0F) {
         ImU32 imColor = static_cast<ImU32>(ImColor(
             mCurrentState.fillColor.r,
             mCurrentState.fillColor.g,
@@ -83,7 +76,19 @@ public:
         float_t y0 = mCurrentState.y;
         float_t x1 = mCurrentState.x + size.width;
         float_t y1 = mCurrentState.y + size.height;
-        mDrawList.AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1), imColor, 0.0F, 0);
+        pDrawList->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1), imColor, rounding, 0);
+    }
+
+    void drawCircle(float_t radius, float_t width) {
+        ImU32 imColor = static_cast<ImU32>(ImColor(
+            mCurrentState.fillColor.r,
+            mCurrentState.fillColor.g,
+            mCurrentState.fillColor.b,
+            mCurrentState.fillColor.a
+        ));
+
+        ImVec2 center = ImVec2(mCurrentState.x + radius, mCurrentState.y + radius);
+        pDrawList->AddCircle(center, radius, imColor, 0, width);
     }
 
     void drawCircleFilled(float_t radius) {
@@ -94,7 +99,37 @@ public:
             mCurrentState.fillColor.a
         ));
 
-        mDrawList.AddCircleFilled(ImVec2(mCurrentState.x + radius, mCurrentState.y + radius), radius, imColor, 100);
+        ImVec2 center = ImVec2(mCurrentState.x + radius, mCurrentState.y + radius);
+
+        pDrawList->AddCircleFilled(center, radius, imColor, 100);
+    }
+
+    void drawLine(const UIPoint& p1, const UIPoint& p2, float width) {
+        ImU32 imColor = static_cast<ImU32>(ImColor(
+            mCurrentState.fillColor.r,
+            mCurrentState.fillColor.g,
+            mCurrentState.fillColor.b,
+            mCurrentState.fillColor.a
+        ));
+
+        float_t x0 = mCurrentState.x + p1.x;
+        float_t y0 = mCurrentState.y + p1.y;
+        float_t x1 = mCurrentState.x + p2.x;
+        float_t y1 = mCurrentState.y + p2.y;
+
+        pDrawList->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), imColor, width);
+    }
+
+    void drawText(std::string_view text, float fontSize) {
+        ImU32 imColor = static_cast<ImU32>(ImColor(
+            mCurrentState.fillColor.r,
+            mCurrentState.fillColor.g,
+            mCurrentState.fillColor.b,
+            mCurrentState.fillColor.a
+        ));
+        float_t x = mCurrentState.x;
+        float_t y = mCurrentState.y;
+        pDrawList->AddText(nullptr, fontSize, ImVec2(x, y), imColor, text.begin(), text.end());
     }
 
     // todo: move to View

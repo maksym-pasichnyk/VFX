@@ -354,23 +354,23 @@ gfx::Texture::~Texture() {
 }
 
 void gfx::Texture::replaceRegion(const void* data, uint64_t size) {
-    auto StorageBuffer = mDevice->newBuffer(vk::BufferUsageFlagBits::eTransferSrc, data, size, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT);
+    auto storageBuffer = mDevice->newBuffer(vk::BufferUsageFlagBits::eTransferSrc, data, size, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
     vk::BufferImageCopy buffer_image_copy = {};
     buffer_image_copy.setImageExtent(vkExtent);
     buffer_image_copy.imageSubresource.setAspectMask(vkImageSubresourceRange.aspectMask);
     buffer_image_copy.imageSubresource.setLayerCount(1);
 
-    auto CommandQueue = mDevice->newCommandQueue();
-    auto CommandBuffer = CommandQueue->commandBufferWithUnretainedReferences();
+    auto commandQueue = mDevice->newCommandQueue();
+    auto commandBuffer = commandQueue->commandBufferWithUnretainedReferences();
 
-    CommandBuffer->begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-    CommandBuffer->changeTextureLayout(RetainPtr(this), vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits2::eHost, vk::PipelineStageFlagBits2::eTransfer, {}, vk::AccessFlagBits2::eTransferWrite);
-    CommandBuffer->vkCommandBuffer.copyBufferToImage(StorageBuffer->vkBuffer, vkImage, vk::ImageLayout::eTransferDstOptimal, 1, &buffer_image_copy, mDevice->vkDispatchLoaderDynamic);
-    CommandBuffer->changeTextureLayout(RetainPtr(this), vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead);
-    CommandBuffer->end();
-    CommandBuffer->submit();
-    CommandBuffer->waitUntilCompleted();
+    commandBuffer->begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+    commandBuffer->changeTextureLayout(RetainPtr(this), vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits2::eHost, vk::PipelineStageFlagBits2::eTransfer, {}, vk::AccessFlagBits2::eTransferWrite);
+    commandBuffer->vkCommandBuffer.copyBufferToImage(storageBuffer->vkBuffer, vkImage, vk::ImageLayout::eTransferDstOptimal, 1, &buffer_image_copy, mDevice->vkDispatchLoaderDynamic);
+    commandBuffer->changeTextureLayout(RetainPtr(this), vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead);
+    commandBuffer->end();
+    commandBuffer->submit();
+    commandBuffer->waitUntilCompleted();
 }
 
 void gfx::Texture::setLabel(const std::string& name) {

@@ -51,22 +51,24 @@ struct Alignment {
     HorizontalAlignment mHorizontalAlignment;
     VerticalAlignment mVerticalAlignment;
 
+    explicit constexpr Alignment(HorizontalAlignment horizontalAlignment, VerticalAlignment verticalAlignment)
+        : mHorizontalAlignment(horizontalAlignment), mVerticalAlignment(verticalAlignment) {}
+
     auto point(const UISize& size) const -> UIPoint {
-        return {
-            mHorizontalAlignment.defaultValue(size),
-            mVerticalAlignment.defaultValue(size),
-        };
+        float_t x = mHorizontalAlignment.defaultValue(size);
+        float_t y = mVerticalAlignment.defaultValue(size);
+        return UIPoint(x, y);
     }
 
     static constexpr auto topLeading() -> Alignment {
-        return {HorizontalAlignment::leading(), VerticalAlignment::top()};
+        return Alignment(HorizontalAlignment::leading(), VerticalAlignment::top());
     }
 
     static constexpr auto bottomLeading() -> Alignment {
-        return {HorizontalAlignment::leading(), VerticalAlignment::bottom()};
+        return Alignment(HorizontalAlignment::leading(), VerticalAlignment::bottom());
     }
 
     static constexpr auto center() -> Alignment {
-        return {HorizontalAlignment::center(), VerticalAlignment::center()};
+        return Alignment(HorizontalAlignment::center(), VerticalAlignment::center());
     }
 };
