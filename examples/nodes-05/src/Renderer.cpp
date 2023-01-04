@@ -1,10 +1,19 @@
-#include <SDL_mouse.h>
 #include "Renderer.hpp"
 #include "Assets.hpp"
 
+#include <SDL_mouse.h>
+
 struct GraphView : View {
+private:
+    enum class Interaction {
+        eNone,
+        eDragGrid,
+        eDragNode,
+    };
+
 public:
     struct Node;
+
     struct Port : gfx::Referencing {
         friend Node;
         friend GraphView;
@@ -13,6 +22,8 @@ public:
         Node* pNode;
         size_t mIndex;
         std::string mName;
+
+        std::vector<gfx::SharedPtr<Port>> mConnections = {};
 
     private:
         explicit Port(Node* node, size_t index, std::string name)
@@ -67,14 +78,18 @@ public:
         }
 
     private:
-        void draw(const gfx::SharedPtr<UIContext> &context, float zoomScale) {
+        void draw(const gfx::SharedPtr<UIContext> &context, bool selected) {
             ImVec2 textSize1 = context->drawList()->_Data->Font->CalcTextSizeA(36.0F, FLT_MAX, FLT_MAX, mText.data(), mText.data() + mText.size(), nullptr);
 
             context->saveState();
             context->translateBy(mPosition.x, mPosition.y);
-            context->setFillColor(UIColor::rgba32(28, 28, 28, 255));
+            context->setFillColor(UIColor::rgba32(28, 28, 28, 245));
             context->drawRectFilled(mSize, 5.0F);
-            context->setFillColor(UIColor(0, 0, 0, 1));
+            if (selected) {
+                context->setFillColor(UIColor::rgba32(4, 156, 227, 255));
+            } else {
+                context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
+            }
             context->drawRect(mSize, 2.0F, 5.0F);
             context->drawLine(UIPoint(0, 50.0F), UIPoint(mSize.width, 50.0F), 2.0F);
             context->setFillColor(UIColor(1, 1, 1, 1));
@@ -93,9 +108,11 @@ public:
                 context->setFillColor(UIColor::rgba32(37, 150, 190, 255));
                 context->drawCircleFilled(10.0F);
 
-                context->translateBy(2.0F, 2.0F);
-                context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
-                context->drawCircleFilled(8.0F);
+                if (port->mConnections.empty()) {
+                    context->translateBy(2.0F, 2.0F);
+                    context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
+                    context->drawCircleFilled(8.0F);
+                }
 
                 context->restoreState();
 
@@ -120,9 +137,11 @@ public:
                 context->setFillColor(UIColor::rgba32(37, 150, 190, 255));
                 context->drawCircleFilled(10.0F);
 
-                context->translateBy(2.0F, 2.0F);
-                context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
-                context->drawCircleFilled(8.0F);
+                if (port->mConnections.empty()) {
+                    context->translateBy(2.0F, 2.0F);
+                    context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
+                    context->drawCircleFilled(8.0F);
+                }
 
                 context->restoreState();
 
@@ -169,6 +188,12 @@ private:
     std::list<gfx::SharedPtr<Node>> mNodes = {};
     std::list<gfx::SharedPtr<Link>> mLinks = {};
 
+    UIPoint mGridOffset = UIPoint();
+    UIPoint mMousePosition = UIPoint();
+    UIPoint mStartDragPosition = UIPoint();
+    Interaction mInteraction = Interaction::eNone;
+    gfx::SharedPtr<GraphView::Node> mSelectedNode = {};
+
 private:
     auto _size(const ProposedSize &proposed) -> UISize override {
         return proposed.orMax();
@@ -183,21 +208,19 @@ private:
         context->setFillColor(UIColor(0.0F, 0.0F, 0.0F, 0.25F));
 
         float_t cellSize = 50.0F * invScale;
-        for (int32_t i = 0; i < static_cast<int32_t>(std::floor(static_cast<float_t>(size.width) / cellSize)); ++i) {
-            float_t x = static_cast<float_t>(i) * cellSize;
-            context->drawLine(UIPoint(x, 0.0F), UIPoint(x, size.height), 2.0F * invScale);
+        float_t x = std::fmod(mGridOffset.x * invScale, cellSize);
+        float_t y = std::fmod(mGridOffset.y * invScale, cellSize);
+        for (; x < size.width; x += cellSize) {
+            context->drawLine(UIPoint(x, 0.0F), UIPoint(x, size.height), 1.0F);
         }
-        for (int32_t i = 0; i < static_cast<int32_t>(std::floor(static_cast<float_t>(size.height) / cellSize)); ++i) {
-            float_t y = static_cast<float_t>(i) * cellSize;
-            context->drawLine(UIPoint(0.0F, y), UIPoint(size.width, y), 2.0F * invScale);
+        for (; y < size.height; y += cellSize) {
+            context->drawLine(UIPoint(0.0F, y), UIPoint(size.width, y), 1.0F);
         }
         context->restoreState();
 
         context->saveState();
+        context->translateBy(mGridOffset.x, mGridOffset.y);
         context->scaleBy(invScale, invScale);
-        for (auto& node : mNodes) {
-            node->draw(context, mZoomScale);
-        }
 
         for (auto& link : mLinks) {
             UIPoint pointA = link->mPortA->pNode->_getOutputSlot(link->mPortA->mIndex);
@@ -206,27 +229,37 @@ private:
             UIPoint pointB = pointA + UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
             UIPoint pointC = pointD - UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
 
-            ImVec2 p0 = ImVec2(pointA.x, pointA.y);
-            ImVec2 p1 = ImVec2(pointB.x, pointB.y);
-            ImVec2 p2 = ImVec2(pointC.x, pointC.y);
-            ImVec2 p3 = ImVec2(pointD.x, pointD.y);
+            ImVec2 p0 = ImVec2(mGridOffset.x + pointA.x, mGridOffset.y + pointA.y);
+            ImVec2 p1 = ImVec2(mGridOffset.x + pointB.x, mGridOffset.y + pointB.y);
+            ImVec2 p2 = ImVec2(mGridOffset.x + pointC.x, mGridOffset.y + pointC.y);
+            ImVec2 p3 = ImVec2(mGridOffset.x + pointD.x, mGridOffset.y + pointD.y);
 
             context->drawList()->PathLineTo(p0);
             context->drawList()->PathBezierCubicCurveTo(p1, p2, p3);
-            context->drawList()->PathStroke(IM_COL32(255, 255, 255, 255), 0, 2.0F);
+            context->drawList()->PathStroke(IM_COL32(255, 255, 255, 255), 0, 5.0F);
+        }
 
-            context->saveState();
-            context->translateBy(p0.x - 5.0F, p0.y - 5.0F);
-            context->drawCircleFilled(5.0F);
-            context->restoreState();
-
-            context->saveState();
-            context->translateBy(p3.x - 5.0F, p3.y - 5.0F);
-            context->drawCircleFilled(5.0F);
-            context->restoreState();
+        for (auto& node : mNodes) {
+            node->draw(context, node == mSelectedNode);
         }
 
         context->restoreState();
+    }
+
+    auto findNodeAt(int32_t x, int32_t y) -> gfx::SharedPtr<Node> {
+        for (auto& node : ranges::reverse_view(mNodes)) {
+            float_t x1 = static_cast<float_t>(x) * mZoomScale - node->mPosition.x - mGridOffset.x;
+            float_t y1 = static_cast<float_t>(y) * mZoomScale - node->mPosition.y - mGridOffset.y;
+
+            if (x1 < 0.0F || x1 > node->mSize.width) {
+                continue;
+            }
+            if (y1 < 0.0F || y1 > node->mSize.height) {
+                continue;
+            }
+            return node;
+        }
+        return {};
     }
 
 public:
@@ -242,27 +275,56 @@ public:
         return mNodes.emplace_back(gfx::TransferPtr(new GraphView::Node(std::move(text))));
     }
 
-    void addLink(gfx::SharedPtr<Node> nodeA, gfx::SharedPtr<Node> nodeB, size_t slotA, size_t slotB) {
+    void addLink(const gfx::SharedPtr<Node>& nodeA, const gfx::SharedPtr<Node>& nodeB, size_t slotA, size_t slotB) {
         auto portA = nodeA->mOutputs.at(slotA);
         auto portB = nodeB->mInputs.at(slotB);
+
+        portA->mConnections.emplace_back(portB);
+        portB->mConnections.emplace_back(portA);
 
         mLinks.emplace_back(gfx::TransferPtr(new GraphView::Link(std::move(portA), std::move(portB))));
     }
 
-    auto findNodeAt(int32_t x, int32_t y) -> gfx::SharedPtr<Node> {
-        for (auto& node : mNodes) {
-            float_t x1 = x * mZoomScale - node->mPosition.x;
-            float_t y1 = y * mZoomScale - node->mPosition.y;
+    void update(float_t dt) {
+        int32_t x, y;
+        uint32_t mouseState = SDL_GetMouseState(&x, &y);
 
-            if (x1 < 0.0F || x1 > node->mSize.width) {
-                continue;
+        mStartDragPosition = mMousePosition;
+        mMousePosition = UIPoint(static_cast<float_t>(x), static_cast<float_t>(y));
+
+        if (mInteraction == Interaction::eNone) {
+            if ((mouseState & SDL_BUTTON_LMASK) != 0) {
+                mSelectedNode = findNodeAt(x, y);
+                if (mSelectedNode) {
+                    mInteraction = Interaction::eDragNode;
+                    mStartDragPosition = mMousePosition;
+
+                    mNodes.erase(std::find(mNodes.begin(), mNodes.end(), mSelectedNode));
+                    mNodes.emplace_back(mSelectedNode);
+                } else {
+                    mInteraction = Interaction::eDragGrid;
+                    mStartDragPosition = mMousePosition;
+                }
             }
-            if (y1 < 0.0F || y1 > node->mSize.height) {
-                continue;
-            }
-            return node;
         }
-        return {};
+
+        UIPoint dragOffset = (mMousePosition - mStartDragPosition) * mZoomScale;
+
+        if (mInteraction == Interaction::eDragNode) {
+            if ((mouseState & SDL_BUTTON_LMASK) != 0) {
+                mSelectedNode->setPosition(mSelectedNode->position() + dragOffset);
+            } else {
+                mInteraction = Interaction::eNone;
+            }
+        }
+
+        if (mInteraction == Interaction::eDragGrid) {
+            if ((mouseState & SDL_BUTTON_LMASK) != 0) {
+                mGridOffset += dragOffset;
+            } else {
+                mInteraction = Interaction::eNone;
+            }
+        }
     }
 };
 
@@ -293,14 +355,7 @@ Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(devic
 }
 
 void Renderer::update(float_t dt) {
-//    int32_t x;
-//    int32_t y;
-//    uint32_t buttonState = SDL_GetMouseState(&x, &y);
-//    if ((buttonState & SDL_BUTTON_LMASK) != 0) {
-//        if (auto node = mGraphView->findNodeAt(x, y)) {
-//            fmt::print("Clicked {}\n", node->text());
-//        }
-//    }
+    mGraphView->update(dt);
 }
 
 void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
