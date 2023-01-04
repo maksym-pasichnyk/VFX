@@ -41,6 +41,7 @@ namespace gfx {
     public:
         void close();
         auto size() -> vk::Extent2D;
+        auto drawableSize() -> vk::Extent2D;
         void setTitle(const std::string& title);
         void setDelegate(SharedPtr<WindowDelegate> delegate);
         void setResizable(bool resizable);

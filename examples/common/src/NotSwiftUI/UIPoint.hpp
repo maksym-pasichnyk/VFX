@@ -17,3 +17,11 @@ inline constexpr auto operator+(const UIPoint& lhs, const UIPoint& rhs) -> UIPoi
 inline constexpr auto operator-(const UIPoint& lhs, const UIPoint& rhs) -> UIPoint {
     return UIPoint(lhs.x - rhs.x, lhs.y - rhs.y);
 }
+
+inline constexpr auto operator*(const UIPoint& lhs, float_t rhs) -> UIPoint {
+    return UIPoint(lhs.x * rhs, lhs.y * rhs);
+}
+
+inline constexpr auto operator/(const UIPoint& lhs, float_t rhs) -> UIPoint {
+    return UIPoint(lhs.x / rhs, lhs.y / rhs);
+}

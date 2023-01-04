@@ -3,7 +3,7 @@
 #include "gfx/GFX.hpp"
 #include "UIRenderer.hpp"
 
-struct UINodeEditor;
+struct GraphView;
 
 struct Renderer : gfx::Referencing {
 public:
@@ -11,14 +11,15 @@ public:
     ~Renderer() override = default;
 
 public:
+    void update(float_t dt);
     void draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain);
     void screenResized(const vk::Extent2D& size);
 
 private:
     UISize mScreenSize;
 
+    gfx::SharedPtr<GraphView> mGraphView;
     gfx::SharedPtr<UIContext> mUIContext;
-    gfx::SharedPtr<UINodeEditor> mNodeEditor;
     gfx::SharedPtr<UIRenderer> mGuiRenderer;
 
     gfx::SharedPtr<gfx::Device> device;

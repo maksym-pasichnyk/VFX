@@ -1,158 +1,178 @@
+#include <SDL_mouse.h>
 #include "Renderer.hpp"
 #include "Assets.hpp"
 
-#include "NotSwiftUI/View.hpp"
+struct GraphView : View {
+public:
+    struct Node;
+    struct Port : gfx::Referencing {
+        friend Node;
+        friend GraphView;
 
-struct UINode;
-struct UINodeEditor;
-struct UINodeConnection : gfx::Referencing {
-    friend UINodeEditor;
+    private:
+        Node* pNode;
+        size_t mIndex;
+        std::string mName;
+
+    private:
+        explicit Port(Node* node, size_t index, std::string name)
+            : pNode(node), mIndex(index), mName(std::move(name)) {}
+    };
+
+    struct Node : gfx::Referencing {
+        friend GraphView;
+
+    private:
+        std::string mText;
+        UISize mSize = UISize(450.0F, 250.0F);
+        UIPoint mPosition = UIPoint(0.0F, 0.0F);
+
+        std::vector<gfx::SharedPtr<Port>> mInputs = {};
+        std::vector<gfx::SharedPtr<Port>> mOutputs = {};
+
+    private:
+        explicit Node(std::string text) : mText(std::move(text)) {}
+
+    public:
+        auto size() -> const UISize& {
+            return mSize;
+        }
+
+        void setSize(const UISize& size) {
+            mSize = size;
+        }
+
+        auto position() -> const UIPoint& {
+            return mPosition;
+        }
+
+        void setPosition(const UIPoint& point) {
+            mPosition = point;
+        }
+
+        auto text() -> const std::string& {
+            return mText;
+        }
+
+        void setText(std::string text) {
+            mText = std::move(text);
+        }
+
+        void addInput(std::string name) {
+            mInputs.emplace_back(gfx::TransferPtr(new Port(this, mInputs.size(), std::move(name))));
+        }
+
+        void addOutput(std::string name) {
+            mOutputs.emplace_back(gfx::TransferPtr(new Port(this, mOutputs.size(), std::move(name))));
+        }
+
+    private:
+        void draw(const gfx::SharedPtr<UIContext> &context, float zoomScale) {
+            ImVec2 textSize1 = context->drawList()->_Data->Font->CalcTextSizeA(36.0F, FLT_MAX, FLT_MAX, mText.data(), mText.data() + mText.size(), nullptr);
+
+            context->saveState();
+            context->translateBy(mPosition.x / zoomScale, mPosition.y / zoomScale);
+            context->setFillColor(UIColor::rgba32(28, 28, 28, 255));
+            context->drawRectFilled(mSize / zoomScale, 5.0F / zoomScale);
+            context->setFillColor(UIColor(0, 0, 0, 1));
+            context->drawRect(mSize / zoomScale, 2.0F, 5.0F);
+            context->drawLine(UIPoint(0, 50.0F) / zoomScale, UIPoint(mSize.width, 50.0F) / zoomScale, 2.0F);
+            context->setFillColor(UIColor(1, 1, 1, 1));
+            context->translateBy(mSize.width * 0.5F / zoomScale, 50.0F * 0.5F / zoomScale);
+            context->translateBy(-textSize1.x * 0.5F / zoomScale, -textSize1.y * 0.5F / zoomScale);
+            context->drawText(mText, 36.0F / zoomScale);
+            context->restoreState();
+
+            for (auto& port : mInputs) {
+                UIPoint slot = _getInputSlot(port->mIndex);
+
+                context->saveState();
+                context->translateBy(slot.x / zoomScale, slot.y / zoomScale);
+                context->translateBy(-10.0F / zoomScale, -10.0F / zoomScale);
+                context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
+                context->drawCircleFilled(10 / zoomScale);
+                context->setFillColor(UIColor::rgba32(37, 150, 190, 255));
+                context->drawCircle(10.0F / zoomScale, 2.0F);
+                context->restoreState();
+
+                if (!port->mName.empty()) {
+                    ImVec2 textSize2 = context->drawList()->_Data->Font->CalcTextSizeA(28.0F, FLT_MAX, FLT_MAX, port->mName.data(), port->mName.data() + port->mName.size(), nullptr);
+
+                    context->saveState();
+                    context->translateBy(slot.x / zoomScale, slot.y / zoomScale);
+                    context->translateBy(20.0F / zoomScale, -textSize2.y * 0.5F / zoomScale);
+                    context->drawText(port->mName, 28.0F / zoomScale);
+                    context->restoreState();
+                }
+            }
+
+            for (auto& port : mOutputs) {
+                UIPoint slot = _getOutputSlot(port->mIndex);
+
+                context->saveState();
+                context->translateBy(slot.x / zoomScale, slot.y / zoomScale);
+                context->translateBy(-10.0F / zoomScale, -10.0F / zoomScale);
+                context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
+                context->drawCircleFilled(10 / zoomScale);
+                context->setFillColor(UIColor::rgba32(37, 150, 190, 255));
+                context->drawCircle(10.0F / zoomScale, 2.0F);
+                context->restoreState();
+
+                if (!port->mName.empty()) {
+                    ImVec2 textSize3 = context->drawList()->_Data->Font->CalcTextSizeA(28.0F, FLT_MAX, FLT_MAX, port->mName.data(), port->mName.data() + port->mName.size(), nullptr);
+
+                    context->saveState();
+                    context->translateBy(slot.x / zoomScale, slot.y / zoomScale);
+                    context->translateBy(-20.0F / zoomScale, 0.0F);
+                    context->translateBy(-textSize3.x / zoomScale, -textSize3.y * 0.5F / zoomScale);
+                    context->drawText(port->mName, 28.0F / zoomScale);
+                    context->restoreState();
+                }
+            }
+        }
+
+        auto _getInputSlot(size_t i) -> UIPoint {
+            float_t x = mPosition.x + 10.0F + 10.0F + 10.0F;
+            float_t y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * i;
+            return UIPoint(x, y);
+        }
+
+        auto _getOutputSlot(size_t i) -> UIPoint {
+            float_t x = mPosition.x + 10.0F + mSize.width - 20.0F - 10.0F;
+            float_t y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * i;
+            return UIPoint(x, y);
+        }
+    };
+
+    struct Link : gfx::Referencing {
+        friend GraphView;
+
+    private:
+        gfx::SharedPtr<Port> mPortA;
+        gfx::SharedPtr<Port> mPortB;
+
+    private:
+        explicit Link(gfx::SharedPtr<Port> portA, gfx::SharedPtr<Port> portB)
+            : mPortA(std::move(portA)), mPortB(std::move(portB)){}
+    };
 
 private:
-    size_t mIndexA = 0;
-    size_t mIndexB = 0;
-    gfx::SharedPtr<UINode> mNodeA = {};
-    gfx::SharedPtr<UINode> mNodeB = {};
+    float_t mZoomScale = 1.0F;
+    std::list<gfx::SharedPtr<Node>> mNodes = {};
+    std::list<gfx::SharedPtr<Link>> mLinks = {};
 
-public:
-    UINodeConnection(int32_t indexA, size_t indexB, gfx::SharedPtr<UINode> nodeA, gfx::SharedPtr<UINode> nodeB)
-        : mIndexA(indexA), mIndexB(indexB), mNodeA(std::move(nodeA)), mNodeB(std::move(nodeB)) {}
-};
-
-struct UINode : View {
-    friend UINodeEditor;
-
-private:
-    UISize mSize = UISize(350.0F, 250.0F);
-    UIPoint mPosition = UIPoint(0.0F, 0.0F);
-
-    size_t mInputs = {};
-    size_t mOutputs = {};
-    std::string mText = "Node";
-
-public:
-    explicit UINode(size_t inputs, size_t outputs)
-        : mInputs(inputs), mOutputs(outputs) {}
-
-public:
-    auto position() -> const UIPoint& {
-        return mPosition;
-    }
-    
-    void setPosition(const UIPoint& point) {
-        mPosition = point;
-    }
-
-    auto text() -> const std::string& {
-        return mText;
-    }
-
-    void setText(std::string text) {
-        mText = std::move(text);
-    }
-    
 private:
     auto _size(const ProposedSize &proposed) -> UISize override {
-        return mSize;
+        return proposed.orMax();
     }
 
-    void _draw(const gfx::SharedPtr<UIContext> &context, const UISize& size) override {
-        context->saveState();
-        context->translateBy(mPosition.x, mPosition.y);
-        context->setFillColor(UIColor::rgba32(28, 28, 28, 255));
-        context->drawRectFilled(size, 5.0F);
-        context->setFillColor(UIColor(0, 0, 0, 1));
-        context->drawRect(size, 2.0F, 5.0F);
-        context->drawLine(UIPoint(0, 50.0F), UIPoint(size.width, 50.0F), 2.0F);
-        context->setFillColor(UIColor(1, 1, 1, 1));
-
-        ImVec2 textSize = context->drawList()->_Data->Font->CalcTextSizeA(36.0F, FLT_MAX, FLT_MAX, mText.data(), mText.data() + mText.size(), nullptr);
-
-        context->translateBy((size.width - textSize.x) * 0.5F, (50.0F - textSize.y) * 0.5F);
-        context->drawText(mText, 36.0F);
-        context->restoreState();
-
-        float_t currentOutputX = mPosition.x + size.width - 20.0F - 10.0F;
-        float_t currentOutputY = mPosition.y + 15.0F + 50.0F;
-        for (size_t i : ranges::views::iota(0zu, mOutputs)) {
-            context->saveState();
-            context->translateBy(currentOutputX, currentOutputY);
-            context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
-            context->drawCircleFilled(10);
-            context->setFillColor(UIColor::rgba32(37, 150, 190, 255));
-            context->drawCircle(10.0F, 2.0F);
-            context->restoreState();
-            currentOutputY += 30.0F;
-        }
-
-        float_t currentInputX = mPosition.x + 10.0F;
-        float_t currentInputY = mPosition.y + 15.0F + 50.0F;
-        for (size_t i : ranges::views::iota(0zu, mInputs)) {
-            context->saveState();
-            context->translateBy(currentInputX, currentInputY);
-            context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
-            context->drawCircleFilled(10);
-            context->setFillColor(UIColor::rgba32(37, 150, 190, 255));
-            context->drawCircle(10.0F, 2.0F);
-            context->restoreState();
-            currentInputY += 30.0F;
-        }
-    }
-
-    auto getInputPosition(size_t index) -> std::optional<UIPoint> {
-        if (index >= mInputs) {
-            return std::nullopt;
-        }
-        float_t x = mPosition.x + 10.0F + 10.0F;
-        float_t y = mPosition.y + 10.0F + 15.0F + 50.0F;
-        return UIPoint(x, y + 30.0F * index);
-    }
-
-    auto getOutputPosition(size_t index) -> std::optional<UIPoint> {
-        if (index >= mOutputs) {
-            return std::nullopt;
-        }
-        float_t x = mPosition.x + 10.0F + mSize.width - 20.0F - 10.0F;
-        float_t y = mPosition.y + 10.0F + 15.0F + 50.0F;
-        return UIPoint(x, y + 30.0F * index);
-    }
-};
-
-struct UINodeEditor : View {
-private:
-    std::list<gfx::SharedPtr<UINode>> mNodes = {};
-    std::list<gfx::SharedPtr<UINodeConnection>> mConnections = {};
-
-public:
-    void addNode(const gfx::SharedPtr<UINode>& node) {
-        auto it = std::find(mNodes.begin(), mNodes.end(), node);
-        if (it == mNodes.end()) {
-            mNodes.emplace_back(node);
-        }
-    }
-
-    void removeNode(const gfx::SharedPtr<UINode>& node) {
-        // todo: remove connections
-
-        auto it = std::find(mNodes.begin(), mNodes.end(), node);
-        if (it != mNodes.end()) {
-            mNodes.erase(it);
-        }
-    }
-
-    void addConnection(gfx::SharedPtr<UINode> nodeA, gfx::SharedPtr<UINode> nodeB, int32_t indexA, size_t indexB) {
-        // todo: check connections
-        mConnections.emplace_back(gfx::TransferPtr(new UINodeConnection(indexA, indexB, nodeA, nodeB)));
-    }
-
-private:
     void _draw(const gfx::SharedPtr<UIContext> &context, const UISize& size) override {
         context->saveState();
         context->setFillColor(UIColor::rgba32(45, 45, 45, 255));
         context->drawRectFilled(size);
         context->setFillColor(UIColor(0.0F, 0.0F, 0.0F, 0.25F));
 
-        float_t cellSize = 50.0F;
+        float_t cellSize = 50.0F / mZoomScale;
         for (int32_t i = 0; i < static_cast<int32_t>(std::floor(static_cast<float_t>(size.width) / cellSize)); ++i) {
             float_t x = static_cast<float_t>(i) * cellSize;
             context->drawLine(UIPoint(x, 0.0F), UIPoint(x, size.height), 2.0F);
@@ -163,32 +183,75 @@ private:
         }
         context->restoreState();
 
+        context->saveState();
         for (auto& node : mNodes) {
-            node->draw(context, node->View::size(ProposedSize(size)));
+            node->draw(context, mZoomScale);
         }
 
-        for (auto& connection : mConnections) {
-            UIPoint pointA = connection->mNodeA->getOutputPosition(connection->mIndexA).value();
-            UIPoint pointD = connection->mNodeB->getInputPosition(connection->mIndexB).value();
+        for (auto& link : mLinks) {
+            UIPoint pointA = link->mPortA->pNode->_getOutputSlot(link->mPortA->mIndex);
+            UIPoint pointD = link->mPortB->pNode->_getInputSlot(link->mPortB->mIndex);
 
-            float_t distance = std::abs(pointD.x - pointA.x);
+            UIPoint pointB = pointA + UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
+            UIPoint pointC = pointD - UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
 
-            UIPoint pointB = pointA + UIPoint(distance, 0.0F);
-            UIPoint pointC = pointD - UIPoint(distance, 0.0F);
-
-            ImVec2 p0 = ImVec2(pointA.x, pointA.y);
-            ImVec2 p1 = ImVec2(pointB.x, pointB.y);
-            ImVec2 p2 = ImVec2(pointC.x, pointC.y);
-            ImVec2 p3 = ImVec2(pointD.x, pointD.y);
+            ImVec2 p0 = ImVec2(pointA.x / mZoomScale, pointA.y / mZoomScale);
+            ImVec2 p1 = ImVec2(pointB.x / mZoomScale, pointB.y / mZoomScale);
+            ImVec2 p2 = ImVec2(pointC.x / mZoomScale, pointC.y / mZoomScale);
+            ImVec2 p3 = ImVec2(pointD.x / mZoomScale, pointD.y / mZoomScale);
 
             context->drawList()->PathLineTo(p0);
             context->drawList()->PathBezierCubicCurveTo(p1, p2, p3);
             context->drawList()->PathStroke(IM_COL32(255, 255, 255, 255), 0, 2.0F);
+
+            context->saveState();
+            context->translateBy(p0.x - 5.0F / mZoomScale, p0.y - 5.0F / mZoomScale);
+            context->drawCircleFilled(5.0F / mZoomScale);
+            context->restoreState();
+
+            context->saveState();
+            context->translateBy(p3.x - 5.0F / mZoomScale, p3.y - 5.0F / mZoomScale);
+            context->drawCircleFilled(5.0F / mZoomScale);
+            context->restoreState();
         }
+
+        context->restoreState();
     }
 
-    auto _size(const ProposedSize &proposed) -> UISize override {
-        return proposed.orMax();
+public:
+    auto zoomScale() -> float_t {
+        return mZoomScale;
+    }
+
+    void setZoomScale(float_t zoomScale) {
+        mZoomScale = std::max(zoomScale, 1.0F);
+    }
+
+    auto addNode(std::string text) -> gfx::SharedPtr<Node> {
+        return mNodes.emplace_back(gfx::TransferPtr(new GraphView::Node(std::move(text))));
+    }
+
+    void addLink(gfx::SharedPtr<Node> nodeA, gfx::SharedPtr<Node> nodeB, size_t slotA, size_t slotB) {
+        auto portA = nodeA->mOutputs.at(slotA);
+        auto portB = nodeB->mInputs.at(slotB);
+
+        mLinks.emplace_back(gfx::TransferPtr(new GraphView::Link(std::move(portA), std::move(portB))));
+    }
+
+    auto findNodeAt(int32_t x, int32_t y) -> gfx::SharedPtr<Node> {
+        for (auto& node : mNodes) {
+            float_t x1 = x * mZoomScale - node->mPosition.x;
+            float_t y1 = y * mZoomScale - node->mPosition.y;
+
+            if (x1 < 0.0F || x1 > node->mSize.width) {
+                continue;
+            }
+            if (y1 < 0.0F || y1 > node->mSize.height) {
+                continue;
+            }
+            return node;
+        }
+        return {};
     }
 };
 
@@ -197,25 +260,37 @@ Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(devic
     commandBuffer = commandQueue->commandBuffer();
 
     mGuiRenderer = gfx::TransferPtr(new UIRenderer(device));
-    mNodeEditor = gfx::TransferPtr(new UINodeEditor());
+    mGraphView = gfx::TransferPtr(new GraphView());
 
-    auto nodeA = gfx::TransferPtr(new UINode(0, 1));
-    nodeA->setText("Node A");
+    auto nodeA = mGraphView->addNode("Node A");
+    nodeA->addOutput("");
     nodeA->setPosition(UIPoint(125, 110));
-    mNodeEditor->addNode(nodeA);
 
-    auto nodeB = gfx::TransferPtr(new UINode(0, 1));
-    nodeB->setText("Node B");
+    auto nodeB = mGraphView->addNode("Node B");
+    nodeB->addOutput("");
     nodeB->setPosition(UIPoint(125, 710));
-    mNodeEditor->addNode(nodeB);
 
-    auto nodeC = gfx::TransferPtr(new UINode(2, 0));
-    nodeC->setText("Node C");
+    auto nodeC = mGraphView->addNode("Node C");
+    nodeC->addInput("A");
+    nodeC->addInput("B");
+    nodeC->addOutput("Result");
     nodeC->setPosition(UIPoint(825, 330));
-    mNodeEditor->addNode(nodeC);
 
-    mNodeEditor->addConnection(nodeA, nodeC, 0, 0);
-    mNodeEditor->addConnection(nodeB, nodeC, 0, 1);
+    mGraphView->addLink(nodeA, nodeC, 0, 0);
+    mGraphView->addLink(nodeB, nodeC, 0, 1);
+
+    mGraphView->setZoomScale(2.0F);
+}
+
+void Renderer::update(float_t dt) {
+//    int32_t x;
+//    int32_t y;
+//    uint32_t buttonState = SDL_GetMouseState(&x, &y);
+//    if ((buttonState & SDL_BUTTON_LMASK) != 0) {
+//        if (auto node = mGraphView->findNodeAt(x, y)) {
+//            fmt::print("Clicked {}\n", node->text());
+//        }
+//    }
 }
 
 void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
@@ -249,8 +324,9 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
 
     auto ctx = gfx::TransferPtr(new UIContext(mGuiRenderer->drawList()));
 
+    auto body = mGraphView->frame(mScreenSize.width, mScreenSize.height);
     mGuiRenderer->resetForNewFrame();
-    mNodeEditor->draw(ctx, mScreenSize);
+    body->draw(ctx, body->size(ProposedSize(mScreenSize)));
     mGuiRenderer->draw(commandBuffer);
 
     commandBuffer->endRendering();

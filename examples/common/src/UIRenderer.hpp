@@ -16,9 +16,11 @@ public:
     void resetForNewFrame();
     auto drawList() -> ImDrawList*;
     void draw(const gfx::SharedPtr<gfx::CommandBuffer>& cmd);
+    void setScale(float_t scale);
     void setScreenSize(const UISize& size);
 
 private:
+    float_t mScale = 1.0F;
     UISize mScreenSize = UISize(0.0F, 0.0F);
 
     ImDrawList mDrawList;

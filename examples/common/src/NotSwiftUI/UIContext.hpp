@@ -15,6 +15,8 @@ private:
     struct State {
         float_t x = 0.0F;
         float_t y = 0.0F;
+        float_t scaleX = 0.0F;
+        float_t scaleY = 0.0F;
         UIColor fillColor = UIColor(1.0F, 1.0F, 1.0F, 1.0F);
     };
 
@@ -49,19 +51,33 @@ public:
         mCurrentState.y += y;
     }
 
+    void scaleBy(float_t x, float_t y) {
+        mCurrentState.scaleX *= x;
+        mCurrentState.scaleY *= y;
+    }
+
+    struct UIPath {
+        virtual ~UIPath() = default;
+
+        virtual void stroke(ImDrawList* drawList) = 0;
+    };
+
     void drawRect(const UISize& size, float_t width, float_t rounding = 0.0F) {
+        if (mCurrentState.fillColor.a == 0.0F) {
+            return;
+        }
         ImU32 imColor = static_cast<ImU32>(ImColor(
             mCurrentState.fillColor.r,
             mCurrentState.fillColor.g,
             mCurrentState.fillColor.b,
             mCurrentState.fillColor.a
         ));
-
         float_t x0 = mCurrentState.x;
         float_t y0 = mCurrentState.y;
         float_t x1 = mCurrentState.x + size.width;
         float_t y1 = mCurrentState.y + size.height;
-        pDrawList->AddRect(ImVec2(x0, y0), ImVec2(x1, y1), imColor, rounding, 0, width);
+
+        pDrawList->AddRect(ImVec2(x0, y0), ImVec2(x1, y1), imColor, rounding, ImDrawFlags_RoundCornersAll, width);
     }
 
     void drawRectFilled(const UISize& size, float_t rounding = 0.0F) {
@@ -71,7 +87,6 @@ public:
             mCurrentState.fillColor.b,
             mCurrentState.fillColor.a
         ));
-
         float_t x0 = mCurrentState.x;
         float_t y0 = mCurrentState.y;
         float_t x1 = mCurrentState.x + size.width;
@@ -86,9 +101,9 @@ public:
             mCurrentState.fillColor.b,
             mCurrentState.fillColor.a
         ));
-
-        ImVec2 center = ImVec2(mCurrentState.x + radius, mCurrentState.y + radius);
-        pDrawList->AddCircle(center, radius, imColor, 0, width);
+        float_t x = mCurrentState.x + radius;
+        float_t y = mCurrentState.y + radius;
+        pDrawList->AddCircle(ImVec2(x, y), radius, imColor, 0, width);
     }
 
     void drawCircleFilled(float_t radius) {
@@ -98,10 +113,9 @@ public:
             mCurrentState.fillColor.b,
             mCurrentState.fillColor.a
         ));
-
-        ImVec2 center = ImVec2(mCurrentState.x + radius, mCurrentState.y + radius);
-
-        pDrawList->AddCircleFilled(center, radius, imColor, 100);
+        float_t x = mCurrentState.x + radius;
+        float_t y = mCurrentState.y + radius;
+        pDrawList->AddCircleFilled(ImVec2(x, y), radius, imColor, 100);
     }
 
     void drawLine(const UIPoint& p1, const UIPoint& p2, float width) {
@@ -111,12 +125,10 @@ public:
             mCurrentState.fillColor.b,
             mCurrentState.fillColor.a
         ));
-
         float_t x0 = mCurrentState.x + p1.x;
         float_t y0 = mCurrentState.y + p1.y;
         float_t x1 = mCurrentState.x + p2.x;
         float_t y1 = mCurrentState.y + p2.y;
-
         pDrawList->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), imColor, width);
     }
 

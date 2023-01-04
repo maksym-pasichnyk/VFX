@@ -1,9 +1,9 @@
 #define VMA_IMPLEMENTATION
 
 #include "Renderer.hpp"
-
 #include "SDL_events.h"
-#include "spdlog/spdlog.h"
+
+#include <chrono>
 
 struct Game : gfx::Referencing {
 private:
@@ -41,10 +41,22 @@ public:
 
 public:
     void run() {
+        using std::chrono::steady_clock;
+        using as_seconds = std::chrono::duration<float_t, std::chrono::seconds::period>;
+
+        steady_clock::time_point timePointA = steady_clock::now();
+        steady_clock::time_point timePointB;
+
         running = true;
         while (running) {
             pollEvents();
 
+            timePointB = timePointA;
+            timePointA = steady_clock::now();
+
+            float_t dt = as_seconds(timePointA - timePointB).count();
+
+            renderer->update(dt);
             renderer->draw(swapchain);
         }
     }

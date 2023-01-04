@@ -28,6 +28,12 @@ void gfx::Window::close() {
 
 auto gfx::Window::size() -> vk::Extent2D {
     int width, height;
+    SDL_GetWindowSize(pWindow, &width, &height);
+    return {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+}
+
+auto gfx::Window::drawableSize() -> vk::Extent2D {
+    int width, height;
     SDL_Vulkan_GetDrawableSize(pWindow, &width, &height);
     return {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 }
@@ -59,7 +65,7 @@ auto gfx::Window::native() -> SDL_Window* {
 void gfx::Window::windowDidResize() {
     if (mSwapchain) {
         mSwapchain->mDevice->waitIdle();
-        mSwapchain->setDrawableSize(size());
+        mSwapchain->setDrawableSize(drawableSize());
         mSwapchain->releaseDrawables();
     }
 

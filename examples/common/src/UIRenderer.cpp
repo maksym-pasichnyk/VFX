@@ -125,7 +125,7 @@ void UIRenderer::draw(const gfx::SharedPtr<gfx::CommandBuffer>& cmd) {
         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
     GuiShaderData gui_shader_data = {};
-    gui_shader_data.scale = 2.0F / simd::float2{mScreenSize.width, mScreenSize.height};
+    gui_shader_data.scale = mScale * 2.0F / simd::float2{mScreenSize.width, mScreenSize.height};
 
     cmd->setRenderPipelineState(mRenderPipelineState);
     cmd->bindDescriptorSet(mDescriptorSet, 0);
@@ -136,6 +136,10 @@ void UIRenderer::draw(const gfx::SharedPtr<gfx::CommandBuffer>& cmd) {
     for (auto& drawCmd : std::span(mDrawList.CmdBuffer.Data, mDrawList.CmdBuffer.Size)) {
         cmd->drawIndexed(drawCmd.ElemCount, 1, drawCmd.IdxOffset, static_cast<int32_t>(drawCmd.VtxOffset), 0);
     }
+}
+
+void UIRenderer::setScale(float_t scale) {
+    mScale = scale;
 }
 
 void UIRenderer::setScreenSize(const UISize& size) {
