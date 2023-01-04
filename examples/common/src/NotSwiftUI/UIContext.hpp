@@ -15,8 +15,8 @@ private:
     struct State {
         float_t x = 0.0F;
         float_t y = 0.0F;
-        float_t scaleX = 0.0F;
-        float_t scaleY = 0.0F;
+        float_t scaleX = 1.0F;
+        float_t scaleY = 1.0F;
         UIColor fillColor = UIColor(1.0F, 1.0F, 1.0F, 1.0F);
     };
 
@@ -44,6 +44,9 @@ public:
     void restoreState() {
         mCurrentState = mSavedStates.back();
         mSavedStates.pop_back();
+
+        pDrawList->_Data->Scale.x = mCurrentState.scaleX;
+        pDrawList->_Data->Scale.y = mCurrentState.scaleY;
     }
 
     void translateBy(float_t x, float_t y) {
@@ -54,6 +57,9 @@ public:
     void scaleBy(float_t x, float_t y) {
         mCurrentState.scaleX *= x;
         mCurrentState.scaleY *= y;
+
+        pDrawList->_Data->Scale.x = mCurrentState.scaleX;
+        pDrawList->_Data->Scale.y = mCurrentState.scaleY;
     }
 
     struct UIPath {

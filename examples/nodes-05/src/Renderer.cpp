@@ -71,37 +71,41 @@ public:
             ImVec2 textSize1 = context->drawList()->_Data->Font->CalcTextSizeA(36.0F, FLT_MAX, FLT_MAX, mText.data(), mText.data() + mText.size(), nullptr);
 
             context->saveState();
-            context->translateBy(mPosition.x / zoomScale, mPosition.y / zoomScale);
+            context->translateBy(mPosition.x, mPosition.y);
             context->setFillColor(UIColor::rgba32(28, 28, 28, 255));
-            context->drawRectFilled(mSize / zoomScale, 5.0F / zoomScale);
+            context->drawRectFilled(mSize, 5.0F);
             context->setFillColor(UIColor(0, 0, 0, 1));
-            context->drawRect(mSize / zoomScale, 2.0F, 5.0F);
-            context->drawLine(UIPoint(0, 50.0F) / zoomScale, UIPoint(mSize.width, 50.0F) / zoomScale, 2.0F);
+            context->drawRect(mSize, 2.0F, 5.0F);
+            context->drawLine(UIPoint(0, 50.0F), UIPoint(mSize.width, 50.0F), 2.0F);
             context->setFillColor(UIColor(1, 1, 1, 1));
-            context->translateBy(mSize.width * 0.5F / zoomScale, 50.0F * 0.5F / zoomScale);
-            context->translateBy(-textSize1.x * 0.5F / zoomScale, -textSize1.y * 0.5F / zoomScale);
-            context->drawText(mText, 36.0F / zoomScale);
+            context->translateBy(mSize.width * 0.5F, 50.0F * 0.5F);
+            context->translateBy(-textSize1.x * 0.5F, -textSize1.y * 0.5F);
+            context->drawText(mText, 36.0F);
             context->restoreState();
 
             for (auto& port : mInputs) {
                 UIPoint slot = _getInputSlot(port->mIndex);
 
                 context->saveState();
-                context->translateBy(slot.x / zoomScale, slot.y / zoomScale);
-                context->translateBy(-10.0F / zoomScale, -10.0F / zoomScale);
-                context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
-                context->drawCircleFilled(10 / zoomScale);
+                context->translateBy(slot.x, slot.y);
+
+                context->translateBy(-10.0F, -10.0F);
                 context->setFillColor(UIColor::rgba32(37, 150, 190, 255));
-                context->drawCircle(10.0F / zoomScale, 2.0F);
+                context->drawCircleFilled(10.0F);
+
+                context->translateBy(2.0F, 2.0F);
+                context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
+                context->drawCircleFilled(8.0F);
+
                 context->restoreState();
 
                 if (!port->mName.empty()) {
                     ImVec2 textSize2 = context->drawList()->_Data->Font->CalcTextSizeA(28.0F, FLT_MAX, FLT_MAX, port->mName.data(), port->mName.data() + port->mName.size(), nullptr);
 
                     context->saveState();
-                    context->translateBy(slot.x / zoomScale, slot.y / zoomScale);
-                    context->translateBy(20.0F / zoomScale, -textSize2.y * 0.5F / zoomScale);
-                    context->drawText(port->mName, 28.0F / zoomScale);
+                    context->translateBy(slot.x, slot.y);
+                    context->translateBy(20.0F, -textSize2.y * 0.5F);
+                    context->drawText(port->mName, 28.0F);
                     context->restoreState();
                 }
             }
@@ -110,22 +114,26 @@ public:
                 UIPoint slot = _getOutputSlot(port->mIndex);
 
                 context->saveState();
-                context->translateBy(slot.x / zoomScale, slot.y / zoomScale);
-                context->translateBy(-10.0F / zoomScale, -10.0F / zoomScale);
-                context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
-                context->drawCircleFilled(10 / zoomScale);
+                context->translateBy(slot.x, slot.y);
+                context->translateBy(-10.0F, -10.0F);
+
                 context->setFillColor(UIColor::rgba32(37, 150, 190, 255));
-                context->drawCircle(10.0F / zoomScale, 2.0F);
+                context->drawCircleFilled(10.0F);
+
+                context->translateBy(2.0F, 2.0F);
+                context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
+                context->drawCircleFilled(8.0F);
+
                 context->restoreState();
 
                 if (!port->mName.empty()) {
                     ImVec2 textSize3 = context->drawList()->_Data->Font->CalcTextSizeA(28.0F, FLT_MAX, FLT_MAX, port->mName.data(), port->mName.data() + port->mName.size(), nullptr);
 
                     context->saveState();
-                    context->translateBy(slot.x / zoomScale, slot.y / zoomScale);
-                    context->translateBy(-20.0F / zoomScale, 0.0F);
-                    context->translateBy(-textSize3.x / zoomScale, -textSize3.y * 0.5F / zoomScale);
-                    context->drawText(port->mName, 28.0F / zoomScale);
+                    context->translateBy(slot.x, slot.y);
+                    context->translateBy(-20.0F, 0.0F);
+                    context->translateBy(-textSize3.x, -textSize3.y * 0.5F);
+                    context->drawText(port->mName, 28.0F);
                     context->restoreState();
                 }
             }
@@ -167,23 +175,26 @@ private:
     }
 
     void _draw(const gfx::SharedPtr<UIContext> &context, const UISize& size) override {
+        float invScale = 1.0F / mZoomScale;
+
         context->saveState();
         context->setFillColor(UIColor::rgba32(45, 45, 45, 255));
         context->drawRectFilled(size);
         context->setFillColor(UIColor(0.0F, 0.0F, 0.0F, 0.25F));
 
-        float_t cellSize = 50.0F / mZoomScale;
+        float_t cellSize = 50.0F * invScale;
         for (int32_t i = 0; i < static_cast<int32_t>(std::floor(static_cast<float_t>(size.width) / cellSize)); ++i) {
             float_t x = static_cast<float_t>(i) * cellSize;
-            context->drawLine(UIPoint(x, 0.0F), UIPoint(x, size.height), 2.0F);
+            context->drawLine(UIPoint(x, 0.0F), UIPoint(x, size.height), 2.0F * invScale);
         }
         for (int32_t i = 0; i < static_cast<int32_t>(std::floor(static_cast<float_t>(size.height) / cellSize)); ++i) {
             float_t y = static_cast<float_t>(i) * cellSize;
-            context->drawLine(UIPoint(0.0F, y), UIPoint(size.width, y), 2.0F);
+            context->drawLine(UIPoint(0.0F, y), UIPoint(size.width, y), 2.0F * invScale);
         }
         context->restoreState();
 
         context->saveState();
+        context->scaleBy(invScale, invScale);
         for (auto& node : mNodes) {
             node->draw(context, mZoomScale);
         }
@@ -195,23 +206,23 @@ private:
             UIPoint pointB = pointA + UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
             UIPoint pointC = pointD - UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
 
-            ImVec2 p0 = ImVec2(pointA.x / mZoomScale, pointA.y / mZoomScale);
-            ImVec2 p1 = ImVec2(pointB.x / mZoomScale, pointB.y / mZoomScale);
-            ImVec2 p2 = ImVec2(pointC.x / mZoomScale, pointC.y / mZoomScale);
-            ImVec2 p3 = ImVec2(pointD.x / mZoomScale, pointD.y / mZoomScale);
+            ImVec2 p0 = ImVec2(pointA.x, pointA.y);
+            ImVec2 p1 = ImVec2(pointB.x, pointB.y);
+            ImVec2 p2 = ImVec2(pointC.x, pointC.y);
+            ImVec2 p3 = ImVec2(pointD.x, pointD.y);
 
             context->drawList()->PathLineTo(p0);
             context->drawList()->PathBezierCubicCurveTo(p1, p2, p3);
             context->drawList()->PathStroke(IM_COL32(255, 255, 255, 255), 0, 2.0F);
 
             context->saveState();
-            context->translateBy(p0.x - 5.0F / mZoomScale, p0.y - 5.0F / mZoomScale);
-            context->drawCircleFilled(5.0F / mZoomScale);
+            context->translateBy(p0.x - 5.0F, p0.y - 5.0F);
+            context->drawCircleFilled(5.0F);
             context->restoreState();
 
             context->saveState();
-            context->translateBy(p3.x - 5.0F / mZoomScale, p3.y - 5.0F / mZoomScale);
-            context->drawCircleFilled(5.0F / mZoomScale);
+            context->translateBy(p3.x - 5.0F, p3.y - 5.0F);
+            context->drawCircleFilled(5.0F);
             context->restoreState();
         }
 
@@ -278,7 +289,6 @@ Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(devic
 
     mGraphView->addLink(nodeA, nodeC, 0, 0);
     mGraphView->addLink(nodeB, nodeC, 0, 1);
-
     mGraphView->setZoomScale(2.0F);
 }
 

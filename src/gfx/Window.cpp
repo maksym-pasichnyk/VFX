@@ -15,7 +15,7 @@ gfx::Window::Window(SharedPtr<Application> application, int32_t width, int32_t h
 
     mSurface = TransferPtr(new Surface(mApplication, vkSurface));
     mSwapchain = TransferPtr(new gfx::Swapchain(mSurface));
-    mSwapchain->setDrawableSize(size());
+    mSwapchain->setDrawableSize(drawableSize());
 }
 
 gfx::Window::~Window() {

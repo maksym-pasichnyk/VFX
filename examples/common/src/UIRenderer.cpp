@@ -40,9 +40,9 @@ void UIRenderer::buildFonts() {
     mFontTexture->replaceRegion(pixels.data(), pixels.size() * sizeof(uint32_t));
 
     vk::SamplerCreateInfo font_sampler_description = {};
-    font_sampler_description.setMagFilter(vk::Filter::eNearest);
-    font_sampler_description.setMinFilter(vk::Filter::eNearest);
-    font_sampler_description.setMipmapMode(vk::SamplerMipmapMode::eNearest);
+    font_sampler_description.setMagFilter(vk::Filter::eLinear);
+    font_sampler_description.setMinFilter(vk::Filter::eLinear);
+    font_sampler_description.setMipmapMode(vk::SamplerMipmapMode::eLinear);
     font_sampler_description.setAddressModeU(vk::SamplerAddressMode::eRepeat);
     font_sampler_description.setAddressModeV(vk::SamplerAddressMode::eRepeat);
     font_sampler_description.setAddressModeW(vk::SamplerAddressMode::eRepeat);
