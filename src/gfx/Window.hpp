@@ -17,11 +17,6 @@ namespace gfx {
         virtual auto windowShouldClose(const SharedPtr<Window>& sender) -> bool {
             return true;
         }
-        virtual void windowKeyEvent(const SharedPtr<Window>& sender, int32_t keycode, int32_t scancode, int32_t action, int32_t mods) {}
-        virtual void windowMouseEvent(const SharedPtr<Window>& sender, int32_t button, int32_t action, int32_t mods) {}
-        virtual void windowCursorEvent(const SharedPtr<Window>& sender, double_t x, double_t y) {}
-        virtual void windowMouseEnter(const SharedPtr<Window>& sender) {}
-        virtual void windowMouseExit(const SharedPtr<Window>& sender) {}
     };
 
     struct Window final : Referencing {
@@ -50,13 +45,8 @@ namespace gfx {
         auto native() -> SDL_Window*;
 
     public:
-        void windowDidResize();
-        void windowShouldClose();
-        void windowKeyEvent(int32_t keycode, int32_t scancode, int32_t action, int32_t mods);
-        void windowMouseEvent(int32_t button, int32_t action, int32_t mods);
-        void windowCursorEvent(double_t x, double_t y);
-        void windowMouseEnter();
-        void windowMouseExit();
+        void performClose();
+        void performResize();
 
     public:
         static auto alloc(SharedPtr<Application> application, int32_t width, int32_t height) -> SharedPtr<Window>;

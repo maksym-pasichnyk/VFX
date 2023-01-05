@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gfx/GFX.hpp"
-#include "../../circles-02/src/GuiRenderer.hpp"
+#include "UIRenderer.hpp"
 
 struct Renderer : gfx::Referencing {
 public:

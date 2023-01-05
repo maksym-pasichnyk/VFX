@@ -322,7 +322,7 @@ public:
         }
     }
 
-    void update(float_t dt) {
+    void update() {
         int32_t x, y;
         uint32_t mouseState = SDL_GetMouseState(&x, &y);
 

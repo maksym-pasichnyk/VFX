@@ -62,7 +62,15 @@ auto gfx::Window::native() -> SDL_Window* {
     return pWindow;
 }
 
-void gfx::Window::windowDidResize() {
+void gfx::Window::performClose() {
+    if (mDelegate) {
+        if (mDelegate->windowShouldClose(RetainPtr(this))) {
+            close();
+        }
+    }
+}
+
+void gfx::Window::performResize() {
     if (mSwapchain) {
         mSwapchain->mDevice->waitIdle();
         mSwapchain->setDrawableSize(drawableSize());
@@ -71,44 +79,6 @@ void gfx::Window::windowDidResize() {
 
     if (mDelegate) {
         mDelegate->windowDidResize(RetainPtr(this));
-    }
-}
-
-void gfx::Window::windowShouldClose() {
-    if (mDelegate) {
-        if (mDelegate->windowShouldClose(RetainPtr(this))) {
-            close();
-        }
-    }
-}
-
-void gfx::Window::windowKeyEvent(int32_t keycode, int32_t scancode, int32_t action, int32_t mods) {
-    if (mDelegate) {
-        mDelegate->windowKeyEvent(RetainPtr(this), keycode, scancode, action, mods);
-    }
-}
-
-void gfx::Window::windowMouseEvent(int32_t button, int32_t action, int32_t mods) {
-    if (mDelegate) {
-        mDelegate->windowMouseEvent(RetainPtr(this), button, action, mods);
-    }
-}
-
-void gfx::Window::windowCursorEvent(double_t x, double_t y) {
-    if (mDelegate) {
-        mDelegate->windowCursorEvent(RetainPtr(this), x, y);
-    }
-}
-
-void gfx::Window::windowMouseEnter() {
-    if (mDelegate) {
-        mDelegate->windowMouseEnter(RetainPtr(this));
-    }
-}
-
-void gfx::Window::windowMouseExit() {
-    if (mDelegate) {
-        mDelegate->windowMouseExit(RetainPtr(this));
     }
 }
 

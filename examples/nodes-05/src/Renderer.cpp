@@ -31,8 +31,8 @@ Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(devic
     mGraphView->setZoomScale(2.0F);
 }
 
-void Renderer::update(float_t dt) {
-    mGraphView->update(dt);
+void Renderer::update() {
+    mGraphView->update();
 }
 
 void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
@@ -66,7 +66,8 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
 
     auto ctx = gfx::TransferPtr(new UIContext(mGuiRenderer->drawList()));
 
-    auto body = mGraphView->frame(mScreenSize.width, mScreenSize.height);
+    auto view = mGraphView;
+    auto body = view->frame(mScreenSize.width, mScreenSize.height);
     mGuiRenderer->resetForNewFrame();
     body->draw(ctx, body->size(ProposedSize(mScreenSize)));
     mGuiRenderer->draw(commandBuffer);
@@ -78,6 +79,26 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
     commandBuffer->submit();
     commandBuffer->present(drawable);
     commandBuffer->waitUntilCompleted();
+}
+
+void Renderer::keyUp(SDL_KeyboardEvent* event) {
+
+}
+
+void Renderer::keyDown(SDL_KeyboardEvent* event) {
+
+}
+
+void Renderer::mouseUp(SDL_MouseButtonEvent* event) {
+
+}
+
+void Renderer::mouseDown(SDL_MouseButtonEvent* event) {
+
+}
+
+void Renderer::mouseWheel(SDL_MouseWheelEvent* event) {
+    mGraphView->setZoomScale(mGraphView->zoomScale() - event->preciseY * ImGui::GetIO().DeltaTime * 5.0F);
 }
 
 void Renderer::screenResized(const vk::Extent2D& size) {

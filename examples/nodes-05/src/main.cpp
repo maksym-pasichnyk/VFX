@@ -41,22 +41,26 @@ public:
 
 public:
     void run() {
-        using std::chrono::steady_clock;
-        using as_seconds = std::chrono::duration<float_t, std::chrono::seconds::period>;
+        using seconds = std::chrono::duration<float_t, std::chrono::seconds::period>;
 
-        steady_clock::time_point timePointA = steady_clock::now();
-        steady_clock::time_point timePointB;
+        auto previous = std::chrono::steady_clock::now();
+
+        ImGui::SetCurrentContext(&im_gui_context);
 
         running = true;
         while (running) {
+            auto current = std::chrono::steady_clock::now();
+            auto elapsed = current - previous;
+            previous = current;
+
+            auto size = window->size();
+
+            im_gui_context.IO.DeltaTime = seconds(elapsed).count();
+            im_gui_context.IO.DisplaySize = ImVec2(size.width, size.height);
+
             pollEvents();
 
-            timePointB = timePointA;
-            timePointA = steady_clock::now();
-
-            float_t dt = as_seconds(timePointA - timePointB).count();
-
-            renderer->update(dt);
+            renderer->update();
             renderer->draw(swapchain);
         }
     }
@@ -71,22 +75,58 @@ public:
                 case SDL_WINDOWEVENT: {
                     auto pSDLWindow = SDL_GetWindowFromID(event.window.windowID);
                     auto pGFXWindow = static_cast<gfx::Window*>(SDL_GetWindowData(pSDLWindow, "this"));
-                    if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
-                        pGFXWindow->windowDidResize();
-                    } else if (event.window.event == SDL_WINDOWEVENT_ENTER) {
-                        pGFXWindow->windowMouseEnter();
-                    } else if (event.window.event == SDL_WINDOWEVENT_LEAVE) {
-                        pGFXWindow->windowMouseExit();
-                    } else if (event.window.event == SDL_WINDOWEVENT_CLOSE) {
-                        pGFXWindow->windowShouldClose();
+                    switch (event.window.event) {
+                        case SDL_WINDOWEVENT_CLOSE:
+                            pGFXWindow->performClose();
+                            break;
+                        case SDL_WINDOWEVENT_RESIZED:
+                            pGFXWindow->performResize();
+                            break;
+                        default:
+                            break;
                     }
                     break;
                 }
+                case SDL_KEYUP:
+                    keyUp(&event.key);
+                    break;
+                case SDL_KEYDOWN:
+                    keyDown(&event.key);
+                    break;
+                case SDL_MOUSEBUTTONUP:
+                    mouseUp(&event.button);
+                    break;
+                case SDL_MOUSEBUTTONDOWN:
+                    mouseDown(&event.button);
+                    break;
+                case SDL_MOUSEWHEEL:
+                    mouseWheel(&event.wheel);
+                    break;
             }
         }
     }
 
 private:
+    void keyUp(SDL_KeyboardEvent* event) {
+        renderer->keyUp(event);
+    }
+
+    void keyDown(SDL_KeyboardEvent* event) {
+        renderer->keyDown(event);
+    }
+
+    void mouseUp(SDL_MouseButtonEvent* event) {
+        renderer->mouseUp(event);
+    }
+
+    void mouseDown(SDL_MouseButtonEvent* event) {
+        renderer->mouseDown(event);
+    }
+
+    void mouseWheel(SDL_MouseWheelEvent* event) {
+        renderer->mouseWheel(event);
+    }
+
     void screenResized(const vk::Extent2D& size) {
         renderer->screenResized(size);
     }
@@ -99,6 +139,9 @@ private:
     gfx::SharedPtr<gfx::Window> window;
     gfx::SharedPtr<gfx::Swapchain> swapchain;
     gfx::SharedPtr<gfx::Application> application;
+
+    ImFontAtlas im_font_atlas = {};
+    ImGuiContext im_gui_context = {&im_font_atlas};
 };
 
 auto main() -> int32_t {

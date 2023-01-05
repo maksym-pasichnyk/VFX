@@ -59,14 +59,15 @@ public:
                 case SDL_WINDOWEVENT: {
                     auto pSDLWindow = SDL_GetWindowFromID(event.window.windowID);
                     auto pGFXWindow = static_cast<gfx::Window*>(SDL_GetWindowData(pSDLWindow, "this"));
-                    if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
-                        pGFXWindow->windowDidResize();
-                    } else if (event.window.event == SDL_WINDOWEVENT_ENTER) {
-                        pGFXWindow->windowMouseEnter();
-                    } else if (event.window.event == SDL_WINDOWEVENT_LEAVE) {
-                        pGFXWindow->windowMouseExit();
-                    } else if (event.window.event == SDL_WINDOWEVENT_CLOSE) {
-                        pGFXWindow->windowShouldClose();
+                    switch (event.window.event) {
+                        case SDL_WINDOWEVENT_CLOSE:
+                            pGFXWindow->performClose();
+                            break;
+                        case SDL_WINDOWEVENT_RESIZED:
+                            pGFXWindow->performResize();
+                            break;
+                        default:
+                            break;
                     }
                     break;
                 }
