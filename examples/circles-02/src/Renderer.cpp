@@ -1,6 +1,7 @@
 #include "Renderer.hpp"
-
 #include "Assets.hpp"
+
+#include "NotSwiftUI/View.hpp"
 
 Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(device_)) {
     commandQueue = device->newCommandQueue();

@@ -1,8 +1,7 @@
 #pragma once
 
 #include "gfx/GFX.hpp"
-#include "NotSwiftUI/View.hpp"
-#include "NotSwiftUI/UIContext.hpp"
+#include "UIContext.hpp"
 
 struct UIRenderer : gfx::Referencing {
 public:

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "UIContext.hpp"
+#include "Alignment.hpp"
 
 #include "Iter.hpp"
 #include "fmt/format.h"
@@ -52,6 +53,12 @@ struct View : gfx::Referencing {
     virtual void _draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) {
         throw std::runtime_error("FatalError");
     }
+
+    void align(const gfx::SharedPtr<UIContext> &context, const UISize& childSize, const UISize& parentSize, const Alignment& alignment) {
+        UIPoint childPoint = alignment.point(childSize);
+        UIPoint parentPoint = alignment.point(parentSize);
+        context->translateBy(parentPoint.x - childPoint.x, parentPoint.y - childPoint.y);
+    }
 };
 
 struct Text : View {
@@ -70,7 +77,7 @@ public:
         UISize uiSize = UISize(imSize.x, imSize.y);
 
         context->saveState();
-        context->align(uiSize, size, Alignment::center());
+        align(context, uiSize, size, Alignment::center());
         context->drawText(text, fontSize, font, size.width);
         context->restoreState();
     }
@@ -83,12 +90,10 @@ public:
 
 struct Shape : View {
     auto body() -> gfx::SharedPtr<View> override;
-
-    virtual void draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) = 0;
 };
 
 struct Circle : Shape {
-    void draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) override {
+    void _draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) override {
         float_t halfSize = std::min(size.width, size.height) * 0.5F;
         float_t dx = size.width * 0.5F - halfSize;
         float_t dy = size.height * 0.5F - halfSize;
@@ -107,13 +112,13 @@ private:
 public:
     explicit Border(float_t width) : width(width) {}
 
-    void draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) override {
+    void _draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) override {
         context->drawRect(size, width);
     }
 };
 
 struct Rectangle : Shape {
-    void draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) override {
+    void _draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) override {
         context->drawRectFilled(size);
     }
 };
@@ -132,7 +137,7 @@ public:
     }
 
     void _draw(const gfx::SharedPtr<UIContext> &context, const UISize &size) override {
-        shape->draw(context, size);
+        shape->_draw(context, size);
     }
 };
 
@@ -157,7 +162,7 @@ public:
         auto childSize = content->size(ProposedSize(size));
 
         context->saveState();
-        context->align(childSize, size, alignment);
+        align(context, childSize, size, alignment);
         content->draw(context, childSize);
         context->restoreState();
     }
@@ -220,7 +225,7 @@ public:
         auto childSize = content->size(ProposedSize(size));
 
         context->saveState();
-        context->align(childSize, size, alignment);
+        align(context, childSize, size, alignment);
         content->draw(context, childSize);
         context->restoreState();
     }
@@ -245,7 +250,7 @@ public:
 
         auto childSize = overlay->size(ProposedSize(size));
         context->saveState();
-        context->align(childSize, size, alignment);
+        align(context, childSize, size, alignment);
         overlay->draw(context, childSize);
         context->restoreState();
     }

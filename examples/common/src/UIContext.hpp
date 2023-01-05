@@ -3,7 +3,6 @@
 #include "UISize.hpp"
 #include "UIPoint.hpp"
 #include "UIColor.hpp"
-#include "Alignment.hpp"
 
 #include <stack>
 
@@ -148,12 +147,5 @@ public:
         float_t x = mCurrentState.x;
         float_t y = mCurrentState.y;
         pDrawList->AddText(font, fontSize, ImVec2(x, y), imColor, text.begin(), text.end(), wrap_width);
-    }
-
-    // todo: move to View
-    void align(const UISize& childSize, const UISize& parentSize, const Alignment& alignment) {
-        UIPoint childPoint = alignment.point(childSize);
-        UIPoint parentPoint = alignment.point(parentSize);
-        translateBy(parentPoint.x - childPoint.x, parentPoint.y - childPoint.y);
     }
 };

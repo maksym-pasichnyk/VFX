@@ -12,17 +12,17 @@ Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(devic
     mGraphView = gfx::TransferPtr(new GraphView());
 
     auto nodeA = mGraphView->addNode("Node A");
-    nodeA->addOutput("", Capacity::eSingle);
+    nodeA->addOutput("Return Value", Capacity::eMulti);
     nodeA->setPosition(UIPoint(125, 110));
 
     auto nodeB = mGraphView->addNode("Node B");
-    nodeB->addOutput("", Capacity::eMulti);
+    nodeB->addOutput("Return Value", Capacity::eMulti);
     nodeB->setPosition(UIPoint(125, 710));
 
     auto nodeC = mGraphView->addNode("Node C");
     nodeC->addInput("A", Capacity::eSingle);
     nodeC->addInput("B", Capacity::eSingle);
-    nodeC->addOutput("Result", Capacity::eMulti);
+    nodeC->addOutput("Return Value", Capacity::eMulti);
     nodeC->setPosition(UIPoint(825, 330));
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "NotSwiftUI/UIContext.hpp"
+#include "UIContext.hpp"
+#include "NotSwiftUI/View.hpp"
 
 #include <SDL_mouse.h>
 
@@ -22,16 +23,15 @@ public:
         friend Node;
         friend GraphView;
 
-    private:
-        enum class Direction {
-            eInput,
-            eOutput
-        };
-
     public:
         enum class Capacity {
             eSingle,
             eMulti
+        };
+
+        enum class Direction {
+            eInput,
+            eOutput
         };
 
     private:
