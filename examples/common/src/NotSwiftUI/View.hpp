@@ -39,7 +39,7 @@ struct View : gfx::Referencing {
     auto frame(std::optional<float_t> width, std::optional<float_t> height, Alignment alignment = Alignment::center()) -> gfx::SharedPtr<FixedFrame>;
     auto frame(std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment = Alignment::center()) -> gfx::SharedPtr<FlexibleFrame>;
     auto border(const UIColor& color, float_t width) -> gfx::SharedPtr<View>;
-    auto overlay(gfx::SharedPtr<View> overlay) -> gfx::SharedPtr<Overlay>;
+    auto overlay(gfx::SharedPtr<View> overlay, Alignment alignment = Alignment::center()) -> gfx::SharedPtr<Overlay>;
     auto fixedSize(bool horizontal, bool vertical) -> gfx::SharedPtr<FixedSize>;
     auto foregroundColor(const UIColor& color) -> gfx::SharedPtr<ForegroundColor>;
 
@@ -51,6 +51,33 @@ struct View : gfx::Referencing {
     }
     virtual void _draw(const gfx::SharedPtr<UIContext>& context, const UISize& size) {
         throw std::runtime_error("FatalError");
+    }
+};
+
+struct Text : View {
+private:
+    std::string text;
+    ImFont* font;
+    float_t fontSize;
+
+public:
+    explicit Text(std::string text, ImFont* font, float_t fontSize)
+        : text(std::move(text)), font(font), fontSize(fontSize) {}
+
+public:
+    void _draw(const gfx::SharedPtr<UIContext> &context, const UISize &size) override {
+        ImVec2 imSize = font->CalcTextSizeA(fontSize, FLT_MAX, size.width, text.data(), text.data() + text.size(), nullptr);
+        UISize uiSize = UISize(imSize.x, imSize.y);
+
+        context->saveState();
+        context->align(uiSize, size, Alignment::center());
+        context->drawText(text, fontSize, font, size.width);
+        context->restoreState();
+    }
+
+    auto _size(const ProposedSize& proposed) -> UISize override {
+        ImVec2 imSize = font->CalcTextSizeA(fontSize, FLT_MAX, proposed.orMax().width, text.data(), text.data() + text.size(), nullptr);
+        return proposed.orDefault(imSize.x, imSize.y);
     }
 };
 
@@ -203,9 +230,11 @@ struct Overlay : View {
 private:
     gfx::SharedPtr<View> content;
     gfx::SharedPtr<View> overlay;
+    Alignment alignment;
 
 public:
-    explicit Overlay(gfx::SharedPtr<View> content, gfx::SharedPtr<View> overlay) : content(std::move(content)), overlay(std::move(overlay)) {}
+    explicit Overlay(gfx::SharedPtr<View> content, gfx::SharedPtr<View> overlay, Alignment alignment)
+        : content(std::move(content)), overlay(std::move(overlay)), alignment(alignment) {}
 
     auto _size(const ProposedSize& proposed) -> UISize override {
         return content->size(proposed);
@@ -216,7 +245,7 @@ public:
 
         auto childSize = overlay->size(ProposedSize(size));
         context->saveState();
-        context->align(childSize, size, Alignment::center());
+        context->align(childSize, size, alignment);
         overlay->draw(context, childSize);
         context->restoreState();
     }
@@ -411,8 +440,8 @@ inline auto View::border(const UIColor& color, float_t width) -> gfx::SharedPtr<
     return overlay(gfx::TransferPtr(new Border(width))->foregroundColor(color));
 }
 
-inline auto View::overlay(gfx::SharedPtr<View> overlay) -> gfx::SharedPtr<Overlay> {
-    return gfx::TransferPtr(new Overlay(gfx::RetainPtr(this), overlay));
+inline auto View::overlay(gfx::SharedPtr<View> overlay, Alignment alignment) -> gfx::SharedPtr<Overlay> {
+    return gfx::TransferPtr(new Overlay(gfx::RetainPtr(this), overlay, alignment));
 }
 
 inline auto View::fixedSize(bool horizontal, bool vertical) -> gfx::SharedPtr<FixedSize> {

@@ -138,7 +138,7 @@ public:
         pDrawList->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), imColor, width);
     }
 
-    void drawText(std::string_view text, float fontSize) {
+    void drawText(std::string_view text, float fontSize, ImFont* font = nullptr, float wrap_width = 0.0F) {
         ImU32 imColor = static_cast<ImU32>(ImColor(
             mCurrentState.fillColor.r,
             mCurrentState.fillColor.g,
@@ -147,7 +147,7 @@ public:
         ));
         float_t x = mCurrentState.x;
         float_t y = mCurrentState.y;
-        pDrawList->AddText(nullptr, fontSize, ImVec2(x, y), imColor, text.begin(), text.end());
+        pDrawList->AddText(font, fontSize, ImVec2(x, y), imColor, text.begin(), text.end(), wrap_width);
     }
 
     // todo: move to View

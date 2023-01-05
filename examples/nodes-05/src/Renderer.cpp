@@ -66,7 +66,13 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
 
     auto ctx = gfx::TransferPtr(new UIContext(mGuiRenderer->drawList()));
 
-    auto view = mGraphView;
+    auto view = mGraphView
+        ->overlay(
+            gfx::TransferPtr(new Text(fmt::format("FPS {:.2F}", 1.0F / ImGui::GetIO().DeltaTime), ctx->drawList()->_Data->Font, 24.0F))
+                ->fixedSize(true, true),
+            Alignment::topLeading()
+        );
+
     auto body = view->frame(mScreenSize.width, mScreenSize.height);
     mGuiRenderer->resetForNewFrame();
     body->draw(ctx, body->size(ProposedSize(mScreenSize)));
