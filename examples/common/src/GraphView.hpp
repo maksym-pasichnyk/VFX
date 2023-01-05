@@ -294,13 +294,13 @@ private:
     auto findPortAt(const gfx::SharedPtr<Node>& node, int32_t x, int32_t y) -> gfx::SharedPtr<Port> {
         for (auto& port : node->mInputs) {
             UIPoint p = UIPoint(x, y) * mZoomScale - node->_getSlotPosition(port) - mGridOffset;
-            if (std::abs(p.x) <= 10.0F * mZoomScale && std::abs(p.y) <= 10.0F * mZoomScale) {
+            if (std::abs(p.x) <= 10.0F && std::abs(p.y) <= 10.0F) {
                 return port;
             }
         }
         for (auto& port : node->mOutputs) {
             UIPoint p = UIPoint(x, y) * mZoomScale - node->_getSlotPosition(port) - mGridOffset;
-            if (std::abs(p.x) <= 10.0F * mZoomScale && std::abs(p.y) <= 10.0F * mZoomScale) {
+            if (std::abs(p.x) <= 10.0F && std::abs(p.y) <= 10.0F) {
                 return port;
             }
         }
@@ -324,6 +324,26 @@ private:
         portA->mLinks.emplace(link);
         portB->mLinks.emplace(link);
         return link;
+    }
+
+    void removeNode(const gfx::SharedPtr<Node>& node) {
+        for (auto& port : node->mInputs) {
+            if (port == mSelectedPort) {
+                mSelectedPort = {};
+            }
+            removeLinks(port);
+        }
+        for (auto& port : node->mOutputs) {
+            if (port == mSelectedPort) {
+                mSelectedPort = {};
+            }
+            removeLinks(port);
+        }
+        mNodes.erase(std::find(mNodes.begin(), mNodes.end(), node));
+
+        if (node == mSelectedNode) {
+            mSelectedNode = {};
+        }
     }
 
     void removeLinks(const gfx::SharedPtr<Port>& port) {
@@ -380,6 +400,14 @@ public:
                     mInteraction = Interaction::eDragGrid;
                 }
             }
+
+            if ((mouseState & SDL_BUTTON_RMASK) != 0) {
+                mSelectedNode = findNodeAt(x, y);
+                if (!mSelectedNode) {
+                    mSelectedNode = addNode("Node");
+                    mSelectedNode->setPosition(mMousePosition * mZoomScale);
+                }
+            }
         }
 
         UIPoint dragOffset = (mMousePosition - mStartDragPosition) * mZoomScale;
@@ -405,7 +433,7 @@ public:
                 auto node = findNodeAt(mMousePosition.x, mMousePosition.y);
                 if (node && node != mSelectedNode) {
                     auto port = findPortAt(node, mMousePosition.x, mMousePosition.y);
-                    if (port->mDirection == Port::Direction::eInput) {
+                    if (port && port->mDirection == Port::Direction::eInput) {
                         addLink(mSelectedPort, port);
                     }
                 }
@@ -419,14 +447,7 @@ public:
                 const Uint8* keys = SDL_GetKeyboardState(nullptr);
 
                 if (keys[SDL_SCANCODE_BACKSPACE]) {
-                    for (auto& port : mSelectedNode->mInputs) {
-                        removeLinks(port);
-                    }
-                    for (auto& port : mSelectedNode->mOutputs) {
-                        removeLinks(port);
-                    }
-                    mNodes.erase(std::find(mNodes.begin(), mNodes.end(), mSelectedNode));
-                    mSelectedNode = {};
+                    removeNode(mSelectedNode);
                 }
             }
         }

@@ -47,20 +47,26 @@ public:
 
         ImGui::SetCurrentContext(&im_gui_context);
 
+        float_t accumulate = 0.0F;
+        float_t fixed_delta_time = 1.0F / 60.0F;
+
         running = true;
         while (running) {
             auto current = std::chrono::steady_clock::now();
             auto elapsed = current - previous;
             previous = current;
 
-            auto size = window->size();
-
-            im_gui_context.IO.DeltaTime = seconds(elapsed).count();
-            im_gui_context.IO.DisplaySize = ImVec2(size.width, size.height);
+            accumulate += seconds(elapsed).count();
 
             pollEvents();
 
-            renderer->update();
+            // fixed update
+            im_gui_context.IO.DeltaTime = fixed_delta_time;
+            while (accumulate >= fixed_delta_time) {
+                accumulate -= fixed_delta_time;
+                renderer->update();
+            }
+
             renderer->draw(swapchain);
         }
     }
