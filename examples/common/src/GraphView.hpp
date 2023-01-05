@@ -405,7 +405,7 @@ public:
                 mSelectedNode = findNodeAt(x, y);
                 if (!mSelectedNode) {
                     mSelectedNode = addNode("Node");
-                    mSelectedNode->setPosition(mMousePosition * mZoomScale);
+                    mSelectedNode->setPosition(mMousePosition * mZoomScale - mGridOffset);
                 }
             }
         }
