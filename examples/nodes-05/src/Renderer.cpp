@@ -20,18 +20,24 @@ Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(devic
     nodeB->setPosition(UIPoint(125, 710));
 
     auto nodeC = mGraphView->addNode("Node C");
-    nodeC->addInput("A", Capacity::eMulti);
-    nodeC->addInput("B", Capacity::eMulti);
+    nodeC->addInput("A", Capacity::eSingle);
+    nodeC->addInput("B", Capacity::eSingle);
     nodeC->addOutput("Result", Capacity::eMulti);
     nodeC->setPosition(UIPoint(825, 330));
 
-    mGraphView->addLink(nodeA, nodeC, 0, 0);
-    mGraphView->addLink(nodeB, nodeC, 0, 0);
-    mGraphView->addLink(nodeB, nodeC, 0, 1);
     mGraphView->setZoomScale(2.0F);
 }
 
 void Renderer::update() {
+    mAccumulateTotal -= mAccumulate[mAccumulateIndex];
+    mAccumulate[mAccumulateIndex] = ImGui::GetIO().DeltaTime;
+    mAccumulateTotal += mAccumulate[mAccumulateIndex];
+
+    mAccumulateIndex = (mAccumulateIndex + 1) % static_cast<int32_t>(std::size(mAccumulate));
+    mAccumulateCount = std::min(mAccumulateCount + 1, static_cast<int32_t>(std::size(mAccumulate)));
+
+    mAverage = mAccumulateTotal / static_cast<float_t>(mAccumulateCount);
+
     mGraphView->update();
 }
 
@@ -68,7 +74,7 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
 
     auto view = mGraphView
         ->overlay(
-            gfx::TransferPtr(new Text(fmt::format("FPS {:.2F}", 1.0F / ImGui::GetIO().DeltaTime), ctx->drawList()->_Data->Font, 24.0F))
+            gfx::TransferPtr(new Text(fmt::format("FPS {:.0F}", 1.0F / mAverage), ctx->drawList()->_Data->Font, 24.0F))
                 ->fixedSize(true, true),
             Alignment::topLeading()
         );

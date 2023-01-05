@@ -26,6 +26,12 @@ public:
 private:
     UISize mScreenSize;
 
+    float_t mAverage = {};
+    float_t mAccumulate[60] = {};
+    float_t mAccumulateTotal = {};
+    int32_t mAccumulateCount = {};
+    int32_t mAccumulateIndex = {};
+
     gfx::SharedPtr<GraphView> mGraphView;
     gfx::SharedPtr<UIContext> mUIContext;
     gfx::SharedPtr<UIRenderer> mGuiRenderer;

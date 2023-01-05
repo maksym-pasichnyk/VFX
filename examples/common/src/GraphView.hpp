@@ -10,6 +10,7 @@ private:
         eNone,
         eDragGrid,
         eDragNode,
+        eDragLink
     };
 
 public:
@@ -19,6 +20,12 @@ public:
     struct Port : gfx::Referencing {
         friend Node;
         friend GraphView;
+
+    private:
+        enum class Direction {
+            eInput,
+            eOutput
+        };
 
     public:
         enum class Capacity {
@@ -31,12 +38,13 @@ public:
         size_t mIndex;
         std::string mName;
         Capacity mCapacity;
+        Direction mDirection;
 
         std::set<gfx::SharedPtr<Link>> mLinks = {};
 
     private:
-        explicit Port(Node* node, size_t index, std::string name, Capacity capacity)
-            : pNode(node), mIndex(index), mName(std::move(name)), mCapacity(capacity) {}
+        explicit Port(Node* node, size_t index, std::string name, Capacity capacity, Direction direction)
+            : pNode(node), mIndex(index), mName(std::move(name)), mCapacity(capacity), mDirection(direction) {}
     };
 
     struct Node : gfx::Referencing {
@@ -79,19 +87,11 @@ public:
         }
 
         void addInput(std::string name, Port::Capacity capacity) {
-            mInputs.emplace_back(gfx::TransferPtr(new Port(this, mInputs.size(), std::move(name), capacity)));
+            mInputs.emplace_back(gfx::TransferPtr(new Port(this, mInputs.size(), std::move(name), capacity, Port::Direction::eInput)));
         }
 
         void addOutput(std::string name, Port::Capacity capacity) {
-            mOutputs.emplace_back(gfx::TransferPtr(new Port(this, mOutputs.size(), std::move(name), capacity)));
-        }
-
-        auto getInput(int32_t index) -> gfx::SharedPtr<Port> {
-            return mInputs.at(index);
-        }
-
-        auto getOutput(int32_t index) -> gfx::SharedPtr<Port> {
-            return mOutputs.at(index);
+            mOutputs.emplace_back(gfx::TransferPtr(new Port(this, mOutputs.size(), std::move(name), capacity, Port::Direction::eOutput)));
         }
 
     private:
@@ -116,7 +116,7 @@ public:
             context->restoreState();
 
             for (auto& port : mInputs) {
-                UIPoint slot = _getInputSlot(port->mIndex);
+                UIPoint slot = _getSlotPosition(port);
 
                 context->saveState();
                 context->translateBy(slot.x, slot.y);
@@ -145,7 +145,7 @@ public:
             }
 
             for (auto& port : mOutputs) {
-                UIPoint slot = _getOutputSlot(port->mIndex);
+                UIPoint slot = _getSlotPosition(port);
 
                 context->saveState();
                 context->translateBy(slot.x, slot.y);
@@ -175,16 +175,16 @@ public:
             }
         }
 
-        auto _getInputSlot(size_t i) -> UIPoint {
-            float_t x = mPosition.x + 10.0F + 10.0F + 10.0F;
-            float_t y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * i;
-            return UIPoint(x, y);
-        }
-
-        auto _getOutputSlot(size_t i) -> UIPoint {
-            float_t x = mPosition.x + 10.0F + mSize.width - 20.0F - 10.0F;
-            float_t y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * i;
-            return UIPoint(x, y);
+        auto _getSlotPosition(const gfx::SharedPtr<Port>& port) -> UIPoint {
+            if (port->mDirection == Port::Direction::eInput) {
+                float_t x = mPosition.x + 10.0F + 10.0F + 10.0F;
+                float_t y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * static_cast<float_t>(port->mIndex);
+                return UIPoint(x, y);
+            } else {
+                float_t x = mPosition.x + 10.0F + mSize.width - 20.0F - 10.0F;
+                float_t y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * static_cast<float_t>(port->mIndex);
+                return UIPoint(x, y);
+            }
         }
     };
 
@@ -209,7 +209,9 @@ private:
     UIPoint mMousePosition = UIPoint();
     UIPoint mStartDragPosition = UIPoint();
     Interaction mInteraction = Interaction::eNone;
+
     gfx::SharedPtr<Node> mSelectedNode = {};
+    gfx::SharedPtr<Port> mSelectedPort = {};
 
 private:
     auto _size(const ProposedSize &proposed) -> UISize override {
@@ -240,20 +242,14 @@ private:
         context->scaleBy(invScale, invScale);
 
         for (auto& link : mLinks) {
-            UIPoint pointA = link->mPortA->pNode->_getOutputSlot(link->mPortA->mIndex);
-            UIPoint pointD = link->mPortB->pNode->_getInputSlot(link->mPortB->mIndex);
+            UIPoint pointA = link->mPortA->pNode->_getSlotPosition(link->mPortA);
+            UIPoint pointD = link->mPortB->pNode->_getSlotPosition(link->mPortB);
 
-            UIPoint pointB = pointA + UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
-            UIPoint pointC = pointD - UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
+            drawLink(context, pointA, pointD);
+        }
 
-            ImVec2 p0 = ImVec2(mGridOffset.x + pointA.x, mGridOffset.y + pointA.y);
-            ImVec2 p1 = ImVec2(mGridOffset.x + pointB.x, mGridOffset.y + pointB.y);
-            ImVec2 p2 = ImVec2(mGridOffset.x + pointC.x, mGridOffset.y + pointC.y);
-            ImVec2 p3 = ImVec2(mGridOffset.x + pointD.x, mGridOffset.y + pointD.y);
-
-            context->drawList()->PathLineTo(p0);
-            context->drawList()->PathBezierCubicCurveTo(p1, p2, p3);
-            context->drawList()->PathStroke(IM_COL32(255, 255, 255, 255), 0, 5.0F);
+        if (mInteraction == Interaction::eDragLink) {
+            drawLink(context, mSelectedPort->pNode->_getSlotPosition(mSelectedPort), mMousePosition * mZoomScale - mGridOffset);
         }
 
         for (auto& node : mNodes) {
@@ -263,15 +259,27 @@ private:
         context->restoreState();
     }
 
+    void drawLink(const gfx::SharedPtr<UIContext> &context, const UIPoint& pointA, const UIPoint& pointD) {
+        UIPoint pointB = pointA + UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
+        UIPoint pointC = pointD - UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
+
+        ImVec2 p0 = ImVec2(mGridOffset.x + pointA.x, mGridOffset.y + pointA.y);
+        ImVec2 p1 = ImVec2(mGridOffset.x + pointB.x, mGridOffset.y + pointB.y);
+        ImVec2 p2 = ImVec2(mGridOffset.x + pointC.x, mGridOffset.y + pointC.y);
+        ImVec2 p3 = ImVec2(mGridOffset.x + pointD.x, mGridOffset.y + pointD.y);
+
+        context->drawList()->PathLineTo(p0);
+        context->drawList()->PathBezierCubicCurveTo(p1, p2, p3);
+        context->drawList()->PathStroke(IM_COL32(255, 255, 255, 255), 0, 5.0F);
+    }
+
     auto findNodeAt(int32_t x, int32_t y) -> gfx::SharedPtr<Node> {
         for (auto& node : ranges::reverse_view(mNodes)) {
-            float_t x1 = static_cast<float_t>(x) * mZoomScale - node->mPosition.x - mGridOffset.x;
-            float_t y1 = static_cast<float_t>(y) * mZoomScale - node->mPosition.y - mGridOffset.y;
-
-            if (x1 < 0.0F || x1 > node->mSize.width) {
+            UIPoint p = UIPoint(x, y) * mZoomScale - node->mPosition - mGridOffset;
+            if (p.x < 0.0F || p.x > node->mSize.width) {
                 continue;
             }
-            if (y1 < 0.0F || y1 > node->mSize.height) {
+            if (p.y < 0.0F || p.y > node->mSize.height) {
                 continue;
             }
             return node;
@@ -279,23 +287,23 @@ private:
         return {};
     }
 
-public:
-    auto zoomScale() -> float_t {
-        return mZoomScale;
+    auto findPortAt(const gfx::SharedPtr<Node>& node, int32_t x, int32_t y) -> gfx::SharedPtr<Port> {
+        for (auto& port : node->mInputs) {
+            UIPoint p = UIPoint(x, y) * mZoomScale - node->_getSlotPosition(port) - mGridOffset;
+            if (std::abs(p.x) <= 10.0F * mZoomScale && std::abs(p.y) <= 10.0F * mZoomScale) {
+                return port;
+            }
+        }
+        for (auto& port : node->mOutputs) {
+            UIPoint p = UIPoint(x, y) * mZoomScale - node->_getSlotPosition(port) - mGridOffset;
+            if (std::abs(p.x) <= 10.0F * mZoomScale && std::abs(p.y) <= 10.0F * mZoomScale) {
+                return port;
+            }
+        }
+        return {};
     }
 
-    void setZoomScale(float_t zoomScale) {
-        mZoomScale = std::max(zoomScale, 1.0F);
-    }
-
-    auto addNode(std::string text) -> gfx::SharedPtr<Node> {
-        return mNodes.emplace_back(gfx::TransferPtr(new Node(std::move(text))));
-    }
-
-    auto addLink(const gfx::SharedPtr<Node>& nodeA, const gfx::SharedPtr<Node>& nodeB, size_t slotA, size_t slotB) -> gfx::SharedPtr<Link> {
-        auto portA = nodeA->mOutputs.at(slotA);
-        auto portB = nodeB->mInputs.at(slotB);
-
+    auto addLink(const gfx::SharedPtr<Port>& portA, const gfx::SharedPtr<Port>& portB) -> gfx::SharedPtr<Link> {
         for (auto& link : mLinks) {
             if (link->mPortA == portA && link->mPortB == portB) {
                 return {};
@@ -322,6 +330,19 @@ public:
         }
     }
 
+public:
+    auto zoomScale() -> float_t {
+        return mZoomScale;
+    }
+
+    void setZoomScale(float_t zoomScale) {
+        mZoomScale = std::max(zoomScale, 1.0F);
+    }
+
+    auto addNode(std::string text) -> gfx::SharedPtr<Node> {
+        return mNodes.emplace_back(gfx::TransferPtr(new Node(std::move(text))));
+    }
+
     void update() {
         int32_t x, y;
         uint32_t mouseState = SDL_GetMouseState(&x, &y);
@@ -331,16 +352,22 @@ public:
 
         if (mInteraction == Interaction::eNone) {
             if ((mouseState & SDL_BUTTON_LMASK) != 0) {
+                mStartDragPosition = mMousePosition;
+
                 mSelectedNode = findNodeAt(x, y);
                 if (mSelectedNode) {
-                    mInteraction = Interaction::eDragNode;
-                    mStartDragPosition = mMousePosition;
+                    mSelectedPort = findPortAt(mSelectedNode, x, y);
+                    if (mSelectedPort && mSelectedPort->mDirection == Port::Direction::eOutput) {
+                        mInteraction = Interaction::eDragLink;
+                    } else {
+                        mSelectedPort = {};
+                        mInteraction = Interaction::eDragNode;
+                    }
 
                     mNodes.erase(std::find(mNodes.begin(), mNodes.end(), mSelectedNode));
                     mNodes.emplace_back(mSelectedNode);
                 } else {
                     mInteraction = Interaction::eDragGrid;
-                    mStartDragPosition = mMousePosition;
                 }
             }
         }
@@ -348,18 +375,32 @@ public:
         UIPoint dragOffset = (mMousePosition - mStartDragPosition) * mZoomScale;
 
         if (mInteraction == Interaction::eDragNode) {
-            if ((mouseState & SDL_BUTTON_LMASK) != 0) {
-                mSelectedNode->setPosition(mSelectedNode->position() + dragOffset);
-            } else {
+            if ((mouseState & SDL_BUTTON_LMASK) == 0) {
                 mInteraction = Interaction::eNone;
+            } else {
+                mSelectedNode->setPosition(mSelectedNode->position() + dragOffset);
             }
         }
 
         if (mInteraction == Interaction::eDragGrid) {
-            if ((mouseState & SDL_BUTTON_LMASK) != 0) {
-                mGridOffset += dragOffset;
-            } else {
+            if ((mouseState & SDL_BUTTON_LMASK) == 0) {
                 mInteraction = Interaction::eNone;
+            } else {
+                mGridOffset += dragOffset;
+            }
+        }
+
+        if (mInteraction == Interaction::eDragLink) {
+            if ((mouseState & SDL_BUTTON_LMASK) == 0) {
+                auto node = findNodeAt(mMousePosition.x, mMousePosition.y);
+                if (node && node != mSelectedNode) {
+                    auto port = findPortAt(node, mMousePosition.x, mMousePosition.y);
+                    if (port->mDirection == Port::Direction::eInput) {
+                        addLink(mSelectedPort, port);
+                    }
+                }
+                mInteraction = Interaction::eNone;
+                mSelectedPort = {};
             }
         }
     }
