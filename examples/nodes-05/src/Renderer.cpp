@@ -24,8 +24,6 @@ Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(devic
     nodeC->addInput("B", Capacity::eSingle);
     nodeC->addOutput("Result", Capacity::eMulti);
     nodeC->setPosition(UIPoint(825, 330));
-
-    mGraphView->setZoomScale(2.0F);
 }
 
 void Renderer::update() {
@@ -110,7 +108,7 @@ void Renderer::mouseDown(SDL_MouseButtonEvent* event) {
 }
 
 void Renderer::mouseWheel(SDL_MouseWheelEvent* event) {
-    mGraphView->setZoomScale(mGraphView->zoomScale() - event->preciseY * ImGui::GetIO().DeltaTime * 5.0F);
+    mGraphView->mouseWheel(event);
 }
 
 void Renderer::screenResized(const vk::Extent2D& size) {

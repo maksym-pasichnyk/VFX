@@ -8,6 +8,7 @@ struct GraphView : View {
 private:
     enum class Interaction {
         eNone,
+        eZoom,
         eDragGrid,
         eDragNode,
         eDragLink
@@ -201,7 +202,10 @@ public:
     };
 
 private:
-    float_t mZoomScale = 1.0F;
+    float_t mZoomScale = 2.0F;
+    float_t mTargetZoomScale = 2.0F;
+    UIPoint mTargetZoomPoint = UIPoint();
+
     std::list<gfx::SharedPtr<Node>> mNodes = {};
     std::list<gfx::SharedPtr<Link>> mLinks = {};
 
@@ -331,14 +335,6 @@ private:
     }
 
 public:
-    auto zoomScale() -> float_t {
-        return mZoomScale;
-    }
-
-    void setZoomScale(float_t zoomScale) {
-        mZoomScale = std::max(zoomScale, 1.0F);
-    }
-
     auto addNode(std::string text) -> gfx::SharedPtr<Node> {
         return mNodes.emplace_back(gfx::TransferPtr(new Node(std::move(text))));
     }
@@ -349,6 +345,20 @@ public:
 
         mStartDragPosition = mMousePosition;
         mMousePosition = UIPoint(static_cast<float_t>(x), static_cast<float_t>(y));
+
+        if (mInteraction == Interaction::eZoom) {
+            float_t zoomSpeed = std::min(ImGui::GetIO().DeltaTime * 10.0F, 1.0F);
+
+            mZoomScale = std::lerp(mZoomScale, mTargetZoomScale, zoomSpeed);
+            mGridOffset.x = std::lerp(mGridOffset.x, mTargetZoomPoint.x, zoomSpeed);
+            mGridOffset.y = std::lerp(mGridOffset.y, mTargetZoomPoint.y, zoomSpeed);
+
+            if (std::abs(mZoomScale - mTargetZoomScale) < 0.01F) {
+                mInteraction = Interaction::eNone;
+                mZoomScale = mTargetZoomScale;
+                mGridOffset = mTargetZoomPoint;
+            }
+        }
 
         if (mInteraction == Interaction::eNone) {
             if ((mouseState & SDL_BUTTON_LMASK) != 0) {
@@ -402,6 +412,33 @@ public:
                 mInteraction = Interaction::eNone;
                 mSelectedPort = {};
             }
+        }
+
+        if (mInteraction == Interaction::eNone) {
+            if (mSelectedNode) {
+                const Uint8* keys = SDL_GetKeyboardState(nullptr);
+
+                if (keys[SDL_SCANCODE_BACKSPACE]) {
+                    for (auto& port : mSelectedNode->mInputs) {
+                        removeLinks(port);
+                    }
+                    for (auto& port : mSelectedNode->mOutputs) {
+                        removeLinks(port);
+                    }
+                    mNodes.erase(std::find(mNodes.begin(), mNodes.end(), mSelectedNode));
+                    mSelectedNode = {};
+                }
+            }
+        }
+    }
+
+    void mouseWheel(SDL_MouseWheelEvent* event) {
+        if (mInteraction == Interaction::eNone || mInteraction == Interaction::eZoom) {
+            mInteraction = Interaction::eZoom;
+
+            mTargetZoomScale -= event->y;
+            mTargetZoomScale = std::min(std::max(mTargetZoomScale, 1.0F), 5.0F);
+            mTargetZoomPoint = mGridOffset + mMousePosition * (mTargetZoomScale - mZoomScale);
         }
     }
 };
