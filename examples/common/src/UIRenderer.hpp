@@ -13,6 +13,8 @@ private:
 
 public:
     void resetForNewFrame();
+    void setCurrentContext();
+
     auto drawList() -> ImDrawList*;
     void draw(const gfx::SharedPtr<gfx::CommandBuffer>& cmd);
     void setScale(float_t scale);
@@ -24,6 +26,7 @@ private:
 
     ImDrawList mDrawList;
     ImFontAtlas mFontAtlas = {};
+    ImGuiContext mGuiContext = {&mFontAtlas};
     ImDrawListSharedData mDrawListSharedData = {};
 
     gfx::SharedPtr<gfx::Device> mDevice;

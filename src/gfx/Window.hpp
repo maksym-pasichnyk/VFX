@@ -7,6 +7,7 @@
 struct SDL_Window;
 
 namespace gfx {
+    struct View;
     struct Window;
     struct Surface;
     struct Swapchain;
@@ -24,14 +25,19 @@ namespace gfx {
 
     private:
         SDL_Window* pWindow = {};
+
+        SharedPtr<View> mView = {};
         SharedPtr<Surface> mSurface = {};
         SharedPtr<Swapchain> mSwapchain = {};
-        SharedPtr<Application> mApplication = {};
         SharedPtr<WindowDelegate> mDelegate = {};
 
+        bool mShouldClose = {};
+
     private:
-        Window(SharedPtr<Application> application, int32_t width, int32_t height);
-        ~Window() override;
+        explicit Window(int32_t width, int32_t height);
+
+    private:
+        void _destroy();
 
     public:
         void close();
@@ -40,6 +46,7 @@ namespace gfx {
         void setTitle(const std::string& title);
         void setDelegate(SharedPtr<WindowDelegate> delegate);
         void setResizable(bool resizable);
+        auto view() -> SharedPtr<View>;
         auto swapchain() -> SharedPtr<Swapchain>;
         auto getWindowNumber() -> uint32_t;
         auto native() -> SDL_Window*;
@@ -49,6 +56,6 @@ namespace gfx {
         void performResize();
 
     public:
-        static auto alloc(SharedPtr<Application> application, int32_t width, int32_t height) -> SharedPtr<Window>;
+        static auto alloc(int32_t width, int32_t height) -> SharedPtr<Window>;
     };
 }

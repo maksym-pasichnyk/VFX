@@ -50,9 +50,9 @@ void Renderer::buildBuffers() {
     descriptorSet->setStorageBuffer(vertexBuffer, 0, 0);
 }
 
-void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
-    auto drawable = swapchain->nextDrawable();
-    auto drawableSize = swapchain->drawableSize();
+void Renderer::draw(const gfx::SharedPtr<gfx::View>& view) {
+    auto drawable = view->nextDrawable();
+    auto drawableSize = view->drawableSize();
 
     vk::Rect2D rendering_area = {};
     rendering_area.setOffset(vk::Offset2D{0, 0});

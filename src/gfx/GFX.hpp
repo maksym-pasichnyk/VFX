@@ -1,5 +1,6 @@
 #pragma once
 
+#include "View.hpp"
 #include "Buffer.hpp"
 #include "Device.hpp"
 #include "Window.hpp"

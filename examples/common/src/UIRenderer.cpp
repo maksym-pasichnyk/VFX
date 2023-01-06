@@ -103,6 +103,10 @@ void UIRenderer::resetForNewFrame() {
     mDrawList.PushTextureID(mFontAtlas.TexID);
 }
 
+void UIRenderer::setCurrentContext() {
+    ImGui::SetCurrentContext(&mGuiContext);
+}
+
 auto UIRenderer::drawList() -> ImDrawList* {
     return &mDrawList;
 }

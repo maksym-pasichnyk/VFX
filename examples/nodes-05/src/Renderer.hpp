@@ -6,21 +6,22 @@
 #include <SDL_events.h>
 
 struct GraphView;
-struct Renderer : gfx::Referencing {
+struct Renderer : gfx::ViewDelegate {
 public:
     explicit Renderer(gfx::SharedPtr<gfx::Device> device_);
     ~Renderer() override = default;
 
 public:
-    void update();
-    void draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain);
+    void update(float_t dt) override;
+    void draw(const gfx::SharedPtr<gfx::View>& view) override;
 
 public:
-    void keyUp(SDL_KeyboardEvent* event);
-    void keyDown(SDL_KeyboardEvent* event);
-    void mouseUp(SDL_MouseButtonEvent* event);
-    void mouseDown(SDL_MouseButtonEvent* event);
-    void mouseWheel(SDL_MouseWheelEvent* event);
+    void keyUp(SDL_KeyboardEvent* event) override;
+    void keyDown(SDL_KeyboardEvent* event) override;
+    void mouseUp(SDL_MouseButtonEvent* event) override;
+    void mouseDown(SDL_MouseButtonEvent* event) override;
+    void mouseWheel(SDL_MouseWheelEvent* event) override;
+
     void screenResized(const vk::Extent2D& size);
 
 private:

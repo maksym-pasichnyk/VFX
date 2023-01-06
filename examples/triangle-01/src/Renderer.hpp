@@ -3,7 +3,7 @@
 #include "gfx/GFX.hpp"
 #include "UIRenderer.hpp"
 
-struct Renderer : gfx::Referencing {
+struct Renderer : gfx::ViewDelegate {
 public:
     explicit Renderer(gfx::SharedPtr<gfx::Device> device_);
     ~Renderer() override = default;
@@ -13,7 +13,7 @@ private:
     void buildBuffers();
 
 public:
-    void draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain);
+    void draw(const gfx::SharedPtr<gfx::View>& view) override;
     void screenResized(const vk::Extent2D& size);
 
 private:

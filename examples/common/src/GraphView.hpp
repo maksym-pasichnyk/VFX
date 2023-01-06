@@ -3,6 +3,7 @@
 #include "UIContext.hpp"
 #include "NotSwiftUI/View.hpp"
 
+#include <list>
 #include <SDL_mouse.h>
 
 struct GraphView : View {
@@ -395,14 +396,57 @@ public:
         }
 
         int32_t x, y;
-        uint32_t mouseState = SDL_GetMouseState(&x, &y);
+        SDL_GetMouseState(&x, &y);
 
         mStartPosition = mMousePosition;
         mMousePosition = UIPoint(x, y);
         mCursorPosition = mMousePosition * mZoomScale - mGridOffset;
 
+        auto drag = (mMousePosition - mStartPosition) * mZoomScale;
+        if (mInteraction == Interaction::eDragNode) {
+            mSelectedNode->setPosition(mSelectedNode->position() + drag);
+        }
+
+        if (mInteraction == Interaction::eDragGrid) {
+            mGridOffset += drag;
+        }
+
         if (mInteraction == Interaction::eNone) {
-            if ((mouseState & SDL_BUTTON_LMASK) != 0) {
+            if (mSelectedNode) {
+                const Uint8* keys = SDL_GetKeyboardState(nullptr);
+
+                if (keys[SDL_SCANCODE_BACKSPACE]) {
+                    removeNode(mSelectedNode);
+                }
+            }
+        }
+    }
+
+    void mouseUp(SDL_MouseButtonEvent* event) {
+        if (event->button == SDL_BUTTON_LEFT) {
+            if (mInteraction == Interaction::eDragNode) {
+                mInteraction = Interaction::eNone;
+            }
+            if (mInteraction == Interaction::eDragLink) {
+                auto node = findNodeAt(mCursorPosition.x, mCursorPosition.y);
+                if (node && node != mSelectedNode) {
+                    auto port = findPortAt(node, mCursorPosition.x, mCursorPosition.y);
+                    if (port && port->mDirection == Port::Direction::eInput) {
+                        addLink(mSelectedPort, port);
+                    }
+                }
+                mInteraction = Interaction::eNone;
+                mSelectedPort = {};
+            }
+            if (mInteraction == Interaction::eDragGrid) {
+                mInteraction = Interaction::eNone;
+            }
+        }
+    }
+
+    void mouseDown(SDL_MouseButtonEvent* event) {
+        if (mInteraction == Interaction::eNone) {
+            if (event->button == SDL_BUTTON_LEFT) {
                 mStartPosition = mMousePosition;
 
                 mSelectedNode = findNodeAt(mCursorPosition.x, mCursorPosition.y);
@@ -421,53 +465,11 @@ public:
                     mInteraction = Interaction::eDragGrid;
                 }
             }
-
-            if ((mouseState & SDL_BUTTON_RMASK) != 0) {
+            if (event->button == SDL_BUTTON_RIGHT) {
                 mSelectedNode = findNodeAt(mCursorPosition.x, mCursorPosition.y);
                 if (!mSelectedNode) {
                     mSelectedNode = addNode("Node");
                     mSelectedNode->setPosition(mCursorPosition);
-                }
-            }
-        }
-
-        UIPoint dragOffset = (mMousePosition - mStartPosition) * mZoomScale;
-        if (mInteraction == Interaction::eDragNode) {
-            if ((mouseState & SDL_BUTTON_LMASK) == 0) {
-                mInteraction = Interaction::eNone;
-            } else {
-                mSelectedNode->setPosition(mSelectedNode->position() + dragOffset);
-            }
-        }
-
-        if (mInteraction == Interaction::eDragGrid) {
-            if ((mouseState & SDL_BUTTON_LMASK) == 0) {
-                mInteraction = Interaction::eNone;
-            } else {
-                mGridOffset += dragOffset;
-            }
-        }
-
-        if (mInteraction == Interaction::eDragLink) {
-            if ((mouseState & SDL_BUTTON_LMASK) == 0) {
-                auto node = findNodeAt(mCursorPosition.x, mCursorPosition.y);
-                if (node && node != mSelectedNode) {
-                    auto port = findPortAt(node, mCursorPosition.x, mCursorPosition.y);
-                    if (port && port->mDirection == Port::Direction::eInput) {
-                        addLink(mSelectedPort, port);
-                    }
-                }
-                mInteraction = Interaction::eNone;
-                mSelectedPort = {};
-            }
-        }
-
-        if (mInteraction == Interaction::eNone) {
-            if (mSelectedNode) {
-                const Uint8* keys = SDL_GetKeyboardState(nullptr);
-
-                if (keys[SDL_SCANCODE_BACKSPACE]) {
-                    removeNode(mSelectedNode);
                 }
             }
         }

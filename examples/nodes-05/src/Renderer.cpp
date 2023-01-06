@@ -26,22 +26,25 @@ Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(devic
     nodeC->setPosition(UIPoint(825, 330));
 }
 
-void Renderer::update() {
+void Renderer::update(float_t dt) {
+    mGuiRenderer->setCurrentContext();
+
+    ImGui::GetIO().DeltaTime = dt;
+
     mAccumulateTotal -= mAccumulate[mAccumulateIndex];
     mAccumulate[mAccumulateIndex] = ImGui::GetIO().DeltaTime;
     mAccumulateTotal += mAccumulate[mAccumulateIndex];
-
     mAccumulateIndex = (mAccumulateIndex + 1) % static_cast<int32_t>(std::size(mAccumulate));
     mAccumulateCount = std::min(mAccumulateCount + 1, static_cast<int32_t>(std::size(mAccumulate)));
-
     mAverage = mAccumulateTotal / static_cast<float_t>(mAccumulateCount);
-
     mGraphView->update();
 }
 
-void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
-    auto drawable = swapchain->nextDrawable();
-    auto drawableSize = swapchain->drawableSize();
+void Renderer::draw(const gfx::SharedPtr<gfx::View>& view) {
+    mGuiRenderer->setCurrentContext();
+
+    auto drawable = view->nextDrawable();
+    auto drawableSize = view->drawableSize();
 
     vk::Rect2D rendering_area = {};
     rendering_area.setOffset(vk::Offset2D{0, 0});
@@ -70,14 +73,14 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
 
     auto ctx = gfx::TransferPtr(new UIContext(mGuiRenderer->drawList()));
 
-    auto view = mGraphView
+    auto body = mGraphView
         ->overlay(
             gfx::TransferPtr(new Text(fmt::format("FPS {:.0F}", 1.0F / mAverage), ctx->drawList()->_Data->Font, 24.0F))
                 ->fixedSize(true, true),
             Alignment::topLeading()
-        );
+        )
+        ->frame(mScreenSize.width, mScreenSize.height);
 
-    auto body = view->frame(mScreenSize.width, mScreenSize.height);
     mGuiRenderer->resetForNewFrame();
     body->draw(ctx, body->size(ProposedSize(mScreenSize)));
     mGuiRenderer->draw(commandBuffer);
@@ -100,11 +103,11 @@ void Renderer::keyDown(SDL_KeyboardEvent* event) {
 }
 
 void Renderer::mouseUp(SDL_MouseButtonEvent* event) {
-
+    mGraphView->mouseUp(event);
 }
 
 void Renderer::mouseDown(SDL_MouseButtonEvent* event) {
-
+    mGraphView->mouseDown(event);
 }
 
 void Renderer::mouseWheel(SDL_MouseWheelEvent* event) {

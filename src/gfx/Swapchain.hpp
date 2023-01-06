@@ -18,11 +18,11 @@ namespace gfx {
         friend Swapchain;
 
     private:
-        SharedPtr<gfx::Application> mApplication;
+        gfx::Application* pApplication;
         vk::SurfaceKHR vkSurface;
 
     private:
-        Surface(SharedPtr<Application> application, vk::SurfaceKHR surface);
+        Surface(Application* application, vk::SurfaceKHR surface);
         ~Surface() override;
     };
 

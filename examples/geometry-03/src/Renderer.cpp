@@ -332,9 +332,9 @@ void Renderer::update(float_t dt) {
     g_view_matrix = glm::rotate(g_view_matrix, angle, glm::vec3(0, 1, 0));
 }
 
-void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
-    auto drawable = swapchain->nextDrawable();
-    auto drawableSize = swapchain->drawableSize();
+void Renderer::draw(const gfx::SharedPtr<gfx::View>& view) {
+    auto drawable = view->nextDrawable();
+    auto drawableSize = view->drawableSize();
 
     vk::Rect2D rendering_area = {};
     rendering_area.setOffset(vk::Offset2D{0, 0});

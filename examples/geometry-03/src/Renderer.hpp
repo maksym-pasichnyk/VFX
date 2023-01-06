@@ -9,7 +9,7 @@ struct Mesh;
 struct Scene;
 struct Animation;
 
-struct Renderer : gfx::Referencing {
+struct Renderer : gfx::ViewDelegate {
 public:
     explicit Renderer(gfx::SharedPtr<gfx::Device> device_);
     ~Renderer() override = default;
@@ -19,8 +19,8 @@ private:
     void buildBuffers();
 
 public:
-    void update(float_t dt);
-    void draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain);
+    void update(float_t dt) override;
+    void draw(const gfx::SharedPtr<gfx::View>& view) override;
     void screenResized(const vk::Extent2D& size);
 
 private:

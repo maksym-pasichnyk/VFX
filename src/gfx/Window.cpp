@@ -1,3 +1,4 @@
+#include "View.hpp"
 #include "Window.hpp"
 #include "Device.hpp"
 #include "Swapchain.hpp"
@@ -6,24 +7,33 @@
 #include "SDL_video.h"
 #include "SDL_vulkan.h"
 
-gfx::Window::Window(SharedPtr<Application> application, int32_t width, int32_t height) : mApplication(std::move(application)) {
+gfx::Window::Window(int32_t width, int32_t height) {
+    auto application = Application::sharedApplication();
+
     pWindow = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_SetWindowData(pWindow, "this", this);
 
     VkSurfaceKHR vkSurface;
-    SDL_Vulkan_CreateSurface(pWindow, mApplication->vkInstance, &vkSurface);
+    SDL_Vulkan_CreateSurface(pWindow, application->vkInstance, &vkSurface);
 
-    mSurface = TransferPtr(new Surface(mApplication, vkSurface));
+    mSurface = TransferPtr(new Surface(application.get(), vkSurface));
     mSwapchain = TransferPtr(new gfx::Swapchain(mSurface));
     mSwapchain->setDrawableSize(drawableSize());
+
+    mView = TransferPtr(new View(mSwapchain));
+
+    application->mWindows.emplace_back(RetainPtr(this));
 }
 
-gfx::Window::~Window() {
+void gfx::Window::_destroy() {
+    mView = {};
+    mSurface = {};
+    mSwapchain = {};
     SDL_DestroyWindow(pWindow);
 }
 
 void gfx::Window::close() {
-//    SDL_DestroyWindow(pWindow);
+    mShouldClose = true;
 }
 
 auto gfx::Window::size() -> vk::Extent2D {
@@ -50,6 +60,10 @@ void gfx::Window::setResizable(bool resizable) {
     SDL_SetWindowResizable(pWindow, resizable ? SDL_TRUE : SDL_FALSE);
 }
 
+auto gfx::Window::view() -> SharedPtr<View> {
+    return mView;
+}
+
 auto gfx::Window::swapchain() -> SharedPtr<Swapchain> {
     return mSwapchain;
 }
@@ -63,10 +77,12 @@ auto gfx::Window::native() -> SDL_Window* {
 }
 
 void gfx::Window::performClose() {
+    bool flag = true;
     if (mDelegate) {
-        if (mDelegate->windowShouldClose(RetainPtr(this))) {
-            close();
-        }
+        flag = mDelegate->windowShouldClose(RetainPtr(this));
+    }
+    if (flag) {
+        close();
     }
 }
 
@@ -82,6 +98,6 @@ void gfx::Window::performResize() {
     }
 }
 
-auto gfx::Window::alloc(SharedPtr<Application> application, int32_t width, int32_t height) -> SharedPtr<Window> {
-    return TransferPtr(new Window(std::move(application), width, height));
+auto gfx::Window::alloc(int32_t width, int32_t height) -> SharedPtr<Window> {
+    return TransferPtr(new Window(width, height));
 }

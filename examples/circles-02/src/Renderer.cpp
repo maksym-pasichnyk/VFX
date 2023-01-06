@@ -10,9 +10,9 @@ Renderer::Renderer(gfx::SharedPtr<gfx::Device> device_) : device(std::move(devic
     mGuiRenderer = gfx::TransferPtr(new UIRenderer(device));
 }
 
-void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
-    auto drawable = swapchain->nextDrawable();
-    auto drawableSize = swapchain->drawableSize();
+void Renderer::draw(const gfx::SharedPtr<gfx::View>& view) {
+    auto drawable = view->nextDrawable();
+    auto drawableSize = view->drawableSize();
 
     vk::Rect2D rendering_area = {};
     rendering_area.setOffset(vk::Offset2D{0, 0});
@@ -41,7 +41,7 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
 
     auto ctx = gfx::TransferPtr(new UIContext(mGuiRenderer->drawList()));
 
-    static auto view =
+    static auto body =
         gfx::TransferPtr(new HStack({
             gfx::TransferPtr(new VStack({
                 gfx::TransferPtr(new HStack({
@@ -61,9 +61,8 @@ void Renderer::draw(const gfx::SharedPtr<gfx::Swapchain>& swapchain) {
                 })),
             })),
         }))
-        ->border(UIColor(1, 1, 1, 0.25F), 4);
-
-    auto body = view->frame(mScreenSize.width, mScreenSize.height);
+        ->border(UIColor(1, 1, 1, 0.25F), 4)
+        ->frame(mScreenSize.width, mScreenSize.height);
 
     mGuiRenderer->resetForNewFrame();
     body->draw(ctx, mScreenSize);

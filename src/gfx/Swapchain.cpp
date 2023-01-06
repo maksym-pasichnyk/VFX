@@ -8,12 +8,12 @@
 
 #include <set>
 
-gfx::Surface::Surface(SharedPtr<gfx::Application> application, vk::SurfaceKHR surface)
-: mApplication(std::move(application))
+gfx::Surface::Surface(Application* application, vk::SurfaceKHR surface)
+: pApplication(application)
 , vkSurface(surface) {}
 
 gfx::Surface::~Surface() {
-    mApplication->vkInstance.destroySurfaceKHR(vkSurface, nullptr, mApplication->vkDispatchLoaderDynamic);
+    pApplication->vkInstance.destroySurfaceKHR(vkSurface, nullptr, pApplication->vkDispatchLoaderDynamic);
 }
 
 gfx::Swapchain::Swapchain(SharedPtr<Surface> surface) : mSurface(std::move(surface)) {}
