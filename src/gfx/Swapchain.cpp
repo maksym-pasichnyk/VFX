@@ -22,15 +22,11 @@ gfx::Swapchain::~Swapchain() {
 void gfx::Swapchain::createDrawables() {
     vk::SurfaceCapabilitiesKHR capabilities = mDevice->mPhysicalDevice.getSurfaceCapabilitiesKHR(mSurface, mDevice->mDispatchLoaderDynamic);
 
-    auto unique_family_indices = std::set<uint32_t>{
-        mDevice->mGraphicsQueueFamilyIndex,
-        mDevice->mPresentQueueFamilyIndex
-    };
-
-    auto queue_family_indices = std::vector<uint32_t>(
-        unique_family_indices.begin(),
-        unique_family_indices.end()
-    );
+    std::vector<uint32_t> queue_family_indices = {};
+    if (mDevice->mGraphicsQueueFamilyIndex != mDevice->mPresentQueueFamilyIndex) {
+        queue_family_indices.emplace_back(mDevice->mGraphicsQueueFamilyIndex);
+        queue_family_indices.emplace_back(mDevice->mPresentQueueFamilyIndex);
+    }
 
     vk::SwapchainCreateInfoKHR swapchain_create_info = {};
     swapchain_create_info.setSurface(mSurface);
@@ -40,11 +36,11 @@ void gfx::Swapchain::createDrawables() {
     swapchain_create_info.setImageExtent(mDrawableSize);
     swapchain_create_info.setImageArrayLayers(1);
     swapchain_create_info.setImageUsage(capabilities.supportedUsageFlags);
-    if (queue_family_indices.size() > 1) {
+    if (queue_family_indices.empty()) {
+        swapchain_create_info.setImageSharingMode(vk::SharingMode::eExclusive);
+    } else {
         swapchain_create_info.setImageSharingMode(vk::SharingMode::eConcurrent);
         swapchain_create_info.setQueueFamilyIndices(queue_family_indices);
-    } else {
-        swapchain_create_info.setImageSharingMode(vk::SharingMode::eExclusive);
     }
     swapchain_create_info.setPreTransform(capabilities.currentTransform);
     swapchain_create_info.setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);
@@ -52,11 +48,10 @@ void gfx::Swapchain::createDrawables() {
     swapchain_create_info.setClipped(true);
     swapchain_create_info.setOldSwapchain(mSwapchain);
 
-    vk::SwapchainKHR oldSwapchain = mSwapchain;
+    vk::SwapchainKHR swapchain = mSwapchain;
     mSwapchain = mDevice->mDevice.createSwapchainKHR(swapchain_create_info, nullptr, mDevice->mDispatchLoaderDynamic);
-
-    if (oldSwapchain) {
-        mDevice->mDevice.destroySwapchainKHR(oldSwapchain, nullptr, mDevice->mDispatchLoaderDynamic);
+    if (swapchain) {
+        mDevice->mDevice.destroySwapchainKHR(swapchain, nullptr, mDevice->mDispatchLoaderDynamic);
     }
     auto images = mDevice->mDevice.getSwapchainImagesKHR(mSwapchain, mDevice->mDispatchLoaderDynamic);
 

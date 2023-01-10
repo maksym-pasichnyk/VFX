@@ -17,7 +17,7 @@ gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context
     std::vector<std::vector<float_t>> queue_priorities = {};
     std::vector<vk::DeviceQueueCreateInfo> queue_create_infos = {};
 
-    auto queue_family_properties = gpu.getQueueFamilyProperties(context->mDispatchLoaderDynamic);
+    auto queue_family_properties = gpu.getQueueFamilyProperties(pContext->mDispatchLoaderDynamic);
     queue_priorities.resize(queue_family_properties.size());
 
     for (size_t i = 0; i < queue_family_properties.size(); i++) {
@@ -31,14 +31,14 @@ gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context
 
     std::vector<const char*> layers = {};
 
-    auto available_layers = gpu.enumerateDeviceLayerProperties(context->mDispatchLoaderDynamic);
+    auto available_layers = gpu.enumerateDeviceLayerProperties(pContext->mDispatchLoaderDynamic);
     for (auto& layer : available_layers) {
         layers.emplace_back(layer.layerName);
     }
 
     std::vector<const char*> extensions = {};
 
-    auto available_extensions = gpu.enumerateDeviceExtensionProperties(nullptr, context->mDispatchLoaderDynamic);
+    auto available_extensions = gpu.enumerateDeviceExtensionProperties(nullptr, pContext->mDispatchLoaderDynamic);
     for (auto& extension : available_extensions) {
         if (std::strcmp(extension.extensionName, "VK_AMD_negative_viewport_height") == 0) {
             continue;
@@ -62,7 +62,7 @@ gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context
     dynamic_rendering_features.setPNext(&timeline_semaphore_features);
     dynamic_rendering_features.setDynamicRendering(VK_TRUE);
 
-    vk::PhysicalDeviceFeatures2 features_2 = gpu.getFeatures2(context->mDispatchLoaderDynamic);
+    vk::PhysicalDeviceFeatures2 features_2 = gpu.getFeatures2(pContext->mDispatchLoaderDynamic);
     features_2.setPNext(&dynamic_rendering_features);
 
     vk::DeviceCreateInfo device_create_info = {};
@@ -71,9 +71,9 @@ gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context
     device_create_info.setPEnabledLayerNames(layers);
     device_create_info.setPEnabledExtensionNames(extensions);
 
-    mDevice = gpu.createDevice(device_create_info, nullptr, context->mDispatchLoaderDynamic);
-    mDispatchLoaderDynamic.init(context->mDispatchLoaderDynamic.vkGetInstanceProcAddr);
-    mDispatchLoaderDynamic.init(context->mInstance);
+    mDevice = gpu.createDevice(device_create_info, nullptr, pContext->mDispatchLoaderDynamic);
+    mDispatchLoaderDynamic.init(pContext->mDispatchLoaderDynamic.vkGetInstanceProcAddr);
+    mDispatchLoaderDynamic.init(pContext->mInstance);
     mDispatchLoaderDynamic.init(mDevice);
 
     VmaVulkanFunctions functions = {};
@@ -84,14 +84,13 @@ gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context
     allocator_create_info.physicalDevice = gpu;
     allocator_create_info.device = mDevice;
     allocator_create_info.pVulkanFunctions = &functions;
-    allocator_create_info.instance = context->mInstance;
+    allocator_create_info.instance = pContext->mInstance;
     allocator_create_info.vulkanApiVersion = VK_API_VERSION_1_2;
 
     vmaCreateAllocator(&allocator_create_info, &mAllocator);
 
-    // find a graphics queue family index
     mGraphicsQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
-    for (uint32_t i = 0; i < queue_family_properties.size(); i++) {
+    for (uint32_t i = 0; i < queue_family_properties.size(); ++i) {
         if (queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
             mGraphicsQueueFamilyIndex = i;
             break;
