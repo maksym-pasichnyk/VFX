@@ -27,9 +27,9 @@ namespace gfx {
         friend CommandBuffer;
 
     private:
-        Context* pContext;
-        vk::SurfaceKHR mSurface;
-        SharedPtr<Device> mDevice;
+        vk::SurfaceKHR mSurface = {};
+        SharedPtr<Device> mDevice = {};
+        SharedPtr<Context> mContext = {};
         std::vector<SharedPtr<Drawable>> mDrawables = {};
 
         vk::Format mPixelFormat = {};
@@ -41,7 +41,7 @@ namespace gfx {
         uint32_t mMaximumDrawableCount = 3;
 
     public:
-        explicit Swapchain(Context* context, vk::SurfaceKHR surface);
+        explicit Swapchain(SharedPtr<Context> context, vk::SurfaceKHR surface);
         ~Swapchain() override;
 
     private:

@@ -8,15 +8,15 @@
 
 #include <set>
 
-gfx::Swapchain::Swapchain(Context* context, vk::SurfaceKHR surface)
-: pContext(context), mSurface(surface) {}
+gfx::Swapchain::Swapchain(SharedPtr<Context> context, vk::SurfaceKHR surface)
+: mContext(std::move(context)), mSurface(surface) {}
 
 gfx::Swapchain::~Swapchain() {
     releaseDrawables();
     if (vkSwapchain) {
         mDevice->vkDevice.destroySwapchainKHR(vkSwapchain, nullptr, mDevice->vkDispatchLoaderDynamic);
     }
-    pContext->vkInstance.destroySurfaceKHR(mSurface, nullptr, pContext->vkDispatchLoaderDynamic);
+    mContext->vkInstance.destroySurfaceKHR(mSurface, nullptr, mContext->vkDispatchLoaderDynamic);
 }
 
 void gfx::Swapchain::createDrawables() {
@@ -93,6 +93,7 @@ void gfx::Swapchain::setDevice(SharedPtr<Device> device) {
 }
 
 void gfx::Swapchain::releaseDrawables() {
+    mDevice->waitIdle();
     mDrawables.clear();
 }
 

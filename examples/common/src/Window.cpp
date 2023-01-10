@@ -17,18 +17,17 @@ Window::Window(int32_t width, int32_t height) {
     VkSurfaceKHR surface;
     SDL_Vulkan_CreateSurface(pWindow, application->context->vkInstance, &surface);
 
-    mSwapchain = TransferPtr(new gfx::Swapchain(application->context.get(), surface));
-    mSwapchain->setDrawableSize(drawableSize());
+    auto swapchain = TransferPtr(new gfx::Swapchain(application->context, surface));
 
     mView = TransferPtr(new gfx::View());
-    mView->setSwapchain(mSwapchain);
+    mView->setSwapchain(swapchain);
+    mView->setDrawableSize(drawableSize());
 
     application->mWindows.emplace_back(RetainPtr(this));
 }
 
 void Window::_destroy() {
     mView = {};
-    mSwapchain = {};
     SDL_DestroyWindow(pWindow);
 }
 
@@ -83,11 +82,9 @@ void Window::performClose() {
 }
 
 void Window::performResize() {
-    if (mSwapchain) {
-        mSwapchain->device()->waitIdle();
-        mSwapchain->setDrawableSize(drawableSize());
-        mSwapchain->releaseDrawables();
-    }
+    mView->setDrawableSize(drawableSize());
+    mView->releaseDrawables();
+
     if (mDelegate) {
         mDelegate->windowDidResize(RetainPtr(this));
     }

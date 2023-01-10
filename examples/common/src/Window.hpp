@@ -6,7 +6,6 @@
 
 namespace gfx {
     struct View;
-    struct Surface;
     struct Swapchain;
 }
 
@@ -28,7 +27,6 @@ private:
     SDL_Window* pWindow = {};
 
     gfx::SharedPtr<gfx::View> mView = {};
-    gfx::SharedPtr<gfx::Swapchain> mSwapchain = {};
     gfx::SharedPtr<WindowDelegate> mDelegate = {};
 
     bool mShouldClose = {};
