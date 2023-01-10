@@ -3,7 +3,7 @@
 #include "Sampler.hpp"
 #include "Texture.hpp"
 #include "Library.hpp"
-#include "Application.hpp"
+#include "Context.hpp"
 #include "CommandQueue.hpp"
 #include "DescriptorSet.hpp"
 #include "RenderPipelineState.hpp"
@@ -13,11 +13,11 @@
 
 #include <set>
 
-gfx::Device::Device(Application* pApplication, vk::PhysicalDevice gpu) : pApplication(pApplication), vkPhysicalDevice(gpu) {
+gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context), vkPhysicalDevice(gpu) {
     std::vector<std::vector<float_t>> queue_priorities = {};
     std::vector<vk::DeviceQueueCreateInfo> queue_create_infos = {};
 
-    auto queue_family_properties = gpu.getQueueFamilyProperties(pApplication->vkDispatchLoaderDynamic);
+    auto queue_family_properties = gpu.getQueueFamilyProperties(context->vkDispatchLoaderDynamic);
     queue_priorities.resize(queue_family_properties.size());
 
     for (size_t i = 0; i < queue_family_properties.size(); i++) {
@@ -31,14 +31,14 @@ gfx::Device::Device(Application* pApplication, vk::PhysicalDevice gpu) : pApplic
 
     std::vector<const char*> layers = {};
 
-    auto available_layers = gpu.enumerateDeviceLayerProperties(pApplication->vkDispatchLoaderDynamic);
+    auto available_layers = gpu.enumerateDeviceLayerProperties(context->vkDispatchLoaderDynamic);
     for (auto& layer : available_layers) {
         layers.emplace_back(layer.layerName);
     }
 
     std::vector<const char*> extensions = {};
 
-    auto available_extensions = gpu.enumerateDeviceExtensionProperties(nullptr, pApplication->vkDispatchLoaderDynamic);
+    auto available_extensions = gpu.enumerateDeviceExtensionProperties(nullptr, context->vkDispatchLoaderDynamic);
     for (auto& extension : available_extensions) {
         if (std::strcmp(extension.extensionName, "VK_AMD_negative_viewport_height") == 0) {
             continue;
@@ -62,7 +62,7 @@ gfx::Device::Device(Application* pApplication, vk::PhysicalDevice gpu) : pApplic
     dynamic_rendering_features.setPNext(&timeline_semaphore_features);
     dynamic_rendering_features.setDynamicRendering(VK_TRUE);
 
-    vk::PhysicalDeviceFeatures2 features_2 = gpu.getFeatures2(pApplication->vkDispatchLoaderDynamic);
+    vk::PhysicalDeviceFeatures2 features_2 = gpu.getFeatures2(context->vkDispatchLoaderDynamic);
     features_2.setPNext(&dynamic_rendering_features);
 
     vk::DeviceCreateInfo device_create_info = {};
@@ -71,9 +71,9 @@ gfx::Device::Device(Application* pApplication, vk::PhysicalDevice gpu) : pApplic
     device_create_info.setPEnabledLayerNames(layers);
     device_create_info.setPEnabledExtensionNames(extensions);
 
-    vkDevice = gpu.createDevice(device_create_info, nullptr, pApplication->vkDispatchLoaderDynamic);
-    vkDispatchLoaderDynamic.init(pApplication->vkDispatchLoaderDynamic.vkGetInstanceProcAddr);
-    vkDispatchLoaderDynamic.init(pApplication->vkInstance);
+    vkDevice = gpu.createDevice(device_create_info, nullptr, context->vkDispatchLoaderDynamic);
+    vkDispatchLoaderDynamic.init(context->vkDispatchLoaderDynamic.vkGetInstanceProcAddr);
+    vkDispatchLoaderDynamic.init(context->vkInstance);
     vkDispatchLoaderDynamic.init(vkDevice);
 
     VmaVulkanFunctions functions = {};
@@ -84,7 +84,7 @@ gfx::Device::Device(Application* pApplication, vk::PhysicalDevice gpu) : pApplic
     allocator_create_info.physicalDevice = gpu;
     allocator_create_info.device = vkDevice;
     allocator_create_info.pVulkanFunctions = &functions;
-    allocator_create_info.instance = pApplication->vkInstance;
+    allocator_create_info.instance = context->vkInstance;
     allocator_create_info.vulkanApiVersion = VK_API_VERSION_1_2;
 
     vmaCreateAllocator(&allocator_create_info, &vmaAllocator);

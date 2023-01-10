@@ -2,6 +2,7 @@
 
 #include "gfx/GFX.hpp"
 #include "glm/glm.hpp"
+#include "Application.hpp"
 
 #include <random>
 

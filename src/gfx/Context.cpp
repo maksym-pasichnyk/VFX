@@ -1,17 +1,12 @@
 #define VMA_IMPLEMENTATION
 
-#include "Application.hpp"
+#include "Context.hpp"
 #include "Device.hpp"
-#include "Window.hpp"
-#include "View.hpp"
-
-#include <SDL_events.h>
-
 #include "spdlog/spdlog.h"
 
 extern VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData) -> VkBool32;
 
-gfx::Application::Application() {
+gfx::Context::Context() {
     vkDispatchLoaderDynamic.init(vkDynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
 
     vk::ApplicationInfo application_info = {};
@@ -76,7 +71,7 @@ gfx::Application::Application() {
         debug_create_info.setMessageType(message_type_flags);
         debug_create_info.setPfnUserCallback(debug_callback);
 
-        vkDebugUtilsMessengerEXT = vkInstance.createDebugUtilsMessengerEXT(debug_create_info, nullptr, vkDispatchLoaderDynamic);
+        vkDebugUtilsMessenger = vkInstance.createDebugUtilsMessengerEXT(debug_create_info, nullptr, vkDispatchLoaderDynamic);
     }
 
     for (vk::PhysicalDevice gpu : vkInstance.enumeratePhysicalDevices(vkDispatchLoaderDynamic)) {
@@ -84,135 +79,8 @@ gfx::Application::Application() {
     }
 }
 
-gfx::Application::~Application() {
-    for (auto& window : mWindows) {
-        window->_destroy();
-    }
-
-    vkInstance.destroyDebugUtilsMessengerEXT(vkDebugUtilsMessengerEXT, nullptr, vkDispatchLoaderDynamic);
-}
-
-void gfx::Application::run() {
-    if (mDelegate) {
-        mDelegate->applicationDidFinishLaunching(RetainPtr(this));
-    }
-    using seconds = std::chrono::duration<float_t, std::chrono::seconds::period>;
-    auto previous = std::chrono::steady_clock::now();
-
-    float_t accumulate = 0.0F;
-
-    mRunning = true;
-    while (mRunning) {
-        auto current = std::chrono::steady_clock::now();
-        auto elapsed = current - previous;
-        previous = current;
-
-        auto delta_time = seconds(elapsed).count();
-
-        accumulate += delta_time;
-
-        pollEvents();
-
-        for (auto it = mWindows.begin(); it != mWindows.end();) {
-            if ((*it)->mShouldClose) {
-                (*it)->_destroy();
-                it = mWindows.erase(it);
-            } else {
-                it++;
-            }
-        }
-
-        for (auto& window : mWindows) {
-            window->view()->update(delta_time);
-        }
-
-        for (auto& window : mWindows) {
-            window->view()->draw();
-        }
-    }
-}
-
-auto gfx::Application::devices() -> const std::vector<SharedPtr<Device>>& {
-    return mDevices;
-}
-
-auto gfx::Application::delegate() -> SharedPtr<ApplicationDelegate> {
-    return mDelegate;
-}
-
-void gfx::Application::setDelegate(SharedPtr<ApplicationDelegate> delegate) {
-    mDelegate = std::move(delegate);
-}
-
-auto gfx::Application::_getWindowById(uint32_t id) -> gfx::Window* {
-    return static_cast<gfx::Window*>(SDL_GetWindowData(SDL_GetWindowFromID(id), "this"));
-}
-
-void gfx::Application::pollEvents() {
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        switch (event.type) {
-            case SDL_QUIT: {
-                mRunning = false;
-                break;
-            }
-            case SDL_WINDOWEVENT: {
-                auto sender = _getWindowById(event.window.windowID);
-                switch (event.window.event) {
-                    case SDL_WINDOWEVENT_CLOSE: {
-                        sender->performClose();
-                        break;
-                    }
-                    case SDL_WINDOWEVENT_RESIZED: {
-                        sender->performResize();
-                        break;
-                    }
-                    default: {
-                        break;
-                    }
-                }
-                break;
-            }
-            case SDL_KEYUP: {
-                if (auto sender = _getWindowById(event.key.windowID)) {
-                    sender->view()->keyUp(&event.key);
-                }
-                break;
-            }
-            case SDL_KEYDOWN: {
-                if (auto sender = _getWindowById(event.key.windowID)) {
-                    sender->view()->keyDown(&event.key);
-                }
-                break;
-            }
-            case SDL_MOUSEBUTTONUP: {
-                if (auto sender = _getWindowById(event.button.windowID)) {
-                    sender->view()->mouseUp(&event.button);
-                }
-                break;
-            }
-            case SDL_MOUSEBUTTONDOWN: {
-                if (auto sender = _getWindowById(event.button.windowID)) {
-                    sender->view()->mouseDown(&event.button);
-                }
-                break;
-            }
-            case SDL_MOUSEWHEEL: {
-                if (auto sender = _getWindowById(event.wheel.windowID)) {
-                    sender->view()->mouseWheel(&event.wheel);
-                }
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-    }
-}
-
-auto gfx::Application::sharedApplication() -> SharedPtr<Application> {
-    static auto application = TransferPtr(new Application());
-    return application;
+gfx::Context::~Context() {
+    vkInstance.destroyDebugUtilsMessengerEXT(vkDebugUtilsMessenger, nullptr, vkDispatchLoaderDynamic);
 }
 
 VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData) -> VkBool32 {

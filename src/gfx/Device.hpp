@@ -7,13 +7,13 @@
 
 namespace gfx {
     struct Buffer;
+    struct Context;
     struct Texture;
     struct Sampler;
     struct Library;
     struct Function;
     struct Drawable;
     struct Swapchain;
-    struct Application;
     struct CommandQueue;
     struct CommandBuffer;
     struct DescriptorSet;
@@ -24,25 +24,10 @@ namespace gfx {
     struct RenderPipelineStateDescription;
 
     struct Device final : Referencing {
-        friend Buffer;
-        friend Texture;
-        friend Sampler;
-        friend Library;
-        friend Function;
-        friend Drawable;
-        friend Swapchain;
-        friend Application;
-        friend CommandQueue;
-        friend CommandBuffer;
-        friend DescriptorSet;
-        friend TextureDescription;
-        friend RenderPipelineState;
-        friend ComputePipelineState;
-        friend RenderCommandEncoder;
-        friend RenderPipelineStateDescription;
+        friend Context;
 
-    private:
-        Application* pApplication;
+    public:
+        Context* pContext = {};
         VmaAllocator vmaAllocator = {};
 
         vk::Device vkDevice = {};
@@ -54,7 +39,7 @@ namespace gfx {
         uint32_t vkGraphicsQueueFamilyIndex = {};
 
     private:
-        explicit Device(Application* pApplication, vk::PhysicalDevice gpu);
+        explicit Device(Context* context, vk::PhysicalDevice gpu);
         ~Device() override;
 
     public:

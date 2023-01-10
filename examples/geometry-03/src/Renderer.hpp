@@ -3,6 +3,9 @@
 #include "gfx/GFX.hpp"
 #include "glm/glm.hpp"
 
+#include "Window.hpp"
+#include "Application.hpp"
+
 struct Node;
 struct Skin;
 struct Mesh;

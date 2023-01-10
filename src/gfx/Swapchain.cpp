@@ -1,6 +1,6 @@
 #include "Swapchain.hpp"
 #include "Device.hpp"
-#include "Application.hpp"
+#include "Context.hpp"
 #include "Texture.hpp"
 #include "Drawable.hpp"
 
@@ -8,26 +8,19 @@
 
 #include <set>
 
-gfx::Surface::Surface(Application* application, vk::SurfaceKHR surface)
-: pApplication(application)
-, vkSurface(surface) {}
-
-gfx::Surface::~Surface() {
-    pApplication->vkInstance.destroySurfaceKHR(vkSurface, nullptr, pApplication->vkDispatchLoaderDynamic);
-}
-
-gfx::Swapchain::Swapchain(SharedPtr<Surface> surface) : mSurface(std::move(surface)) {}
+gfx::Swapchain::Swapchain(Context* context, vk::SurfaceKHR surface)
+: pContext(context), mSurface(surface) {}
 
 gfx::Swapchain::~Swapchain() {
     releaseDrawables();
-
     if (vkSwapchain) {
         mDevice->vkDevice.destroySwapchainKHR(vkSwapchain, nullptr, mDevice->vkDispatchLoaderDynamic);
     }
+    pContext->vkInstance.destroySurfaceKHR(mSurface, nullptr, pContext->vkDispatchLoaderDynamic);
 }
 
 void gfx::Swapchain::createDrawables() {
-    vk::SurfaceCapabilitiesKHR capabilities = mDevice->vkPhysicalDevice.getSurfaceCapabilitiesKHR(mSurface->vkSurface, mDevice->vkDispatchLoaderDynamic);
+    vk::SurfaceCapabilitiesKHR capabilities = mDevice->vkPhysicalDevice.getSurfaceCapabilitiesKHR(mSurface, mDevice->vkDispatchLoaderDynamic);
 
     auto unique_family_indices = std::set<uint32_t>{
         mDevice->vkGraphicsQueueFamilyIndex,
@@ -40,7 +33,7 @@ void gfx::Swapchain::createDrawables() {
     );
 
     vk::SwapchainCreateInfoKHR swapchain_create_info = {};
-    swapchain_create_info.setSurface(mSurface->vkSurface);
+    swapchain_create_info.setSurface(mSurface);
     swapchain_create_info.setMinImageCount(mMaximumDrawableCount);
     swapchain_create_info.setImageFormat(mPixelFormat);
     swapchain_create_info.setImageColorSpace(mColorSpace);

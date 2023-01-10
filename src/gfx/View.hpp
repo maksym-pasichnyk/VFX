@@ -25,16 +25,28 @@ namespace gfx {
         SharedPtr<Swapchain> mSwapchain;
         SharedPtr<ViewDelegate> mDelegate;
 
-    private:
-        explicit View(SharedPtr<Swapchain> swapchain);
-
     public:
         void draw();
         void update(float_t dt);
         auto delegate() -> SharedPtr<ViewDelegate>;
+        void setSwapchain(SharedPtr<Swapchain> swapchain);
         void setDelegate(SharedPtr<ViewDelegate> delegate);
+
+    public:
+        void releaseDrawables();
+        void setDevice(SharedPtr<Device> device);
+        auto device() -> SharedPtr<Device>;
         auto nextDrawable() -> SharedPtr<Drawable>;
         auto drawableSize() -> vk::Extent2D;
+        void setDrawableSize(const vk::Extent2D& drawableSize);
+        auto pixelFormat() -> vk::Format;
+        void setPixelFormat(vk::Format format);
+        auto colorSpace() -> vk::ColorSpaceKHR;
+        void setColorSpace(vk::ColorSpaceKHR colorSpace);
+        auto displaySyncEnabled() -> bool;
+        void setDisplaySyncEnabled(bool displaySyncEnabled);
+        auto maximumDrawableCount() -> uint32_t;
+        void setMaximumDrawableCount(uint32_t maximumDrawableCount);
 
     public:
         void keyUp(SDL_KeyboardEvent* event);

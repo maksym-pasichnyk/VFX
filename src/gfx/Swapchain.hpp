@@ -6,33 +6,30 @@
 
 namespace gfx {
     struct Device;
-    struct Window;
+    struct Context;
     struct Texture;
     struct Drawable;
     struct Swapchain;
-    struct Application;
     struct CommandBuffer;
 
     struct Surface final : Referencing {
-        friend Window;
         friend Swapchain;
 
     private:
-        gfx::Application* pApplication;
-        vk::SurfaceKHR vkSurface;
 
-    private:
-        Surface(Application* application, vk::SurfaceKHR surface);
+    public:
+//    private:
+        Surface(Context* context, vk::SurfaceKHR surface);
         ~Surface() override;
     };
 
     struct Swapchain final : Referencing {
-        friend Window;
         friend CommandBuffer;
 
     private:
+        Context* pContext;
+        vk::SurfaceKHR mSurface;
         SharedPtr<Device> mDevice;
-        SharedPtr<Surface> mSurface = {};
         std::vector<SharedPtr<Drawable>> mDrawables = {};
 
         vk::Format mPixelFormat = {};
@@ -43,8 +40,8 @@ namespace gfx {
         bool mDisplaySyncEnabled = {};
         uint32_t mMaximumDrawableCount = 3;
 
-    private:
-        explicit Swapchain(SharedPtr<Surface> surface);
+    public:
+        explicit Swapchain(Context* context, vk::SurfaceKHR surface);
         ~Swapchain() override;
 
     private:
