@@ -314,42 +314,44 @@ const auto image_aspect_flags_table = std::unordered_map<vk::Format, vk::ImageAs
 gfx::Texture::Texture(SharedPtr<Device> device) : mDevice(std::move(device)) {}
 
 gfx::Texture::Texture(SharedPtr<Device> device, const TextureDescription& description) : Texture(std::move(device)) {
-    vkFormat = description.format;
-    vkExtent.setWidth(description.width);
-    vkExtent.setHeight(description.height);
-    vkExtent.setDepth(1);
-    vkImageSubresourceRange.setAspectMask(image_aspect_flags_table.at(description.format));
-    vkImageSubresourceRange.setLevelCount(1);
-    vkImageSubresourceRange.setLayerCount(1);
+    auto aspect = image_aspect_flags_table.at(description.mFormat);
+
+    mFormat = description.mFormat;
+    mExtent.setWidth(description.mWidth);
+    mExtent.setHeight(description.mHeight);
+    mExtent.setDepth(1);
+    mImageSubresourceRange.setAspectMask(aspect);
+    mImageSubresourceRange.setLevelCount(1);
+    mImageSubresourceRange.setLayerCount(1);
 
     vk::ImageCreateInfo image_create_info = {};
     image_create_info.setImageType(vk::ImageType::e2D);
-    image_create_info.setFormat(description.format);
-    image_create_info.extent.setWidth(description.width);
-    image_create_info.extent.setHeight(description.height);
+    image_create_info.setFormat(description.mFormat);
+    image_create_info.extent.setWidth(description.mWidth);
+    image_create_info.extent.setHeight(description.mHeight);
     image_create_info.extent.setDepth(1);
     image_create_info.setMipLevels(1);
     image_create_info.setArrayLayers(1);
-    image_create_info.setUsage(description.usage);
+    image_create_info.setUsage(description.mImageUsageFlags);
 
     VmaAllocationCreateInfo allocation_create_info = {};
     allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
-    vmaCreateImage(mDevice->vmaAllocator, reinterpret_cast<const VkImageCreateInfo*>(&image_create_info), &allocation_create_info, reinterpret_cast<VkImage*>(&vkImage), &vmaAllocation, nullptr);
+    vmaCreateImage(mDevice->mAllocator, reinterpret_cast<const VkImageCreateInfo*>(&image_create_info), &allocation_create_info, reinterpret_cast<VkImage*>(&mImage), &mAllocation, nullptr);
 
     vk::ImageViewCreateInfo view_create_info = {};
-    view_create_info.setImage(vkImage);
+    view_create_info.setImage(mImage);
     view_create_info.setViewType(vk::ImageViewType::e2D),
-    view_create_info.setFormat(description.format);
-    view_create_info.setComponents(description.components),
-    view_create_info.setSubresourceRange(vkImageSubresourceRange);
+    view_create_info.setFormat(description.mFormat);
+    view_create_info.setComponents(description.mComponentMapping),
+    view_create_info.setSubresourceRange(mImageSubresourceRange);
 
-    vkImageView = mDevice->vkDevice.createImageView(view_create_info, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
+    mImageView = mDevice->mDevice.createImageView(view_create_info, VK_NULL_HANDLE, mDevice->mDispatchLoaderDynamic);
 }
 
 gfx::Texture::~Texture() {
-    mDevice->vkDevice.destroyImageView(vkImageView, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
-    if (vmaAllocation) {
-        vmaDestroyImage(mDevice->vmaAllocator, vkImage, vmaAllocation);
+    mDevice->mDevice.destroyImageView(mImageView, VK_NULL_HANDLE, mDevice->mDispatchLoaderDynamic);
+    if (mAllocation) {
+        vmaDestroyImage(mDevice->mAllocator, mImage, mAllocation);
     }
 }
 
@@ -357,8 +359,8 @@ void gfx::Texture::replaceRegion(const void* data, uint64_t size) {
     auto storageBuffer = mDevice->newBuffer(vk::BufferUsageFlagBits::eTransferSrc, data, size, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
     vk::BufferImageCopy buffer_image_copy = {};
-    buffer_image_copy.setImageExtent(vkExtent);
-    buffer_image_copy.imageSubresource.setAspectMask(vkImageSubresourceRange.aspectMask);
+    buffer_image_copy.setImageExtent(mExtent);
+    buffer_image_copy.imageSubresource.setAspectMask(mImageSubresourceRange.aspectMask);
     buffer_image_copy.imageSubresource.setLayerCount(1);
 
     auto commandQueue = mDevice->newCommandQueue();
@@ -366,7 +368,7 @@ void gfx::Texture::replaceRegion(const void* data, uint64_t size) {
 
     commandBuffer->begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
     commandBuffer->changeTextureLayout(RetainPtr(this), vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits2::eHost, vk::PipelineStageFlagBits2::eTransfer, {}, vk::AccessFlagBits2::eTransferWrite);
-    commandBuffer->vkCommandBuffer.copyBufferToImage(storageBuffer->vkBuffer, vkImage, vk::ImageLayout::eTransferDstOptimal, 1, &buffer_image_copy, mDevice->vkDispatchLoaderDynamic);
+    commandBuffer->mCommandBuffer.copyBufferToImage(storageBuffer->mBuffer, mImage, vk::ImageLayout::eTransferDstOptimal, 1, &buffer_image_copy, mDevice->mDispatchLoaderDynamic);
     commandBuffer->changeTextureLayout(RetainPtr(this), vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead);
     commandBuffer->end();
     commandBuffer->submit();
@@ -376,15 +378,15 @@ void gfx::Texture::replaceRegion(const void* data, uint64_t size) {
 void gfx::Texture::setLabel(const std::string& name) {
     vk::DebugMarkerObjectNameInfoEXT image_info = {};
     image_info.setObjectType(vk::DebugReportObjectTypeEXT::eImage);
-    image_info.setObject(uint64_t(static_cast<VkImage>(vkImage)));
+    image_info.setObject(uint64_t(static_cast<VkImage>(mImage)));
     image_info.setPObjectName(name.c_str());
 
-    mDevice->vkDevice.debugMarkerSetObjectNameEXT(image_info, mDevice->vkDispatchLoaderDynamic);
+    mDevice->mDevice.debugMarkerSetObjectNameEXT(image_info, mDevice->mDispatchLoaderDynamic);
 
     vk::DebugMarkerObjectNameInfoEXT view_info = {};
     view_info.setObjectType(vk::DebugReportObjectTypeEXT::eImageView);
-    view_info.setObject(uint64_t(static_cast<VkImageView>(vkImageView)));
+    view_info.setObject(uint64_t(static_cast<VkImageView>(mImageView)));
     view_info.setPObjectName(name.c_str());
 
-    mDevice->vkDevice.debugMarkerSetObjectNameEXT(view_info, mDevice->vkDispatchLoaderDynamic);
+    mDevice->mDevice.debugMarkerSetObjectNameEXT(view_info, mDevice->mDispatchLoaderDynamic);
 }

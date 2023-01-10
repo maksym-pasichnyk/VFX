@@ -15,7 +15,7 @@ Window::Window(int32_t width, int32_t height) {
     SDL_SetWindowData(pWindow, "this", this);
 
     VkSurfaceKHR surface;
-    SDL_Vulkan_CreateSurface(pWindow, application->context->vkInstance, &surface);
+    SDL_Vulkan_CreateSurface(pWindow, application->context->mInstance, &surface);
 
     auto swapchain = TransferPtr(new gfx::Swapchain(application->context, surface));
 

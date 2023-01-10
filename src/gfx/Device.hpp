@@ -24,19 +24,32 @@ namespace gfx {
     struct RenderPipelineStateDescription;
 
     struct Device final : Referencing {
+        friend Buffer;
         friend Context;
+        friend Texture;
+        friend Sampler;
+        friend Library;
+        friend Function;
+        friend Drawable;
+        friend Swapchain;
+        friend CommandQueue;
+        friend CommandBuffer;
+        friend DescriptorSet;
+        friend RenderPipelineState;
+        friend ComputePipelineState;
+        friend RenderPipelineStateDescription;
 
-    public:
+    private:
         Context* pContext = {};
-        VmaAllocator vmaAllocator = {};
+        VmaAllocator mAllocator = {};
 
-        vk::Device vkDevice = {};
-        vk::PhysicalDevice vkPhysicalDevice = {};
-        vk::DispatchLoaderDynamic vkDispatchLoaderDynamic = {};
+        vk::Device mDevice = {};
+        vk::PhysicalDevice mPhysicalDevice = {};
+        vk::DispatchLoaderDynamic mDispatchLoaderDynamic = {};
 
-        uint32_t vkPresentQueueFamilyIndex = {};
-        uint32_t vkComputeQueueFamilyIndex = {};
-        uint32_t vkGraphicsQueueFamilyIndex = {};
+        uint32_t mPresentQueueFamilyIndex = {};
+        uint32_t mComputeQueueFamilyIndex = {};
+        uint32_t mGraphicsQueueFamilyIndex = {};
 
     private:
         explicit Device(Context* context, vk::PhysicalDevice gpu);

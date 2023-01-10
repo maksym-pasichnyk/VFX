@@ -21,7 +21,7 @@ namespace gfx {
 
     private:
         SharedPtr<Device> mDevice = {};
-        vk::ShaderModule vkShaderModule = {};
+        vk::ShaderModule mShaderModule = {};
         SpvReflectShaderModule mSpvReflectShaderModule = {};
 
     private:

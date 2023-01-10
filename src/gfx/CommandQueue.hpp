@@ -34,9 +34,9 @@ namespace gfx {
 
     private:
         SharedPtr<Device> mDevice;
-        vk::Queue vkComputeQueue = {};
-        vk::Queue vkPresentQueue = {};
-        vk::Queue vkGraphicsQueue = {};
-        vk::CommandPool vkCommandPool = {};
+        vk::Queue mComputeQueue = {};
+        vk::Queue mPresentQueue = {};
+        vk::Queue mGraphicsQueue = {};
+        vk::CommandPool mCommandPool = {};
     };
 }

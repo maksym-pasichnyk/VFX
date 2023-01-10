@@ -3,13 +3,13 @@
 #include "Function.hpp"
 
 gfx::Library::Library(SharedPtr<Device> device, const vk::ShaderModuleCreateInfo& info) : mDevice(std::move(device)) {
-    vkShaderModule = mDevice->vkDevice.createShaderModule(info, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
+    mShaderModule = mDevice->mDevice.createShaderModule(info, VK_NULL_HANDLE, mDevice->mDispatchLoaderDynamic);
     spvReflectCreateShaderModule(info.codeSize, info.pCode, &mSpvReflectShaderModule);
 }
 
 gfx::Library::~Library() {
     spvReflectDestroyShaderModule(&mSpvReflectShaderModule);
-    mDevice->vkDevice.destroyShaderModule(vkShaderModule, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
+    mDevice->mDevice.destroyShaderModule(mShaderModule, VK_NULL_HANDLE, mDevice->mDispatchLoaderDynamic);
 }
 
 auto gfx::Library::newFunction(std::string name) -> SharedPtr<Function> {

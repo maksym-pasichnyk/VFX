@@ -18,7 +18,7 @@ namespace gfx {
 
     private:
         SharedPtr<Device> mDevice;
-        vk::Sampler vkSampler;
+        vk::Sampler mSampler;
 
     private:
         explicit Sampler(SharedPtr<Device> device, const vk::SamplerCreateInfo& info);

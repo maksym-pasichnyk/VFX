@@ -7,7 +7,7 @@
 extern VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData) -> VkBool32;
 
 gfx::Context::Context() {
-    vkDispatchLoaderDynamic.init(vkDynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
+    mDispatchLoaderDynamic.init(mDynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
 
     vk::ApplicationInfo application_info = {};
     application_info.setPApplicationName("");
@@ -27,7 +27,7 @@ gfx::Context::Context() {
         layers.emplace_back("VK_LAYER_KHRONOS_validation");
     }
 
-    auto available_extensions = vk::enumerateInstanceExtensionProperties(nullptr, vkDispatchLoaderDynamic);
+    auto available_extensions = vk::enumerateInstanceExtensionProperties(nullptr, mDispatchLoaderDynamic);
 
     std::vector<const char*> extensions = {};
     for (auto& extension_properties : available_extensions) {
@@ -51,8 +51,8 @@ gfx::Context::Context() {
     instance_create_info.setPEnabledLayerNames(layers);
     instance_create_info.setPEnabledExtensionNames(extensions);
 
-    vkInstance = vk::createInstance(instance_create_info, nullptr, vkDispatchLoaderDynamic);
-    vkDispatchLoaderDynamic.init(vkInstance);
+    mInstance = vk::createInstance(instance_create_info, nullptr, mDispatchLoaderDynamic);
+    mDispatchLoaderDynamic.init(mInstance);
 
     if (enableApiValidation) {
         vk::DebugUtilsMessageSeverityFlagsEXT message_severity_flags = {};
@@ -71,16 +71,16 @@ gfx::Context::Context() {
         debug_create_info.setMessageType(message_type_flags);
         debug_create_info.setPfnUserCallback(debug_callback);
 
-        vkDebugUtilsMessenger = vkInstance.createDebugUtilsMessengerEXT(debug_create_info, nullptr, vkDispatchLoaderDynamic);
+        mDebugUtilsMessenger = mInstance.createDebugUtilsMessengerEXT(debug_create_info, nullptr, mDispatchLoaderDynamic);
     }
 
-    for (vk::PhysicalDevice gpu : vkInstance.enumeratePhysicalDevices(vkDispatchLoaderDynamic)) {
+    for (vk::PhysicalDevice gpu : mInstance.enumeratePhysicalDevices(mDispatchLoaderDynamic)) {
         mDevices.emplace_back(TransferPtr(new Device(this, gpu)));
     }
 }
 
 gfx::Context::~Context() {
-    vkInstance.destroyDebugUtilsMessengerEXT(vkDebugUtilsMessenger, nullptr, vkDispatchLoaderDynamic);
+    mInstance.destroyDebugUtilsMessengerEXT(mDebugUtilsMessenger, nullptr, mDispatchLoaderDynamic);
 }
 
 VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData) -> VkBool32 {

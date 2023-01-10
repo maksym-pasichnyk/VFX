@@ -15,11 +15,31 @@ namespace gfx {
     struct RenderCommandEncoder;
 
     struct TextureDescription {
-        vk::Format format = vk::Format::eUndefined;
-        uint32_t width = 0;
-        uint32_t height = 0;
-        vk::ImageUsageFlags usage = {};
-        vk::ComponentMapping components = {};
+        friend Texture;
+
+    private:
+        uint32_t mWidth = {};
+        uint32_t mHeight = {};
+        vk::Format mFormat = {};
+        vk::ImageUsageFlags mImageUsageFlags = {};
+        vk::ComponentMapping mComponentMapping = {};
+
+    public:
+        void setWidth(uint32_t width) {
+            mWidth = width;
+        }
+        void setHeight(uint32_t height) {
+            mHeight = height;
+        }
+        void setFormat(vk::Format format) {
+            mFormat = format;
+        }
+        void setImageUsageFlags(vk::ImageUsageFlags imageUsageFlags) {
+            mImageUsageFlags = imageUsageFlags;
+        }
+        void setComponentMapping(vk::ComponentMapping componentMapping) {
+            mComponentMapping = componentMapping;
+        }
     };
 
     struct Texture final : Referencing {
@@ -32,13 +52,13 @@ namespace gfx {
     private:
         SharedPtr<Device> mDevice;
 
-        vk::Image vkImage = {};
-        vk::Format vkFormat = {};
-        vk::Extent3D vkExtent = {};
-        vk::ImageView vkImageView = {};
-        vk::ImageSubresourceRange vkImageSubresourceRange = {};
+        vk::Image mImage = {};
+        vk::Format mFormat = {};
+        vk::Extent3D mExtent = {};
+        vk::ImageView mImageView = {};
+        vk::ImageSubresourceRange mImageSubresourceRange = {};
 
-        VmaAllocation vmaAllocation = {};
+        VmaAllocation mAllocation = {};
 
     private:
         explicit Texture(SharedPtr<Device> device);

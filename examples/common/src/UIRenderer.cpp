@@ -32,10 +32,11 @@ void UIRenderer::buildFonts() {
     }
 
     gfx::TextureDescription font_texture_description = {};
-    font_texture_description.format = vk::Format::eR8G8B8A8Unorm;
-    font_texture_description.width = static_cast<uint32_t>(mFontAtlas.TexWidth);
-    font_texture_description.height = static_cast<uint32_t>(mFontAtlas.TexHeight);
-    font_texture_description.usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
+    font_texture_description.setFormat(vk::Format::eR8G8B8A8Unorm);
+    font_texture_description.setWidth(static_cast<uint32_t>(mFontAtlas.TexWidth));
+    font_texture_description.setHeight(static_cast<uint32_t>(mFontAtlas.TexHeight));
+    font_texture_description.setImageUsageFlags(vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst);
+
     mFontTexture = mDevice->newTexture(font_texture_description);
     mFontTexture->replaceRegion(pixels.data(), pixels.size() * sizeof(uint32_t));
 
@@ -88,7 +89,7 @@ void UIRenderer::buildShaders() {
     description.setFragmentFunction(fragmentFunction);
 
     mRenderPipelineState = mDevice->newRenderPipelineState(description);
-    mDescriptorSet = mDevice->newDescriptorSet(mRenderPipelineState->vkDescriptorSetLayouts.front(), {
+    mDescriptorSet = mDevice->newDescriptorSet(mRenderPipelineState->mDescriptorSetLayouts.front(), {
         vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
         vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 1},
     });

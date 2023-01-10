@@ -20,8 +20,8 @@ namespace gfx {
     private:
         SharedPtr<Device> mDevice;
 
-        vk::Buffer vkBuffer;
-        VmaAllocation vmaAllocation;
+        vk::Buffer mBuffer;
+        VmaAllocation mAllocation;
 
     private:
         explicit Buffer(SharedPtr<Device> device, const vk::BufferCreateInfo& buffer_create_info, const VmaAllocationCreateInfo& allocation_create_info);

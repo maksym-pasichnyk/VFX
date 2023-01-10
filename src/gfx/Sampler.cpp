@@ -2,18 +2,18 @@
 #include "Device.hpp"
 
 gfx::Sampler::Sampler(SharedPtr<Device> device, const vk::SamplerCreateInfo& info) : mDevice(std::move(device)) {
-    vkSampler = mDevice->vkDevice.createSampler(info, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
+    mSampler = mDevice->mDevice.createSampler(info, VK_NULL_HANDLE, mDevice->mDispatchLoaderDynamic);
 }
 
 gfx::Sampler::~Sampler() {
-    mDevice->vkDevice.destroySampler(vkSampler, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
+    mDevice->mDevice.destroySampler(mSampler, VK_NULL_HANDLE, mDevice->mDispatchLoaderDynamic);
 }
 
 void gfx::Sampler::setLabel(const std::string& name) {
     vk::DebugMarkerObjectNameInfoEXT info = {};
     info.setObjectType(vk::DebugReportObjectTypeEXT::eSampler);
-    info.setObject(uint64_t(VkSampler(vkSampler)));
+    info.setObject(uint64_t(VkSampler(mSampler)));
     info.setPObjectName(name.c_str());
 
-    mDevice->vkDevice.debugMarkerSetObjectNameEXT(info, mDevice->vkDispatchLoaderDynamic);
+    mDevice->mDevice.debugMarkerSetObjectNameEXT(info, mDevice->mDispatchLoaderDynamic);
 }

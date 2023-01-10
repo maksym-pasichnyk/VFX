@@ -13,9 +13,9 @@ namespace gfx {
 
     public:
         SharedPtr<Device> mDevice;
-        vk::Pipeline vkPipeline = {};
-        vk::PipelineLayout vkPipelineLayout = {};
-        std::vector<vk::DescriptorSetLayout> vkDescriptorSetLayouts = {};
+        vk::Pipeline mPipeline = {};
+        vk::PipelineLayout mPipelineLayout = {};
+        std::vector<vk::DescriptorSetLayout> mDescriptorSetLayouts = {};
 
     private:
         explicit ComputePipelineState(SharedPtr<Device> device, const SharedPtr<Function>& function);

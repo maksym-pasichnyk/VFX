@@ -17,8 +17,8 @@ namespace gfx {
 
     private:
         SharedPtr<Device> mDevice = {};
-        vk::DescriptorSet vkDescriptorSet = {};
-        vk::DescriptorPool vkDescriptorPool = {};
+        vk::DescriptorSet mDescriptorSet = {};
+        vk::DescriptorPool mDescriptorPool = {};
 
     private:
         explicit DescriptorSet(SharedPtr<Device> device);

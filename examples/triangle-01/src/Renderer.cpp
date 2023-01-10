@@ -27,7 +27,7 @@ void Renderer::buildShaders() {
     description.setFragmentFunction(pFragmentFunction);
 
     renderPipelineState = device->newRenderPipelineState(description);
-    descriptorSet = device->newDescriptorSet(renderPipelineState->vkDescriptorSetLayouts[0], {
+    descriptorSet = device->newDescriptorSet(renderPipelineState->mDescriptorSetLayouts[0], {
         vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1}
     });
 }

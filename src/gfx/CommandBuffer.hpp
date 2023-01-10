@@ -40,36 +40,36 @@ namespace gfx {
         friend CommandBuffer;
 
     private:
-        SharedPtr<Texture>      mTexture             = {};
-        vk::ImageLayout         vkImageLayout        = vk::ImageLayout::eUndefined;
-        vk::ResolveModeFlagBits vkResolveMode        = vk::ResolveModeFlagBits::eNone;
-        SharedPtr<Texture>      mResolveTexture      = {};
-        vk::ImageLayout         vkResolveImageLayout = vk::ImageLayout::eUndefined;
-        vk::AttachmentLoadOp    vkLoadOp             = vk::AttachmentLoadOp::eLoad;
-        vk::AttachmentStoreOp   vkStoreOp            = vk::AttachmentStoreOp::eStore;
-        ClearColor              mClearColor          = {};
+        SharedPtr<Texture>      mTexture            = {};
+        vk::ImageLayout         mImageLayout        = vk::ImageLayout::eUndefined;
+        vk::ResolveModeFlagBits mResolveMode        = vk::ResolveModeFlagBits::eNone;
+        SharedPtr<Texture>      mResolveTexture     = {};
+        vk::ImageLayout         mResolveImageLayout = vk::ImageLayout::eUndefined;
+        vk::AttachmentLoadOp    mLoadOp             = vk::AttachmentLoadOp::eLoad;
+        vk::AttachmentStoreOp   mStoreOp            = vk::AttachmentStoreOp::eStore;
+        ClearColor              mClearColor         = {};
 
     public:
         void setTexture(SharedPtr<Texture> texture) {
             mTexture = std::move(texture);
         }
         void setImageLayout(vk::ImageLayout imageLayout) {
-            vkImageLayout = imageLayout;
+            mImageLayout = imageLayout;
         }
         void setResolveMode(vk::ResolveModeFlagBits resolveMode) {
-            vkResolveMode = resolveMode;
+            mResolveMode = resolveMode;
         }
         void setResolveTexture(SharedPtr<Texture> resolveTexture) {
             mResolveTexture = std::move(resolveTexture);
         }
         void setResolveImageLayout(vk::ImageLayout resolveImageLayout) {
-            vkResolveImageLayout = resolveImageLayout;
+            mResolveImageLayout = resolveImageLayout;
         }
         void setLoadOp(vk::AttachmentLoadOp loadOp) {
-            vkLoadOp = loadOp;
+            mLoadOp = loadOp;
         }
         void setStoreOp(vk::AttachmentStoreOp storeOp) {
-            vkStoreOp = storeOp;
+            mStoreOp = storeOp;
         }
         void setClearColor(ClearColor clearColor) {
             mClearColor = clearColor;
@@ -80,36 +80,36 @@ namespace gfx {
         friend CommandBuffer;
 
     private:
-        SharedPtr<Texture>      mTexture             = {};
-        vk::ImageLayout         vkImageLayout        = vk::ImageLayout::eUndefined;
-        vk::ResolveModeFlagBits vkResolveMode        = vk::ResolveModeFlagBits::eNone;
-        SharedPtr<Texture>      mResolveTexture      = {};
-        vk::ImageLayout         vkResolveImageLayout = vk::ImageLayout::eUndefined;
-        vk::AttachmentLoadOp    vkLoadOp             = vk::AttachmentLoadOp::eLoad;
-        vk::AttachmentStoreOp   vkStoreOp            = vk::AttachmentStoreOp::eStore;
-        float_t                 mClearDepth          = {};
+        SharedPtr<Texture>      mTexture            = {};
+        vk::ImageLayout         mImageLayout        = vk::ImageLayout::eUndefined;
+        vk::ResolveModeFlagBits mResolveMode        = vk::ResolveModeFlagBits::eNone;
+        SharedPtr<Texture>      mResolveTexture     = {};
+        vk::ImageLayout         mResolveImageLayout = vk::ImageLayout::eUndefined;
+        vk::AttachmentLoadOp    mLoadOp             = vk::AttachmentLoadOp::eLoad;
+        vk::AttachmentStoreOp   mStoreOp            = vk::AttachmentStoreOp::eStore;
+        float_t                 mClearDepth         = {};
 
     public:
         void setTexture(SharedPtr<Texture> texture) {
             mTexture = std::move(texture);
         }
         void setImageLayout(vk::ImageLayout imageLayout) {
-            vkImageLayout = imageLayout;
+            mImageLayout = imageLayout;
         }
         void setResolveMode(vk::ResolveModeFlagBits resolveMode) {
-            vkResolveMode = resolveMode;
+            mResolveMode = resolveMode;
         }
         void setResolveTexture(SharedPtr<Texture> resolveTexture) {
             mResolveTexture = std::move(resolveTexture);
         }
         void setResolveImageLayout(vk::ImageLayout resolveImageLayout) {
-            vkResolveImageLayout = resolveImageLayout;
+            mResolveImageLayout = resolveImageLayout;
         }
         void setLoadOp(vk::AttachmentLoadOp loadOp) {
-            vkLoadOp = loadOp;
+            mLoadOp = loadOp;
         }
         void setStoreOp(vk::AttachmentStoreOp storeOp) {
-            vkStoreOp = storeOp;
+            mStoreOp = storeOp;
         }
         void setClearDepth(float_t clearDepth) {
             mClearDepth = clearDepth;
@@ -121,12 +121,12 @@ namespace gfx {
 
     private:
         SharedPtr<Texture>      mTexture             = {};
-        vk::ImageLayout         vkImageLayout        = vk::ImageLayout::eUndefined;
-        vk::ResolveModeFlagBits vkResolveMode        = vk::ResolveModeFlagBits::eNone;
+        vk::ImageLayout         mImageLayout        = vk::ImageLayout::eUndefined;
+        vk::ResolveModeFlagBits mResolveMode        = vk::ResolveModeFlagBits::eNone;
         SharedPtr<Texture>      mResolveTexture      = {};
-        vk::ImageLayout         vkResolveImageLayout = vk::ImageLayout::eUndefined;
-        vk::AttachmentLoadOp    vkLoadOp             = vk::AttachmentLoadOp::eLoad;
-        vk::AttachmentStoreOp   vkStoreOp            = vk::AttachmentStoreOp::eStore;
+        vk::ImageLayout         mResolveImageLayout = vk::ImageLayout::eUndefined;
+        vk::AttachmentLoadOp    mLoadOp             = vk::AttachmentLoadOp::eLoad;
+        vk::AttachmentStoreOp   mStoreOp            = vk::AttachmentStoreOp::eStore;
         uint32_t                mClearStencil        = {};
 
     public:
@@ -134,22 +134,22 @@ namespace gfx {
             mTexture = std::move(texture);
         }
         void setImageLayout(vk::ImageLayout imageLayout) {
-            vkImageLayout = imageLayout;
+            mImageLayout = imageLayout;
         }
         void setResolveMode(vk::ResolveModeFlagBits resolveMode) {
-            vkResolveMode = resolveMode;
+            mResolveMode = resolveMode;
         }
         void setResolveTexture(SharedPtr<Texture> resolveTexture) {
             mResolveTexture = std::move(resolveTexture);
         }
         void setResolveImageLayout(vk::ImageLayout resolveImageLayout) {
-            vkResolveImageLayout = resolveImageLayout;
+            mResolveImageLayout = resolveImageLayout;
         }
         void setLoadOp(vk::AttachmentLoadOp loadOp) {
-            vkLoadOp = loadOp;
+            mLoadOp = loadOp;
         }
         void setStoreOp(vk::AttachmentStoreOp storeOp) {
-            vkStoreOp = storeOp;
+            mStoreOp = storeOp;
         }
         void setClearDepth(uint32_t clearStencil) {
             mClearStencil = clearStencil;
@@ -172,17 +172,16 @@ namespace gfx {
         friend RenderCommandEncoder;
 
     private:
-        vk::Rect2D vkRenderArea = {};
-        uint32_t mLayerCount = {};
         uint32_t mViewMask = {};
-
+        uint32_t mLayerCount = {};
+        vk::Rect2D mRenderArea = {};
         RenderingDepthAttachmentInfo mDepthAttachment = {};
         RenderingStencilAttachmentInfo mStencilAttachment = {};
         RenderingColorAttachmentInfoArray mColorAttachments = {};
 
     public:
         void setRenderArea(vk::Rect2D renderArea) {
-            vkRenderArea = renderArea;
+            mRenderArea = renderArea;
         }
         void setLayerCount(uint32_t layerCount) {
             mLayerCount = layerCount;
@@ -214,17 +213,16 @@ namespace gfx {
     private:
         bool mRetainedReferences = false;
 
-        vk::Pipeline vkPipeline = {};
-        vk::PipelineLayout vkPipelineLayout = {};
-        vk::PipelineBindPoint vkPipelineBindPoint = {};
-
-    private:
         SharedPtr<Device> mDevice;
         CommandQueue* pCommandQueue;
 
-        vk::Fence vkFence = {};
-        vk::Semaphore vkSemaphore = {};
-        vk::CommandBuffer vkCommandBuffer = {};
+        vk::Fence mFence = {};
+        vk::Semaphore mSemaphore = {};
+        vk::CommandBuffer mCommandBuffer = {};
+
+        vk::Pipeline mPipeline = {};
+        vk::PipelineLayout mPipelineLayout = {};
+        vk::PipelineBindPoint mPipelineBindPoint = {};
 
     public:
         auto getRetainedReferences() -> bool;

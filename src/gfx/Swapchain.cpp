@@ -13,18 +13,18 @@ gfx::Swapchain::Swapchain(SharedPtr<Context> context, vk::SurfaceKHR surface)
 
 gfx::Swapchain::~Swapchain() {
     releaseDrawables();
-    if (vkSwapchain) {
-        mDevice->vkDevice.destroySwapchainKHR(vkSwapchain, nullptr, mDevice->vkDispatchLoaderDynamic);
+    if (mSwapchain) {
+        mDevice->mDevice.destroySwapchainKHR(mSwapchain, nullptr, mDevice->mDispatchLoaderDynamic);
     }
-    mContext->vkInstance.destroySurfaceKHR(mSurface, nullptr, mContext->vkDispatchLoaderDynamic);
+    mContext->mInstance.destroySurfaceKHR(mSurface, nullptr, mContext->mDispatchLoaderDynamic);
 }
 
 void gfx::Swapchain::createDrawables() {
-    vk::SurfaceCapabilitiesKHR capabilities = mDevice->vkPhysicalDevice.getSurfaceCapabilitiesKHR(mSurface, mDevice->vkDispatchLoaderDynamic);
+    vk::SurfaceCapabilitiesKHR capabilities = mDevice->mPhysicalDevice.getSurfaceCapabilitiesKHR(mSurface, mDevice->mDispatchLoaderDynamic);
 
     auto unique_family_indices = std::set<uint32_t>{
-        mDevice->vkGraphicsQueueFamilyIndex,
-        mDevice->vkPresentQueueFamilyIndex
+        mDevice->mGraphicsQueueFamilyIndex,
+        mDevice->mPresentQueueFamilyIndex
     };
 
     auto queue_family_indices = std::vector<uint32_t>(
@@ -50,15 +50,15 @@ void gfx::Swapchain::createDrawables() {
     swapchain_create_info.setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);
     swapchain_create_info.setPresentMode(mDisplaySyncEnabled ? vk::PresentModeKHR::eFifo : vk::PresentModeKHR::eImmediate);
     swapchain_create_info.setClipped(true);
-    swapchain_create_info.setOldSwapchain(vkSwapchain);
+    swapchain_create_info.setOldSwapchain(mSwapchain);
 
-    vk::SwapchainKHR oldSwapchain = vkSwapchain;
-    vkSwapchain = mDevice->vkDevice.createSwapchainKHR(swapchain_create_info, nullptr, mDevice->vkDispatchLoaderDynamic);
+    vk::SwapchainKHR oldSwapchain = mSwapchain;
+    mSwapchain = mDevice->mDevice.createSwapchainKHR(swapchain_create_info, nullptr, mDevice->mDispatchLoaderDynamic);
 
     if (oldSwapchain) {
-        mDevice->vkDevice.destroySwapchainKHR(oldSwapchain, nullptr, mDevice->vkDispatchLoaderDynamic);
+        mDevice->mDevice.destroySwapchainKHR(oldSwapchain, nullptr, mDevice->mDispatchLoaderDynamic);
     }
-    auto images = mDevice->vkDevice.getSwapchainImagesKHR(vkSwapchain, mDevice->vkDispatchLoaderDynamic);
+    auto images = mDevice->mDevice.getSwapchainImagesKHR(mSwapchain, mDevice->mDispatchLoaderDynamic);
 
     mDrawables.resize(images.size());
     for (size_t i = 0; i < images.size(); ++i) {
@@ -69,16 +69,16 @@ void gfx::Swapchain::createDrawables() {
         view_create_info.setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
         auto texture = TransferPtr(new Texture(mDevice));
-        texture->vkExtent.setWidth(mDrawableSize.width);
-        texture->vkExtent.setHeight(mDrawableSize.height);
-        texture->vkExtent.setDepth(1);
-        texture->vkFormat = mPixelFormat;
-        texture->vkImage = images[i];
-        texture->vkImageView = mDevice->vkDevice.createImageView(view_create_info, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
-        texture->vmaAllocation = {};
-        texture->vkImageSubresourceRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
-        texture->vkImageSubresourceRange.setLayerCount(1);
-        texture->vkImageSubresourceRange.setLevelCount(1);
+        texture->mExtent.setWidth(mDrawableSize.width);
+        texture->mExtent.setHeight(mDrawableSize.height);
+        texture->mExtent.setDepth(1);
+        texture->mFormat = mPixelFormat;
+        texture->mImage = images[i];
+        texture->mImageView = mDevice->mDevice.createImageView(view_create_info, VK_NULL_HANDLE, mDevice->mDispatchLoaderDynamic);
+        texture->mAllocation = {};
+        texture->mImageSubresourceRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
+        texture->mImageSubresourceRange.setLayerCount(1);
+        texture->mImageSubresourceRange.setLevelCount(1);
 
         mDrawables[i] = TransferPtr(new Drawable(this, texture, uint32_t(i)));
     }
@@ -111,21 +111,21 @@ auto gfx::Swapchain::nextDrawable() -> SharedPtr<Drawable> {
     }
 
     vk::FenceCreateInfo fence_create_info = {};
-    vk::UniqueFence fence = mDevice->vkDevice.createFenceUnique(fence_create_info, VK_NULL_HANDLE, mDevice->vkDispatchLoaderDynamic);
+    vk::UniqueFence fence = mDevice->mDevice.createFenceUnique(fence_create_info, VK_NULL_HANDLE, mDevice->mDispatchLoaderDynamic);
 
     uint32_t index;
-    vk::Result result = mDevice->vkDevice.acquireNextImageKHR(
-        vkSwapchain,
+    vk::Result result = mDevice->mDevice.acquireNextImageKHR(
+        mSwapchain,
         std::numeric_limits<uint64_t>::max(),
         nullptr,
         *fence,
         &index,
-        mDevice->vkDispatchLoaderDynamic
+        mDevice->mDispatchLoaderDynamic
     );
     if (result != vk::Result::eErrorOutOfDateKHR && result != vk::Result::eSuboptimalKHR && result != vk::Result::eSuccess) {
         throw std::runtime_error("failed to acquire swapchain image");
     }
-    vk::resultCheck(mDevice->vkDevice.waitForFences(1, &*fence, true, std::numeric_limits<uint64_t>::max(), mDevice->vkDispatchLoaderDynamic), "waitForFences");
+    vk::resultCheck(mDevice->mDevice.waitForFences(1, &*fence, true, std::numeric_limits<uint64_t>::max(), mDevice->mDispatchLoaderDynamic), "waitForFences");
 
     return mDrawables[uint64_t(index)];
 }

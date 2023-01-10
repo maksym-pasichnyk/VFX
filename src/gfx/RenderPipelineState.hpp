@@ -70,7 +70,7 @@ namespace gfx {
     };
 
     struct RenderPipelineStateDescription {
-        SharedPtr<Function> functions[2] = {};
+        SharedPtr<Function> mFunctions[2] = {};
 
         uint32_t viewMask = {};
         RenderPipelineColorAttachmentFormatArray colorAttachmentFormats = {};
@@ -91,11 +91,11 @@ namespace gfx {
 
     public:
         void setVertexFunction(SharedPtr<Function> function) {
-            functions[0] = std::move(function);
+            mFunctions[0] = std::move(function);
         }
 
         void setFragmentFunction(SharedPtr<Function> function) {
-            functions[1] = std::move(function);
+            mFunctions[1] = std::move(function);
         }
     };
 
@@ -104,9 +104,9 @@ namespace gfx {
 
     public:
         SharedPtr<Device> mDevice;
-        vk::Pipeline vkPipeline = {};
-        vk::PipelineLayout vkPipelineLayout = {};
-        std::vector<vk::DescriptorSetLayout> vkDescriptorSetLayouts = {};
+        vk::Pipeline mPipeline = {};
+        vk::PipelineLayout mPipelineLayout = {};
+        std::vector<vk::DescriptorSetLayout> mDescriptorSetLayouts = {};
 
     private:
         explicit RenderPipelineState(SharedPtr<Device> device, const RenderPipelineStateDescription& description);

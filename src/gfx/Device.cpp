@@ -13,11 +13,11 @@
 
 #include <set>
 
-gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context), vkPhysicalDevice(gpu) {
+gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context), mPhysicalDevice(gpu) {
     std::vector<std::vector<float_t>> queue_priorities = {};
     std::vector<vk::DeviceQueueCreateInfo> queue_create_infos = {};
 
-    auto queue_family_properties = gpu.getQueueFamilyProperties(context->vkDispatchLoaderDynamic);
+    auto queue_family_properties = gpu.getQueueFamilyProperties(context->mDispatchLoaderDynamic);
     queue_priorities.resize(queue_family_properties.size());
 
     for (size_t i = 0; i < queue_family_properties.size(); i++) {
@@ -31,14 +31,14 @@ gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context
 
     std::vector<const char*> layers = {};
 
-    auto available_layers = gpu.enumerateDeviceLayerProperties(context->vkDispatchLoaderDynamic);
+    auto available_layers = gpu.enumerateDeviceLayerProperties(context->mDispatchLoaderDynamic);
     for (auto& layer : available_layers) {
         layers.emplace_back(layer.layerName);
     }
 
     std::vector<const char*> extensions = {};
 
-    auto available_extensions = gpu.enumerateDeviceExtensionProperties(nullptr, context->vkDispatchLoaderDynamic);
+    auto available_extensions = gpu.enumerateDeviceExtensionProperties(nullptr, context->mDispatchLoaderDynamic);
     for (auto& extension : available_extensions) {
         if (std::strcmp(extension.extensionName, "VK_AMD_negative_viewport_height") == 0) {
             continue;
@@ -62,7 +62,7 @@ gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context
     dynamic_rendering_features.setPNext(&timeline_semaphore_features);
     dynamic_rendering_features.setDynamicRendering(VK_TRUE);
 
-    vk::PhysicalDeviceFeatures2 features_2 = gpu.getFeatures2(context->vkDispatchLoaderDynamic);
+    vk::PhysicalDeviceFeatures2 features_2 = gpu.getFeatures2(context->mDispatchLoaderDynamic);
     features_2.setPNext(&dynamic_rendering_features);
 
     vk::DeviceCreateInfo device_create_info = {};
@@ -71,40 +71,40 @@ gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context
     device_create_info.setPEnabledLayerNames(layers);
     device_create_info.setPEnabledExtensionNames(extensions);
 
-    vkDevice = gpu.createDevice(device_create_info, nullptr, context->vkDispatchLoaderDynamic);
-    vkDispatchLoaderDynamic.init(context->vkDispatchLoaderDynamic.vkGetInstanceProcAddr);
-    vkDispatchLoaderDynamic.init(context->vkInstance);
-    vkDispatchLoaderDynamic.init(vkDevice);
+    mDevice = gpu.createDevice(device_create_info, nullptr, context->mDispatchLoaderDynamic);
+    mDispatchLoaderDynamic.init(context->mDispatchLoaderDynamic.vkGetInstanceProcAddr);
+    mDispatchLoaderDynamic.init(context->mInstance);
+    mDispatchLoaderDynamic.init(mDevice);
 
     VmaVulkanFunctions functions = {};
-    functions.vkGetDeviceProcAddr = vkDispatchLoaderDynamic.vkGetDeviceProcAddr;
-    functions.vkGetInstanceProcAddr = vkDispatchLoaderDynamic.vkGetInstanceProcAddr;
+    functions.vkGetDeviceProcAddr = mDispatchLoaderDynamic.vkGetDeviceProcAddr;
+    functions.vkGetInstanceProcAddr = mDispatchLoaderDynamic.vkGetInstanceProcAddr;
 
     VmaAllocatorCreateInfo allocator_create_info = {};
     allocator_create_info.physicalDevice = gpu;
-    allocator_create_info.device = vkDevice;
+    allocator_create_info.device = mDevice;
     allocator_create_info.pVulkanFunctions = &functions;
-    allocator_create_info.instance = context->vkInstance;
+    allocator_create_info.instance = context->mInstance;
     allocator_create_info.vulkanApiVersion = VK_API_VERSION_1_2;
 
-    vmaCreateAllocator(&allocator_create_info, &vmaAllocator);
+    vmaCreateAllocator(&allocator_create_info, &mAllocator);
 
     // find a graphics queue family index
-    vkGraphicsQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
+    mGraphicsQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
     for (uint32_t i = 0; i < queue_family_properties.size(); i++) {
         if (queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
-            vkGraphicsQueueFamilyIndex = i;
+            mGraphicsQueueFamilyIndex = i;
             break;
         }
     }
-    if (vkGraphicsQueueFamilyIndex == std::numeric_limits<uint32_t>::max()) {
+    if (mGraphicsQueueFamilyIndex == std::numeric_limits<uint32_t>::max()) {
         spdlog::error("No graphics queue family index found");
         exit(1);
     }
 
     // find a present queue family index
 #ifdef __APPLE__
-    vkPresentQueueFamilyIndex = vkGraphicsQueueFamilyIndex;
+    mPresentQueueFamilyIndex = mGraphicsQueueFamilyIndex;
 #else
     vkPresentQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
     for (uint32_t i = 0; i < queue_family_properties.size(); i++) {
@@ -117,26 +117,26 @@ gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context
 #endif
 
     // find a compute queue family index
-    vkComputeQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
+    mComputeQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
     for (uint32_t i = 0; i < queue_family_properties.size(); i++) {
         if (queue_family_properties[i].queueFlags & vk::QueueFlagBits::eCompute) {
-            vkComputeQueueFamilyIndex = i;
+            mComputeQueueFamilyIndex = i;
             break;
         }
     }
-    if (vkComputeQueueFamilyIndex == std::numeric_limits<uint32_t>::max()) {
+    if (mComputeQueueFamilyIndex == std::numeric_limits<uint32_t>::max()) {
         spdlog::error("No compute queue family index found");
         exit(1);
     }
 }
 
 gfx::Device::~Device() {
-    vmaDestroyAllocator(vmaAllocator);
-    vkDispatchLoaderDynamic.vkDestroyDevice(vkDevice, nullptr);
+    vmaDestroyAllocator(mAllocator);
+    mDispatchLoaderDynamic.vkDestroyDevice(mDevice, nullptr);
 }
 
 void gfx::Device::waitIdle() {
-    vkDevice.waitIdle(vkDispatchLoaderDynamic);
+    mDevice.waitIdle(mDispatchLoaderDynamic);
 }
 
 auto gfx::Device::newTexture(const TextureDescription& description) -> SharedPtr<Texture> {
@@ -194,13 +194,13 @@ auto gfx::Device::newDescriptorSet(vk::DescriptorSetLayout layout, const std::ve
     vk::DescriptorPoolCreateInfo pool_create_info = {};
     pool_create_info.setMaxSets(1);
     pool_create_info.setPoolSizes(sizes);
-    id->vkDescriptorPool = vkDevice.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, vkDispatchLoaderDynamic);
+    id->mDescriptorPool = mDevice.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, mDispatchLoaderDynamic);
 
     vk::DescriptorSetAllocateInfo ds_allocate_info = {};
-    ds_allocate_info.setDescriptorPool(id->vkDescriptorPool);
+    ds_allocate_info.setDescriptorPool(id->mDescriptorPool);
     ds_allocate_info.setDescriptorSetCount(1);
     ds_allocate_info.setPSetLayouts(&layout);
-    id->vkDescriptorSet = vkDevice.allocateDescriptorSets(ds_allocate_info, vkDispatchLoaderDynamic)[0];
+    id->mDescriptorSet = mDevice.allocateDescriptorSets(ds_allocate_info, mDispatchLoaderDynamic)[0];
 
     return TransferPtr(id);
 }

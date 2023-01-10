@@ -30,7 +30,7 @@ gfx::RenderPipelineState::RenderPipelineState(SharedPtr<Device> device, const Re
     std::vector<vk::PushConstantRange> push_constant_ranges = {};
     std::vector<DescriptorSetLayoutCreateInfo> descriptor_sets = {};
     
-    for (auto& function : description.functions) {
+    for (auto& function : description.mFunctions) {
         // todo: merge if overlaps
         for (auto& pcb : std::span(function->mLibrary->mSpvReflectShaderModule.push_constant_blocks, function->mLibrary->mSpvReflectShaderModule.push_constant_block_count)) {
             vk::PushConstantRange push_constant_range = {};
@@ -58,17 +58,17 @@ gfx::RenderPipelineState::RenderPipelineState(SharedPtr<Device> device, const Re
         }
     }
 
-    vkDescriptorSetLayouts.resize(descriptor_sets.size());
-    for (uint32_t i = 0; i < vkDescriptorSetLayouts.size(); ++i) {
+    mDescriptorSetLayouts.resize(descriptor_sets.size());
+    for (uint32_t i = 0; i < mDescriptorSetLayouts.size(); ++i) {
         vk::DescriptorSetLayoutCreateInfo layout_create_info = {};
         layout_create_info.setBindings(descriptor_sets[i].bindings);
-        vkDescriptorSetLayouts[i] = mDevice->vkDevice.createDescriptorSetLayout(layout_create_info, nullptr, mDevice->vkDispatchLoaderDynamic);
+        mDescriptorSetLayouts[i] = mDevice->mDevice.createDescriptorSetLayout(layout_create_info, nullptr, mDevice->mDispatchLoaderDynamic);
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_create_info = {};
-    pipeline_layout_create_info.setSetLayouts(vkDescriptorSetLayouts);
+    pipeline_layout_create_info.setSetLayouts(mDescriptorSetLayouts);
     pipeline_layout_create_info.setPushConstantRanges(push_constant_ranges);
-    vkPipelineLayout = mDevice->vkDevice.createPipelineLayout(pipeline_layout_create_info, nullptr, mDevice->vkDispatchLoaderDynamic);
+    mPipelineLayout = mDevice->mDevice.createPipelineLayout(pipeline_layout_create_info, nullptr, mDevice->mDispatchLoaderDynamic);
 
     vk::PipelineViewportStateCreateInfo viewport_state = {};
     viewport_state.setViewportCount(1);
@@ -86,14 +86,14 @@ gfx::RenderPipelineState::RenderPipelineState(SharedPtr<Device> device, const Re
 
     vk::PipelineShaderStageCreateInfo vertex_stage = {};
     vertex_stage.setStage(vk::ShaderStageFlagBits::eVertex);
-    vertex_stage.setModule(description.functions[0]->mLibrary->vkShaderModule);
-    vertex_stage.setPName(description.functions[0]->mFunctionName.c_str());
+    vertex_stage.setModule(description.mFunctions[0]->mLibrary->mShaderModule);
+    vertex_stage.setPName(description.mFunctions[0]->mFunctionName.c_str());
     stages.emplace_back(vertex_stage);
 
     vk::PipelineShaderStageCreateInfo fragment_stage = {};
     fragment_stage.setStage(vk::ShaderStageFlagBits::eFragment);
-    fragment_stage.setModule(description.functions[1]->mLibrary->vkShaderModule);
-    fragment_stage.setPName(description.functions[1]->mFunctionName.c_str());
+    fragment_stage.setModule(description.mFunctions[1]->mLibrary->mShaderModule);
+    fragment_stage.setPName(description.mFunctions[1]->mFunctionName.c_str());
     stages.emplace_back(fragment_stage);
 
     vk::PipelineVertexInputStateCreateInfo vertex_input_state = {};
@@ -122,26 +122,26 @@ gfx::RenderPipelineState::RenderPipelineState(SharedPtr<Device> device, const Re
     pipeline_create_info.setPDepthStencilState(&description.depthStencilState);
     pipeline_create_info.setPColorBlendState(&color_blend_state);
     pipeline_create_info.setPDynamicState(&dynamic_state);
-    pipeline_create_info.setLayout(vkPipelineLayout);
+    pipeline_create_info.setLayout(mPipelineLayout);
     pipeline_create_info.setRenderPass(nullptr);
     pipeline_create_info.setSubpass(0);
     pipeline_create_info.setBasePipelineHandle(nullptr);
     pipeline_create_info.setBasePipelineIndex(0);
 
-    std::ignore = mDevice->vkDevice.createGraphicsPipelines(
+    std::ignore = mDevice->mDevice.createGraphicsPipelines(
         {},
         1,
         &pipeline_create_info,
         nullptr,
-        &vkPipeline,
-        mDevice->vkDispatchLoaderDynamic
+        &mPipeline,
+        mDevice->mDispatchLoaderDynamic
     );
 }
 
 gfx::RenderPipelineState::~RenderPipelineState() {
-    for (auto& layout : vkDescriptorSetLayouts) {
-        mDevice->vkDevice.destroyDescriptorSetLayout(layout, nullptr, mDevice->vkDispatchLoaderDynamic);
+    for (auto& layout : mDescriptorSetLayouts) {
+        mDevice->mDevice.destroyDescriptorSetLayout(layout, nullptr, mDevice->mDispatchLoaderDynamic);
     }
-    mDevice->vkDevice.destroyPipelineLayout(vkPipelineLayout, nullptr, mDevice->vkDispatchLoaderDynamic);
-    mDevice->vkDevice.destroyPipeline(vkPipeline, nullptr, mDevice->vkDispatchLoaderDynamic);
+    mDevice->mDevice.destroyPipelineLayout(mPipelineLayout, nullptr, mDevice->mDispatchLoaderDynamic);
+    mDevice->mDevice.destroyPipeline(mPipeline, nullptr, mDevice->mDispatchLoaderDynamic);
 }

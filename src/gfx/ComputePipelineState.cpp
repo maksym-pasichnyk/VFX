@@ -55,45 +55,45 @@ gfx::ComputePipelineState::ComputePipelineState(SharedPtr<Device> device, const 
         }
     }
 
-    vkDescriptorSetLayouts.resize(descriptor_sets.size());
+    mDescriptorSetLayouts.resize(descriptor_sets.size());
     for (uint32_t i = 0; i < descriptor_sets.size(); ++i) {
         vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {};
         descriptor_set_layout_create_info.setBindings(descriptor_sets[i].bindings);
 
-        vkDescriptorSetLayouts[i] = mDevice->vkDevice.createDescriptorSetLayout(descriptor_set_layout_create_info, nullptr, mDevice->vkDispatchLoaderDynamic);
+        mDescriptorSetLayouts[i] = mDevice->mDevice.createDescriptorSetLayout(descriptor_set_layout_create_info, nullptr, mDevice->mDispatchLoaderDynamic);
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_create_info = {};
-    pipeline_layout_create_info.setSetLayouts(vkDescriptorSetLayouts);
+    pipeline_layout_create_info.setSetLayouts(mDescriptorSetLayouts);
     pipeline_layout_create_info.setPushConstantRanges(push_constant_ranges);
-    vkPipelineLayout = mDevice->vkDevice.createPipelineLayout(pipeline_layout_create_info, nullptr, mDevice->vkDispatchLoaderDynamic);
+    mPipelineLayout = mDevice->mDevice.createPipelineLayout(pipeline_layout_create_info, nullptr, mDevice->mDispatchLoaderDynamic);
 
     vk::PipelineShaderStageCreateInfo shader_stage_create_info{};
     shader_stage_create_info.setStage(vk::ShaderStageFlagBits::eCompute);
-    shader_stage_create_info.setModule(function->mLibrary->vkShaderModule);
+    shader_stage_create_info.setModule(function->mLibrary->mShaderModule);
     shader_stage_create_info.setPName(function->mFunctionName.c_str());
 
     vk::ComputePipelineCreateInfo pipeline_create_info = {};
     pipeline_create_info.setStage(shader_stage_create_info);
-    pipeline_create_info.setLayout(vkPipelineLayout);
+    pipeline_create_info.setLayout(mPipelineLayout);
     pipeline_create_info.setBasePipelineHandle(nullptr);
     pipeline_create_info.setBasePipelineIndex(0);
 
-    std::ignore = mDevice->vkDevice.createComputePipelines(
+    std::ignore = mDevice->mDevice.createComputePipelines(
         {},
         1,
         &pipeline_create_info,
         nullptr,
-        &vkPipeline,
-        mDevice->vkDispatchLoaderDynamic
+        &mPipeline,
+        mDevice->mDispatchLoaderDynamic
     );
 }
 
 gfx::ComputePipelineState::~ComputePipelineState() {
-    for (auto& layout : vkDescriptorSetLayouts) {
-        mDevice->vkDevice.destroyDescriptorSetLayout(layout, nullptr, mDevice->vkDispatchLoaderDynamic);
+    for (auto& layout : mDescriptorSetLayouts) {
+        mDevice->mDevice.destroyDescriptorSetLayout(layout, nullptr, mDevice->mDispatchLoaderDynamic);
     }
 
-    mDevice->vkDevice.destroyPipelineLayout(vkPipelineLayout, nullptr, mDevice->vkDispatchLoaderDynamic);
-    mDevice->vkDevice.destroyPipeline(vkPipeline, nullptr, mDevice->vkDispatchLoaderDynamic);
+    mDevice->mDevice.destroyPipelineLayout(mPipelineLayout, nullptr, mDevice->mDispatchLoaderDynamic);
+    mDevice->mDevice.destroyPipeline(mPipeline, nullptr, mDevice->mDispatchLoaderDynamic);
 }

@@ -12,10 +12,10 @@ namespace gfx {
     struct Device;
     struct Context : Referencing {
     public:
-        vk::Instance vkInstance = {};
-        vk::DynamicLoader vkDynamicLoader = {};
-        vk::DispatchLoaderDynamic vkDispatchLoaderDynamic = {};
-        vk::DebugUtilsMessengerEXT vkDebugUtilsMessenger = {};
+        vk::Instance mInstance = {};
+        vk::DynamicLoader mDynamicLoader = {};
+        vk::DispatchLoaderDynamic mDispatchLoaderDynamic = {};
+        vk::DebugUtilsMessengerEXT mDebugUtilsMessenger = {};
 
         std::vector<SharedPtr<Device>> mDevices = {};
 

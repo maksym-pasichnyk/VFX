@@ -34,7 +34,7 @@ namespace gfx {
 
         vk::Format mPixelFormat = {};
         vk::Extent2D mDrawableSize = {};
-        vk::SwapchainKHR vkSwapchain = {};
+        vk::SwapchainKHR mSwapchain = {};
         vk::ColorSpaceKHR mColorSpace = {};
 
         bool mDisplaySyncEnabled = {};
