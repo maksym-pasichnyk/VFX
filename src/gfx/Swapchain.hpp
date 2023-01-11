@@ -4,6 +4,8 @@
 
 #include <vulkan/vulkan.hpp>
 
+struct SDL_Window;
+
 namespace gfx {
     struct Device;
     struct Context;
@@ -11,17 +13,6 @@ namespace gfx {
     struct Drawable;
     struct Swapchain;
     struct CommandBuffer;
-
-    struct Surface final : Referencing {
-        friend Swapchain;
-
-    private:
-
-    public:
-//    private:
-        Surface(Context* context, vk::SurfaceKHR surface);
-        ~Surface() override;
-    };
 
     struct Swapchain final : Referencing {
         friend CommandBuffer;
@@ -40,8 +31,8 @@ namespace gfx {
         bool mDisplaySyncEnabled = {};
         uint32_t mMaximumDrawableCount = 3;
 
-    public:
-        explicit Swapchain(SharedPtr<Context> context, vk::SurfaceKHR surface);
+    private:
+        explicit Swapchain(SharedPtr<Context> context, SDL_Window* window);
         ~Swapchain() override;
 
     private:
@@ -62,5 +53,8 @@ namespace gfx {
         void setDisplaySyncEnabled(bool displaySyncEnabled);
         auto maximumDrawableCount() -> uint32_t;
         void setMaximumDrawableCount(uint32_t maximumDrawableCount);
+
+    public:
+        static auto alloc(SharedPtr<Context> context, SDL_Window* window) -> SharedPtr<Swapchain>;
     };
 }

@@ -4,7 +4,7 @@
 #include "Device.hpp"
 #include "spdlog/spdlog.h"
 
-extern VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData) -> VkBool32;
+extern VKAPI_ATTR auto VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData) -> VkBool32;
 
 gfx::Context::Context() {
     mDispatchLoaderDynamic.init(mDynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
@@ -16,63 +16,53 @@ gfx::Context::Context() {
     application_info.setEngineVersion(VK_MAKE_VERSION(1, 0, 0));
     application_info.setApiVersion(VK_API_VERSION_1_2);
 
-    std::vector<const char*> layers = {};
-    layers.emplace_back("VK_LAYER_KHRONOS_synchronization2");
+    std::vector<const char*> required_instance_layers = {};
+    required_instance_layers.emplace_back("VK_LAYER_KHRONOS_synchronization2");
 
-    bool enableApiValidation = [s = getenv("GFX_ENABLE_API_VALIDATION")] {
-        return s && strcmp(s, "1") == 0;
-    }();
-
-    if (enableApiValidation) {
-        layers.emplace_back("VK_LAYER_KHRONOS_validation");
+    if (strcmp(getenv("GFX_ENABLE_API_VALIDATION") ?: "0", "1") == 0) {
+        required_instance_layers.emplace_back("VK_LAYER_KHRONOS_validation");
     }
 
-    auto available_extensions = vk::enumerateInstanceExtensionProperties(nullptr, mDispatchLoaderDynamic);
+    auto instance_extension_properties = vk::enumerateInstanceExtensionProperties(nullptr, mDispatchLoaderDynamic);
 
-    std::vector<const char*> extensions = {};
-    for (auto& extension_properties : available_extensions) {
-        extensions.emplace_back(extension_properties.extensionName);
+    std::vector<const char*> required_instance_extensions = {};
+    for (auto& extension_properties : instance_extension_properties) {
+        required_instance_extensions.emplace_back(extension_properties.extensionName);
     }
 
-    auto enabled_validation_features = std::array{
-//        vk::ValidationFeatureEnableEXT::eGpuAssisted,
-//        vk::ValidationFeatureEnableEXT::eBestPractices,
-        vk::ValidationFeatureEnableEXT::eSynchronizationValidation,
-    };
+    std::vector<vk::ValidationFeatureEnableEXT> enabled_validation_features = {};
+    enabled_validation_features.emplace_back(vk::ValidationFeatureEnableEXT::eSynchronizationValidation);
+
     vk::ValidationFeaturesEXT validation_features = {};
     validation_features.setEnabledValidationFeatures(enabled_validation_features);
 
     vk::InstanceCreateInfo instance_create_info = {};
     instance_create_info.setPNext(&validation_features);
-#ifdef __APPLE__
     instance_create_info.setFlags(vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR);
-#endif
     instance_create_info.setPApplicationInfo(&application_info);
-    instance_create_info.setPEnabledLayerNames(layers);
-    instance_create_info.setPEnabledExtensionNames(extensions);
+    instance_create_info.setPEnabledLayerNames(required_instance_layers);
+    instance_create_info.setPEnabledExtensionNames(required_instance_extensions);
 
     mInstance = vk::createInstance(instance_create_info, nullptr, mDispatchLoaderDynamic);
     mDispatchLoaderDynamic.init(mInstance);
 
-    if (enableApiValidation) {
-        vk::DebugUtilsMessageSeverityFlagsEXT message_severity_flags = {};
-        message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
-        message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo;
-        message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
-        message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+    vk::DebugUtilsMessageSeverityFlagsEXT message_severity_flags = {};
+    message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
+    message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo;
+    message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
+    message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
 
-        vk::DebugUtilsMessageTypeFlagsEXT message_type_flags = {};
-        message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral;
-        message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
-        message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
+    vk::DebugUtilsMessageTypeFlagsEXT message_type_flags = {};
+    message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral;
+    message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
+    message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
 
-        vk::DebugUtilsMessengerCreateInfoEXT debug_create_info = {};
-        debug_create_info.setMessageSeverity(message_severity_flags);
-        debug_create_info.setMessageType(message_type_flags);
-        debug_create_info.setPfnUserCallback(debug_callback);
+    vk::DebugUtilsMessengerCreateInfoEXT debug_create_info = {};
+    debug_create_info.setMessageSeverity(message_severity_flags);
+    debug_create_info.setMessageType(message_type_flags);
+    debug_create_info.setPfnUserCallback(debugCallback);
 
-        mDebugUtilsMessenger = mInstance.createDebugUtilsMessengerEXT(debug_create_info, nullptr, mDispatchLoaderDynamic);
-    }
+    mDebugUtilsMessenger = mInstance.createDebugUtilsMessengerEXT(debug_create_info, nullptr, mDispatchLoaderDynamic);
 
     for (vk::PhysicalDevice gpu : mInstance.enumeratePhysicalDevices(mDispatchLoaderDynamic)) {
         mDevices.emplace_back(TransferPtr(new Device(this, gpu)));
@@ -83,7 +73,15 @@ gfx::Context::~Context() {
     mInstance.destroyDebugUtilsMessengerEXT(mDebugUtilsMessenger, nullptr, mDispatchLoaderDynamic);
 }
 
-VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData) -> VkBool32 {
+auto gfx::Context::devices() -> const std::vector<SharedPtr<Device>>& {
+    return mDevices;
+}
+
+auto gfx::Context::alloc() -> SharedPtr<Context> {
+    return TransferPtr(new Context());
+}
+
+VKAPI_ATTR auto VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData) -> VkBool32 {
 //    static constexpr const char* skip[] = {
 //        "UNASSIGNED-BestPractices-NonSuccess-Result",
 //        "VUID-vkCmdPushConstants-offset-01796",

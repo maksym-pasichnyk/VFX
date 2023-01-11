@@ -9,7 +9,7 @@ struct GuiShaderData {
     simd::float2 scale;
 };
 
-UIRenderer::UIRenderer(gfx::SharedPtr<gfx::Device> device)
+UIRenderer::UIRenderer(sp<gfx::Device> device)
 : mDevice(std::move(device))
 , mDrawList(&mDrawListSharedData) {
     buildFonts();
@@ -112,7 +112,7 @@ auto UIRenderer::drawList() -> ImDrawList* {
     return &mDrawList;
 }
 
-void UIRenderer::draw(const gfx::SharedPtr<gfx::CommandBuffer>& cmd) {
+void UIRenderer::draw(const sp<gfx::CommandBuffer>& cmd) {
     if (mDrawList.IdxBuffer.Size == 0) {
         return;
     }

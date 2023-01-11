@@ -29,22 +29,22 @@ gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context
         queue_create_infos.emplace_back(queue_create_info);
     }
 
-    std::vector<const char*> layers = {};
+    std::vector<const char*> enabled_layer_names = {};
 
-    auto available_layers = gpu.enumerateDeviceLayerProperties(pContext->mDispatchLoaderDynamic);
-    for (auto& layer : available_layers) {
-        layers.emplace_back(layer.layerName);
+    auto device_layer_properties = gpu.enumerateDeviceLayerProperties(pContext->mDispatchLoaderDynamic);
+    for (auto& layer_properties : device_layer_properties) {
+        enabled_layer_names.emplace_back(layer_properties.layerName);
     }
 
     std::vector<const char*> extensions = {};
 
-    auto available_extensions = gpu.enumerateDeviceExtensionProperties(nullptr, pContext->mDispatchLoaderDynamic);
-    for (auto& extension : available_extensions) {
-        if (std::strcmp(extension.extensionName, "VK_AMD_negative_viewport_height") == 0) {
+    auto device_extension_properties = gpu.enumerateDeviceExtensionProperties(nullptr, pContext->mDispatchLoaderDynamic);
+    for (auto& extension_properties : device_extension_properties) {
+        if (std::strcmp(extension_properties.extensionName, "VK_AMD_negative_viewport_height") == 0) {
             continue;
         }
 
-        extensions.emplace_back(extension.extensionName);
+        extensions.emplace_back(extension_properties.extensionName);
     }
 
     vk::PhysicalDeviceSynchronization2Features synchronization_2_features = {};
@@ -68,7 +68,7 @@ gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context
     vk::DeviceCreateInfo device_create_info = {};
     device_create_info.setPNext(&features_2);
     device_create_info.setQueueCreateInfos(queue_create_infos);
-    device_create_info.setPEnabledLayerNames(layers);
+    device_create_info.setPEnabledLayerNames(enabled_layer_names);
     device_create_info.setPEnabledExtensionNames(extensions);
 
     mDevice = gpu.createDevice(device_create_info, nullptr, pContext->mDispatchLoaderDynamic);
@@ -127,6 +127,10 @@ gfx::Device::Device(Context* context, vk::PhysicalDevice gpu) : pContext(context
         spdlog::error("No compute queue family index found");
         exit(1);
     }
+
+    mComputeQueue = mDevice.getQueue(mComputeQueueFamilyIndex, 0, mDispatchLoaderDynamic);
+    mPresentQueue = mDevice.getQueue(mPresentQueueFamilyIndex, 0, mDispatchLoaderDynamic);
+    mGraphicsQueue = mDevice.getQueue(mGraphicsQueueFamilyIndex, 0, mDispatchLoaderDynamic);
 }
 
 gfx::Device::~Device() {

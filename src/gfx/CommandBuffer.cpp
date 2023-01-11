@@ -11,12 +11,11 @@
 
 #include "spdlog/spdlog.h"
 
-gfx::CommandBuffer::CommandBuffer(SharedPtr<Device> device, CommandQueue* pCommandQueue, bool mRetainedReferences)
+gfx::CommandBuffer::CommandBuffer(SharedPtr<Device> device, CommandQueue* commandQueue)
 : mDevice(std::move(device))
-, pCommandQueue(pCommandQueue)
-, mRetainedReferences(mRetainedReferences) {
+, pCommandQueue(commandQueue) {
     vk::CommandBufferAllocateInfo allocate_info = {};
-    allocate_info.setCommandPool(pCommandQueue->mCommandPool);
+    allocate_info.setCommandPool(commandQueue->mCommandPool);
     allocate_info.setLevel(vk::CommandBufferLevel::ePrimary);
     allocate_info.setCommandBufferCount(1);
 
@@ -32,10 +31,6 @@ gfx::CommandBuffer::CommandBuffer(SharedPtr<Device> device, CommandQueue* pComma
 gfx::CommandBuffer::~CommandBuffer() {
     mDevice->mDevice.destroySemaphore(mSemaphore, nullptr, mDevice->mDispatchLoaderDynamic);
     mDevice->mDevice.destroyFence(mFence, nullptr, mDevice->mDispatchLoaderDynamic);
-}
-
-auto gfx::CommandBuffer::getRetainedReferences() -> bool {
-    return mRetainedReferences;
 }
 
 void gfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
@@ -54,7 +49,7 @@ void gfx::CommandBuffer::submit() {
     submit_info.setPSignalSemaphores(&mSemaphore);
 
     vk::resultCheck(mDevice->mDevice.resetFences(1, &mFence, mDevice->mDispatchLoaderDynamic), "Submit");
-    pCommandQueue->mGraphicsQueue.submit(submit_info, mFence, mDevice->mDispatchLoaderDynamic);
+    mDevice->mGraphicsQueue.submit(submit_info, mFence, mDevice->mDispatchLoaderDynamic);
 }
 
 void gfx::CommandBuffer::present(const SharedPtr<gfx::Drawable>& drawable) {
@@ -64,8 +59,7 @@ void gfx::CommandBuffer::present(const SharedPtr<gfx::Drawable>& drawable) {
     present_info.setPSwapchains(&drawable->pLayer->mSwapchain);
     present_info.setPImageIndices(&drawable->mDrawableIndex);
 
-    vk::Result result = pCommandQueue->mPresentQueue.presentKHR(present_info, mDevice->mDispatchLoaderDynamic);
-
+    vk::Result result = mDevice->mPresentQueue.presentKHR(present_info, mDevice->mDispatchLoaderDynamic);
     if (result != vk::Result::eErrorOutOfDateKHR && result != vk::Result::eSuboptimalKHR && result != vk::Result::eSuccess) {
         throw std::runtime_error(vk::to_string(result));
     }

@@ -30,13 +30,9 @@ namespace gfx {
 
     public:
         auto commandBuffer() -> SharedPtr<CommandBuffer>;
-        auto commandBufferWithUnretainedReferences() -> SharedPtr<CommandBuffer>;
 
     private:
         SharedPtr<Device> mDevice;
-        vk::Queue mComputeQueue = {};
-        vk::Queue mPresentQueue = {};
-        vk::Queue mGraphicsQueue = {};
         vk::CommandPool mCommandPool = {};
     };
 }

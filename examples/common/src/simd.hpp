@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdlib>
+
 template<typename T, size_t N>
 using simd_vector_type = __attribute__((__ext_vector_type__(N))) T;
 

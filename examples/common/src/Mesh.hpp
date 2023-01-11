@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gfx/GFX.hpp"
+#include "Core.hpp"
 #include "Primitive.hpp"
 
 #include "glm/glm.hpp"
@@ -17,8 +17,8 @@ private:
     std::vector<Primitive> mPrimitives = {};
     std::vector<glm::u32vec4> mJoints = {};
     std::vector<glm::f32vec4> mWeights = {};
-    gfx::SharedPtr<gfx::Buffer> mIndexBuffer = {};
-    gfx::SharedPtr<gfx::Buffer> mVertexBuffer = {};
+    sp<gfx::Buffer> mIndexBuffer = {};
+    sp<gfx::Buffer> mVertexBuffer = {};
 
 public:
     explicit Mesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, std::vector<Primitive> primitives, std::vector<glm::u32vec4> joints, std::vector<glm::f32vec4> weights)
@@ -29,7 +29,7 @@ public:
         , mWeights(std::move(weights)) {}
 
 public:
-    void uploadMeshData(const gfx::SharedPtr<gfx::Device>& device) {
+    void uploadMeshData(const sp<gfx::Device>& device) {
         if (mIndices.empty()) {
             mIndexBuffer = {};
         } else {
@@ -42,7 +42,7 @@ public:
         }
     }
 
-    void draw(const gfx::SharedPtr<gfx::CommandBuffer>& cmd) {
+    void draw(const sp<gfx::CommandBuffer>& cmd) {
         if (mIndexBuffer) {
             cmd->bindIndexBuffer(mIndexBuffer, 0, vk::IndexType::eUint32);
         }

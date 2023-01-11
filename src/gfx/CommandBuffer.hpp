@@ -40,10 +40,10 @@ namespace gfx {
         friend CommandBuffer;
 
     private:
-        SharedPtr<Texture>      mTexture            = {};
+        SharedPtr<Texture>             mTexture            = {};
         vk::ImageLayout         mImageLayout        = vk::ImageLayout::eUndefined;
         vk::ResolveModeFlagBits mResolveMode        = vk::ResolveModeFlagBits::eNone;
-        SharedPtr<Texture>      mResolveTexture     = {};
+        SharedPtr<Texture>             mResolveTexture     = {};
         vk::ImageLayout         mResolveImageLayout = vk::ImageLayout::eUndefined;
         vk::AttachmentLoadOp    mLoadOp             = vk::AttachmentLoadOp::eLoad;
         vk::AttachmentStoreOp   mStoreOp            = vk::AttachmentStoreOp::eStore;
@@ -80,10 +80,10 @@ namespace gfx {
         friend CommandBuffer;
 
     private:
-        SharedPtr<Texture>      mTexture            = {};
+        SharedPtr<Texture>             mTexture            = {};
         vk::ImageLayout         mImageLayout        = vk::ImageLayout::eUndefined;
         vk::ResolveModeFlagBits mResolveMode        = vk::ResolveModeFlagBits::eNone;
-        SharedPtr<Texture>      mResolveTexture     = {};
+        SharedPtr<Texture>             mResolveTexture     = {};
         vk::ImageLayout         mResolveImageLayout = vk::ImageLayout::eUndefined;
         vk::AttachmentLoadOp    mLoadOp             = vk::AttachmentLoadOp::eLoad;
         vk::AttachmentStoreOp   mStoreOp            = vk::AttachmentStoreOp::eStore;
@@ -120,10 +120,10 @@ namespace gfx {
         friend CommandBuffer;
 
     private:
-        SharedPtr<Texture>      mTexture             = {};
+        SharedPtr<Texture>             mTexture             = {};
         vk::ImageLayout         mImageLayout        = vk::ImageLayout::eUndefined;
         vk::ResolveModeFlagBits mResolveMode        = vk::ResolveModeFlagBits::eNone;
-        SharedPtr<Texture>      mResolveTexture      = {};
+        SharedPtr<Texture>             mResolveTexture      = {};
         vk::ImageLayout         mResolveImageLayout = vk::ImageLayout::eUndefined;
         vk::AttachmentLoadOp    mLoadOp             = vk::AttachmentLoadOp::eLoad;
         vk::AttachmentStoreOp   mStoreOp            = vk::AttachmentStoreOp::eStore;
@@ -207,12 +207,10 @@ namespace gfx {
         friend RenderCommandEncoder;
 
     private:
-        explicit CommandBuffer(SharedPtr<Device> device, CommandQueue* pCommandQueue, bool mRetainedReferences);
+        explicit CommandBuffer(SharedPtr<Device> device, CommandQueue* commandQueue);
         ~CommandBuffer() override;
 
     private:
-        bool mRetainedReferences = false;
-
         SharedPtr<Device> mDevice;
         CommandQueue* pCommandQueue;
 
@@ -225,7 +223,6 @@ namespace gfx {
         vk::PipelineBindPoint mPipelineBindPoint = {};
 
     public:
-        auto getRetainedReferences() -> bool;
         void begin(const vk::CommandBufferBeginInfo& info);
         void end();
         void submit();

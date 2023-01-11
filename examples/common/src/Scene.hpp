@@ -6,8 +6,8 @@
 
 struct Scene : gfx::Referencing {
 private:
-    std::vector<gfx::SharedPtr<Node>> mNodes;
+    std::vector<sp<Node>> mNodes;
 
 public:
-    explicit Scene(std::vector<gfx::SharedPtr<Node>> nodes) : mNodes(std::move(nodes)) {}
+    explicit Scene(std::vector<sp<Node>> nodes) : mNodes(std::move(nodes)) {}
 };

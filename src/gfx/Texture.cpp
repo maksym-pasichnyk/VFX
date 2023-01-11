@@ -364,7 +364,7 @@ void gfx::Texture::replaceRegion(const void* data, uint64_t size) {
     buffer_image_copy.imageSubresource.setLayerCount(1);
 
     auto commandQueue = mDevice->newCommandQueue();
-    auto commandBuffer = commandQueue->commandBufferWithUnretainedReferences();
+    auto commandBuffer = commandQueue->commandBuffer();
 
     commandBuffer->begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
     commandBuffer->changeTextureLayout(RetainPtr(this), vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits2::eHost, vk::PipelineStageFlagBits2::eTransfer, {}, vk::AccessFlagBits2::eTransferWrite);

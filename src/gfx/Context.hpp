@@ -10,8 +10,12 @@
 
 namespace gfx {
     struct Device;
+    struct Swapchain;
     struct Context : Referencing {
-    public:
+        friend Device;
+        friend Swapchain;
+
+    private:
         vk::Instance mInstance = {};
         vk::DynamicLoader mDynamicLoader = {};
         vk::DispatchLoaderDynamic mDispatchLoaderDynamic = {};
@@ -19,8 +23,14 @@ namespace gfx {
 
         std::vector<SharedPtr<Device>> mDevices = {};
 
-    public:
+    private:
         Context();
         ~Context() override;
+
+    public:
+        auto devices() -> const std::vector<SharedPtr<Device>>&;
+
+    public:
+        static auto alloc() -> SharedPtr<Context>;
     };
 }

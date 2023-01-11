@@ -3,8 +3,12 @@
 #include "UIContext.hpp"
 #include "NotSwiftUI/View.hpp"
 
+#include <set>
 #include <list>
+
 #include <SDL_mouse.h>
+#include <SDL_events.h>
+#include <SDL_keyboard.h>
 
 struct GraphView : View {
 private:
@@ -42,7 +46,7 @@ public:
         Capacity mCapacity;
         Direction mDirection;
 
-        std::set<gfx::SharedPtr<Link>> mLinks = {};
+        std::set<sp<Link>> mLinks = {};
 
     private:
         explicit Port(Node* node, size_t index, std::string name, Capacity capacity, Direction direction)
@@ -57,8 +61,8 @@ public:
         UISize mSize = UISize(450.0F, 250.0F);
         UIPoint mPosition = UIPoint(0.0F, 0.0F);
 
-        std::vector<gfx::SharedPtr<Port>> mInputs = {};
-        std::vector<gfx::SharedPtr<Port>> mOutputs = {};
+        std::vector<sp<Port>> mInputs = {};
+        std::vector<sp<Port>> mOutputs = {};
 
     private:
         explicit Node(std::string text) : mText(std::move(text)) {}
@@ -97,7 +101,7 @@ public:
         }
 
     private:
-        void draw(const gfx::SharedPtr<UIContext> &context, bool selected) {
+        void draw(const sp<UIContext> &context, bool selected) {
             ImVec2 textSize1 = context->drawList()->_Data->Font->CalcTextSizeA(36.0F, FLT_MAX, FLT_MAX, mText.data(), mText.data() + mText.size(), nullptr);
 
             context->saveState();
@@ -177,7 +181,7 @@ public:
             }
         }
 
-        auto _getSlotPosition(const gfx::SharedPtr<Port>& port) -> UIPoint {
+        auto _getSlotPosition(const sp<Port>& port) -> UIPoint {
             if (port->mDirection == Port::Direction::eInput) {
                 float_t x = mPosition.x + 10.0F + 10.0F + 10.0F;
                 float_t y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * static_cast<float_t>(port->mIndex);
@@ -194,11 +198,11 @@ public:
         friend GraphView;
 
     private:
-        gfx::SharedPtr<Port> mPortA;
-        gfx::SharedPtr<Port> mPortB;
+        sp<Port> mPortA;
+        sp<Port> mPortB;
 
     private:
-        explicit Link(gfx::SharedPtr<Port> portA, gfx::SharedPtr<Port> portB)
+        explicit Link(sp<Port> portA, sp<Port> portB)
             : mPortA(std::move(portA)), mPortB(std::move(portB)){}
     };
 
@@ -207,8 +211,8 @@ private:
     float_t mTargetZoomScale = 2.0F;
     UIPoint mTargetZoomPoint = UIPoint();
 
-    std::list<gfx::SharedPtr<Node>> mNodes = {};
-    std::list<gfx::SharedPtr<Link>> mLinks = {};
+    std::list<sp<Node>> mNodes = {};
+    std::list<sp<Link>> mLinks = {};
 
     UIPoint mGridOffset = UIPoint();
     UIPoint mStartPosition = UIPoint();
@@ -216,16 +220,16 @@ private:
     UIPoint mCursorPosition = UIPoint();
     Interaction mInteraction = Interaction::eNone;
 
-    gfx::SharedPtr<Node> mSelectedNode = {};
-    gfx::SharedPtr<Port> mSelectedPort = {};
-    gfx::SharedPtr<Link> mSelectedLink = {};
+    sp<Node> mSelectedNode = {};
+    sp<Port> mSelectedPort = {};
+    sp<Link> mSelectedLink = {};
 
 private:
     auto _size(const ProposedSize &proposed) -> UISize override {
         return proposed.orMax();
     }
 
-    void _draw(const gfx::SharedPtr<UIContext> &context, const UISize& size) override {
+    void _draw(const sp<UIContext> &context, const UISize& size) override {
         float invScale = 1.0F / mZoomScale;
 
         context->saveState();
@@ -284,7 +288,7 @@ private:
         context->restoreState();
     }
 
-    void drawLink(const gfx::SharedPtr<UIContext> &context, const UIPoint& pointA, const UIPoint& pointD, ImU32 color = IM_COL32(255, 255, 255, 255)) {
+    void drawLink(const sp<UIContext> &context, const UIPoint& pointA, const UIPoint& pointD, ImU32 color = IM_COL32(255, 255, 255, 255)) {
         UIPoint pointB = pointA + UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
         UIPoint pointC = pointD - UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
 
@@ -298,7 +302,7 @@ private:
         context->drawList()->PathStroke(color, 0, 5.0F);
     }
 
-    auto findNodeAt(int32_t x, int32_t y) -> gfx::SharedPtr<Node> {
+    auto findNodeAt(int32_t x, int32_t y) -> sp<Node> {
         for (auto& node : ranges::reverse_view(mNodes)) {
             UIPoint p = UIPoint(x, y) - node->mPosition;
             if (p.x < 0.0F || p.x > node->mSize.width) {
@@ -312,7 +316,7 @@ private:
         return {};
     }
 
-    auto findPortAt(const gfx::SharedPtr<Node>& node, int32_t x, int32_t y) -> gfx::SharedPtr<Port> {
+    auto findPortAt(const sp<Node>& node, int32_t x, int32_t y) -> sp<Port> {
         for (auto& port : node->mInputs) {
             UIPoint p = UIPoint(x, y) - node->_getSlotPosition(port);
             if (std::abs(p.x) <= 10.0F && std::abs(p.y) <= 10.0F) {
@@ -328,7 +332,7 @@ private:
         return {};
     }
 
-    auto addLink(const gfx::SharedPtr<Port>& portA, const gfx::SharedPtr<Port>& portB) -> gfx::SharedPtr<Link> {
+    auto addLink(const sp<Port>& portA, const sp<Port>& portB) -> sp<Link> {
         for (auto& link : mLinks) {
             if (link->mPortA == portA && link->mPortB == portB) {
                 return {};
@@ -347,7 +351,7 @@ private:
         return link;
     }
 
-    void removeNode(const gfx::SharedPtr<Node>& node) {
+    void removeNode(const sp<Node>& node) {
         for (auto& port : node->mInputs) {
             if (port == mSelectedPort) {
                 mSelectedPort = {};
@@ -367,7 +371,7 @@ private:
         }
     }
 
-    void removeLinks(const gfx::SharedPtr<Port>& port) {
+    void removeLinks(const sp<Port>& port) {
         for (auto& link : auto(port->mLinks)) {
             link->mPortA->mLinks.erase(link);
             link->mPortB->mLinks.erase(link);
@@ -376,7 +380,7 @@ private:
     }
 
 public:
-    auto addNode(std::string text) -> gfx::SharedPtr<Node> {
+    auto addNode(std::string text) -> sp<Node> {
         return mNodes.emplace_back(gfx::TransferPtr(new Node(std::move(text))));
     }
 

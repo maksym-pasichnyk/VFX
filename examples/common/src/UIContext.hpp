@@ -3,6 +3,7 @@
 #include "UISize.hpp"
 #include "UIPoint.hpp"
 #include "UIColor.hpp"
+#include "gfx/Object.hpp"
 
 #include <stack>
 

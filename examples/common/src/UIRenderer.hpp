@@ -1,11 +1,11 @@
 #pragma once
 
-#include "gfx/GFX.hpp"
+#include "Core.hpp"
 #include "UIContext.hpp"
 
 struct UIRenderer : gfx::Referencing {
 public:
-    explicit UIRenderer(gfx::SharedPtr<gfx::Device> device);
+    explicit UIRenderer(sp<gfx::Device> device);
 
 private:
     void buildFonts();
@@ -16,7 +16,7 @@ public:
     void setCurrentContext();
 
     auto drawList() -> ImDrawList*;
-    void draw(const gfx::SharedPtr<gfx::CommandBuffer>& cmd);
+    void draw(const sp<gfx::CommandBuffer>& cmd);
     void setScale(float_t scale);
     void setScreenSize(const UISize& size);
 
@@ -29,11 +29,11 @@ private:
     ImGuiContext mGuiContext = {&mFontAtlas};
     ImDrawListSharedData mDrawListSharedData = {};
 
-    gfx::SharedPtr<gfx::Device> mDevice;
-    gfx::SharedPtr<gfx::Buffer> mIndexBuffer = {};
-    gfx::SharedPtr<gfx::Buffer> mVertexBuffer = {};
-    gfx::SharedPtr<gfx::Texture> mFontTexture = {};
-    gfx::SharedPtr<gfx::Sampler> mFontSampler = {};
-    gfx::SharedPtr<gfx::DescriptorSet> mDescriptorSet = {};
-    gfx::SharedPtr<gfx::RenderPipelineState> mRenderPipelineState = {};
+    sp<gfx::Device> mDevice;
+    sp<gfx::Buffer> mIndexBuffer = {};
+    sp<gfx::Buffer> mVertexBuffer = {};
+    sp<gfx::Texture> mFontTexture = {};
+    sp<gfx::Sampler> mFontSampler = {};
+    sp<gfx::DescriptorSet> mDescriptorSet = {};
+    sp<gfx::RenderPipelineState> mRenderPipelineState = {};
 };

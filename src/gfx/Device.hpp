@@ -51,6 +51,10 @@ namespace gfx {
         uint32_t mComputeQueueFamilyIndex = {};
         uint32_t mGraphicsQueueFamilyIndex = {};
 
+        vk::Queue mComputeQueue = {};
+        vk::Queue mPresentQueue = {};
+        vk::Queue mGraphicsQueue = {};
+
     private:
         explicit Device(Context* context, vk::PhysicalDevice gpu);
         ~Device() override;

@@ -3,7 +3,6 @@
 #include "View.hpp"
 #include "Buffer.hpp"
 #include "Device.hpp"
-#include "Window.hpp"
 #include "Object.hpp"
 #include "Library.hpp"
 #include "Texture.hpp"

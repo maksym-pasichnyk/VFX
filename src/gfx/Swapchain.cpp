@@ -7,9 +7,21 @@
 #include "spdlog/spdlog.h"
 
 #include <set>
+#include <SDL_vulkan.h>
 
-gfx::Swapchain::Swapchain(SharedPtr<Context> context, vk::SurfaceKHR surface)
-: mContext(std::move(context)), mSurface(surface) {}
+class SDL_Window;
+
+gfx::Swapchain::Swapchain(SharedPtr<Context> context, SDL_Window* window)
+: mContext(std::move(context)) {
+    SDL_Vulkan_CreateSurface(window, mContext->mInstance, reinterpret_cast<VkSurfaceKHR*>(&mSurface));
+
+    int width;
+    int height;
+    SDL_Vulkan_GetDrawableSize(window, &width, &height);
+
+    mDrawableSize.width = width;
+    mDrawableSize.height = height;
+}
 
 gfx::Swapchain::~Swapchain() {
     releaseDrawables();
@@ -155,4 +167,8 @@ auto gfx::Swapchain::maximumDrawableCount() -> uint32_t {
 
 void gfx::Swapchain::setMaximumDrawableCount(uint32_t maximumDrawableCount) {
     mMaximumDrawableCount = maximumDrawableCount;
+}
+
+auto gfx::Swapchain::alloc(SharedPtr<Context> context, SDL_Window* window) -> SharedPtr<gfx::Swapchain> {
+    return TransferPtr(new Swapchain(context, window));
 }
