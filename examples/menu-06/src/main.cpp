@@ -16,7 +16,7 @@ public:
 
 public:
     void _draw(const sp<UIContext> &context, const UISize &size) override {
-        auto textSize = text->size(ProposedSize(size));
+        auto textSize = text->_size(ProposedSize(size));
         auto translate = translation(textSize, size, Alignment::center());
 
         context->drawRectFilled(size, 5.0F);
@@ -24,7 +24,7 @@ public:
         context->saveState();
         context->translateBy(translate.x, translate.y);
         context->setFillColor(UIColor(0.0F, 0.0F, 0.0F, 1.0F));
-        text->draw(context, textSize);
+        text->_draw(context, textSize);
         context->restoreState();
     }
 
@@ -89,7 +89,7 @@ public:
         auto ctx = gfx::TransferPtr(new UIContext(uiRenderer->drawList()));
 
         uiRenderer->resetForNewFrame();
-        content->draw(ctx, getUISize(getWindowSize()));
+        content->_draw(ctx, getUISize(getWindowSize()));
         uiRenderer->draw(commandBuffer);
 
         commandBuffer->endRendering();

@@ -37,8 +37,6 @@ struct ProposedSize {
 
 struct View : gfx::Referencing {
 public:
-    auto size(const ProposedSize& proposed) -> UISize;
-    void draw(const sp<UIContext>& context, const UISize& size);
     auto frame(std::optional<float_t> width, std::optional<float_t> height, Alignment alignment = Alignment::center()) -> sp<FixedFrame>;
     auto frame(std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment = Alignment::center()) -> sp<FlexibleFrame>;
     auto border(const UIColor& color, float_t width) -> sp<View>;
@@ -48,13 +46,13 @@ public:
 
 public:
     virtual auto body() -> sp<View> {
-        return gfx::RetainPtr(this);
+        throw std::runtime_error("FatalError");
     }
     virtual auto _size(const ProposedSize& proposed) -> UISize {
-        throw std::runtime_error("FatalError");
+        return body()->_size(proposed);
     }
     virtual void _draw(const sp<UIContext>& context, const UISize& size) {
-        throw std::runtime_error("FatalError");
+        return body()->_draw(context, size);
     }
 
 public:
@@ -101,10 +99,12 @@ public:
 
 struct Shape : View {
     auto body() -> sp<View> override;
+
+    virtual void path(const sp<UIContext>& context, const UISize& size) = 0;
 };
 
 struct Circle : Shape {
-    void _draw(const sp<UIContext>& context, const UISize& size) override {
+    void path(const sp<UIContext>& context, const UISize& size) override {
         float_t halfSize = std::min(size.width, size.height) * 0.5F;
         float_t dx = size.width * 0.5F - halfSize;
         float_t dy = size.height * 0.5F - halfSize;
@@ -123,13 +123,13 @@ private:
 public:
     explicit Border(float_t width) : width(width) {}
 
-    void _draw(const sp<UIContext>& context, const UISize& size) override {
+    void path(const sp<UIContext>& context, const UISize& size) override {
         context->drawRect(size, width);
     }
 };
 
 struct Rectangle : Shape {
-    void _draw(const sp<UIContext>& context, const UISize& size) override {
+    void path(const sp<UIContext>& context, const UISize& size) override {
         context->drawRectFilled(size);
     }
 };
@@ -148,7 +148,7 @@ public:
     }
 
     void _draw(const sp<UIContext> &context, const UISize &size) override {
-        shape->_draw(context, size);
+        shape->path(context, size);
     }
 };
 
@@ -165,17 +165,17 @@ public:
 
     auto _size(const ProposedSize& proposed) -> UISize override {
         auto cgSize = proposed.orMax();
-        auto childSize = content->size(ProposedSize(width.value_or(cgSize.width), height.value_or(cgSize.height)));
+        auto childSize = content->_size(ProposedSize(width.value_or(cgSize.width), height.value_or(cgSize.height)));
         return UISize(width.value_or(childSize.width), height.value_or(childSize.height));
     }
 
     void _draw(const sp<UIContext>& context, const UISize& size) override {
-        auto childSize = content->size(ProposedSize(size));
+        auto childSize = content->_size(ProposedSize(size));
         auto translate = translation(childSize, size, alignment);
 
         context->saveState();
         context->translateBy(translate.x, translate.y);
-        content->draw(context, childSize);
+        content->_draw(context, childSize);
         context->restoreState();
     }
 };
@@ -217,7 +217,7 @@ public:
             proposed.height = std::min(*maxHeight, proposed.height);
         }
 
-        auto size = content->size(ProposedSize(proposed));
+        auto size = content->_size(ProposedSize(proposed));
         if (minWidth.has_value()) {
             size.width = std::max(*minWidth, std::min(size.width, proposed.width));
         }
@@ -234,12 +234,12 @@ public:
     }
 
     void _draw(const sp<UIContext>& context, const UISize& size) override {
-        auto childSize = content->size(ProposedSize(size));
+        auto childSize = content->_size(ProposedSize(size));
         auto translate = translation(childSize, size, alignment);
 
         context->saveState();
         context->translateBy(translate.x, translate.y);
-        content->draw(context, childSize);
+        content->_draw(context, childSize);
         context->restoreState();
     }
 };
@@ -255,18 +255,18 @@ public:
         : content(std::move(content)), overlay(std::move(overlay)), alignment(alignment) {}
 
     auto _size(const ProposedSize& proposed) -> UISize override {
-        return content->size(proposed);
+        return content->_size(proposed);
     }
 
     void _draw(const sp<UIContext>& context, const UISize& size) override {
-        content->draw(context, size);
+        content->_draw(context, size);
 
-        auto childSize = overlay->size(ProposedSize(size));
+        auto childSize = overlay->_size(ProposedSize(size));
         auto translate = translation(childSize, size, alignment);
 
         context->saveState();
         context->translateBy(translate.x, translate.y);
-        overlay->draw(context, childSize);
+        overlay->_draw(context, childSize);
         context->restoreState();
     }
 };
@@ -282,7 +282,7 @@ public:
     : content(std::move(content)), horizontal(horizontal), vertical(vertical) {}
 
     void _draw(const sp<UIContext> &context, const UISize &size) override {
-        content->draw(context, size);
+        content->_draw(context, size);
     }
 
     auto _size(const ProposedSize &proposed) -> UISize override {
@@ -293,7 +293,7 @@ public:
         if (vertical) {
             p.height = std::nullopt;
         }
-        return content->size(p);
+        return content->_size(p);
     }
 };
 
@@ -319,7 +319,7 @@ public:
 
             context->saveState();
             context->translateBy(currentX, stackY - currentY);
-            children[i]->draw(context, childSize);
+            children[i]->_draw(context, childSize);
             context->restoreState();
 
             currentX += childSize.width + spacing;
@@ -348,8 +348,8 @@ public:
     void layout(const ProposedSize &proposed) {
         auto flexibility = cxx::iter(children)
             .map([&](auto& child) {
-                auto lower = child->size(ProposedSize(0, proposed.height));
-                auto upper = child->size(ProposedSize(std::numeric_limits<float_t>::max(), proposed.height));
+                auto lower = child->_size(ProposedSize(0, proposed.height));
+                auto upper = child->_size(ProposedSize(std::numeric_limits<float_t>::max(), proposed.height));
                 return upper.width - lower.width;
             })
             .collect();
@@ -368,7 +368,7 @@ public:
             size_t idx = remainingIndices.front();
             remainingIndices.erase(remainingIndices.begin());
 
-            auto childSize = children[idx]->size(ProposedSize(width, proposed.height));
+            auto childSize = children[idx]->_size(ProposedSize(width, proposed.height));
             sizes[idx] = childSize;
 
             remainingWidth -= childSize.width;
@@ -402,7 +402,7 @@ private:
 
             context->saveState();
             context->translateBy(stackX - currentX, currentY);
-            children[i]->draw(context, childSize);
+            children[i]->_draw(context, childSize);
             context->restoreState();
 
             currentY += childSize.height + spacing;
@@ -431,8 +431,8 @@ private:
     void layout(const ProposedSize &proposed) {
         auto flexibility = cxx::iter(children)
             .map([&](auto& child) {
-                auto lower = child->size(ProposedSize(proposed.width, 0));
-                auto upper = child->size(ProposedSize(proposed.width, std::numeric_limits<float_t>::max()));
+                auto lower = child->_size(ProposedSize(proposed.width, 0));
+                auto upper = child->_size(ProposedSize(proposed.width, std::numeric_limits<float_t>::max()));
                 return upper.height - lower.height;
             })
             .collect();
@@ -451,7 +451,7 @@ private:
             size_t idx = remainingIndices.front();
             remainingIndices.erase(remainingIndices.begin());
 
-            auto childSize = children[idx]->size(ProposedSize(proposed.width, height));
+            auto childSize = children[idx]->_size(ProposedSize(proposed.width, height));
             sizes[idx] = childSize;
 
             remainingHeight -= childSize.height;
@@ -494,25 +494,17 @@ public:
     void _draw(const sp<UIContext> &context, const UISize &size) override {
         context->saveState();
         context->setFillColor(color);
-        content->draw(context, size);
+        content->_draw(context, size);
         context->restoreState();
     }
 
     auto _size(const ProposedSize &proposed) -> UISize override {
-        return content->size(proposed);
+        return content->_size(proposed);
     }
 };
 
 inline auto View::foregroundColor(const UIColor& color) -> sp<ForegroundColor> {
     return sp<ForegroundColor>::of(gfx::RetainPtr(this), color);
-}
-
-inline auto View::size(const ProposedSize& proposed) -> UISize {
-    return body()->_size(proposed);
-}
-
-inline void View::draw(const sp<UIContext>& context, const UISize& size) {
-    return body()->_draw(context, size);
 }
 
 inline auto Shape::body() -> sp<View> {
