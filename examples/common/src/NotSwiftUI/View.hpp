@@ -36,6 +36,7 @@ struct ProposedSize {
 };
 
 struct View : gfx::Referencing {
+public:
     auto size(const ProposedSize& proposed) -> UISize;
     void draw(const sp<UIContext>& context, const UISize& size);
     auto frame(std::optional<float_t> width, std::optional<float_t> height, Alignment alignment = Alignment::center()) -> sp<FixedFrame>;
@@ -45,6 +46,7 @@ struct View : gfx::Referencing {
     auto fixedSize(bool horizontal, bool vertical) -> sp<FixedSize>;
     auto foregroundColor(const UIColor& color) -> sp<ForegroundColor>;
 
+public:
     virtual auto body() -> sp<View> {
         return gfx::RetainPtr(this);
     }
@@ -55,10 +57,17 @@ struct View : gfx::Referencing {
         throw std::runtime_error("FatalError");
     }
 
-    void align(const sp<UIContext> &context, const UISize& childSize, const UISize& parentSize, const Alignment& alignment) {
+public:
+    auto translation(const UISize& childSize, const UISize& parentSize, const Alignment& alignment) -> UIPoint {
         UIPoint childPoint = alignment.point(childSize);
         UIPoint parentPoint = alignment.point(parentSize);
-        context->translateBy(parentPoint.x - childPoint.x, parentPoint.y - childPoint.y);
+        return parentPoint - childPoint;
+    }
+};
+
+struct ViewBuilder {
+    static auto arrayOf(auto&&... views) -> std::vector<sp<View>> {
+        return {std::forward<decltype(views)>(views)...};
     }
 };
 
@@ -76,9 +85,10 @@ public:
     void _draw(const sp<UIContext> &context, const UISize &size) override {
         ImVec2 imSize = font->CalcTextSizeA(fontSize, FLT_MAX, size.width, text.data(), text.data() + text.size(), nullptr);
         UISize uiSize = UISize(imSize.x, imSize.y);
+        auto translate = translation(uiSize, size, Alignment::center());
 
         context->saveState();
-        align(context, uiSize, size, Alignment::center());
+        context->translateBy(translate.x, translate.y);
         context->drawText(text, fontSize, font, size.width);
         context->restoreState();
     }
@@ -161,9 +171,10 @@ public:
 
     void _draw(const sp<UIContext>& context, const UISize& size) override {
         auto childSize = content->size(ProposedSize(size));
+        auto translate = translation(childSize, size, alignment);
 
         context->saveState();
-        align(context, childSize, size, alignment);
+        context->translateBy(translate.x, translate.y);
         content->draw(context, childSize);
         context->restoreState();
     }
@@ -224,9 +235,10 @@ public:
 
     void _draw(const sp<UIContext>& context, const UISize& size) override {
         auto childSize = content->size(ProposedSize(size));
+        auto translate = translation(childSize, size, alignment);
 
         context->saveState();
-        align(context, childSize, size, alignment);
+        context->translateBy(translate.x, translate.y);
         content->draw(context, childSize);
         context->restoreState();
     }
@@ -250,8 +262,10 @@ public:
         content->draw(context, size);
 
         auto childSize = overlay->size(ProposedSize(size));
+        auto translate = translation(childSize, size, alignment);
+
         context->saveState();
-        align(context, childSize, size, alignment);
+        context->translateBy(translate.x, translate.y);
         overlay->draw(context, childSize);
         context->restoreState();
     }
@@ -449,23 +463,23 @@ private:
 };
 
 inline auto View::frame(std::optional<float_t> width, std::optional<float_t> height, Alignment alignment) -> sp<FixedFrame> {
-    return gfx::TransferPtr(new FixedFrame(gfx::RetainPtr(this), width, height, alignment));
+    return sp<FixedFrame>::of(gfx::RetainPtr(this), width, height, alignment);
 }
 
 inline auto View::frame(std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment) -> sp<FlexibleFrame> {
-    return gfx::TransferPtr(new FlexibleFrame(gfx::RetainPtr(this), minWidth, idealWidth, maxWidth, minHeight, idealHeight, maxHeight, alignment));
+    return sp<FlexibleFrame>::of(gfx::RetainPtr(this), minWidth, idealWidth, maxWidth, minHeight, idealHeight, maxHeight, alignment);
 }
 
 inline auto View::border(const UIColor& color, float_t width) -> sp<View> {
-    return overlay(gfx::TransferPtr(new Border(width))->foregroundColor(color));
+    return overlay(sp<Border>::of(width)->foregroundColor(color));
 }
 
 inline auto View::overlay(sp<View> overlay, Alignment alignment) -> sp<Overlay> {
-    return gfx::TransferPtr(new Overlay(gfx::RetainPtr(this), overlay, alignment));
+    return sp<Overlay>::of(gfx::RetainPtr(this), overlay, alignment);
 }
 
 inline auto View::fixedSize(bool horizontal, bool vertical) -> sp<FixedSize> {
-    return gfx::TransferPtr(new FixedSize(gfx::RetainPtr(this), horizontal, vertical));
+    return sp<FixedSize>::of(gfx::RetainPtr(this), horizontal, vertical);
 }
 
 struct ForegroundColor : View {
@@ -490,7 +504,7 @@ public:
 };
 
 inline auto View::foregroundColor(const UIColor& color) -> sp<ForegroundColor> {
-    return gfx::TransferPtr(new ForegroundColor(gfx::RetainPtr(this), color));
+    return sp<ForegroundColor>::of(gfx::RetainPtr(this), color);
 }
 
 inline auto View::size(const ProposedSize& proposed) -> UISize {
@@ -502,6 +516,6 @@ inline void View::draw(const sp<UIContext>& context, const UISize& size) {
 }
 
 inline auto Shape::body() -> sp<View> {
-    return gfx::TransferPtr(new ShapeView(gfx::RetainPtr(this)));
+    return sp<ShapeView<Shape>>::of(gfx::RetainPtr(this));
 }
 

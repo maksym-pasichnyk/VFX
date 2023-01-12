@@ -16,10 +16,13 @@ public:
 
 public:
     void _draw(const sp<UIContext> &context, const UISize &size) override {
-        context->drawRectFilled(size, 5.0F);
         auto textSize = text->size(ProposedSize(size));
-        align(context, textSize, size, Alignment::center());
+        auto translate = translation(textSize, size, Alignment::center());
+
+        context->drawRectFilled(size, 5.0F);
+
         context->saveState();
+        context->translateBy(translate.x, translate.y);
         context->setFillColor(UIColor(0.0F, 0.0F, 0.0F, 1.0F));
         text->draw(context, textSize);
         context->restoreState();
@@ -33,16 +36,16 @@ public:
 struct Game : Application {
 public:
     Game() : Application("Menu-06") {
-        uiRenderer = gfx::TransferPtr(new UIRenderer(device));
+        uiRenderer = sp<UIRenderer>::of(device);
 
         auto font = uiRenderer->drawList()->_Data->Font;
 
         content =
-            gfx::TransferPtr(new VStack({
-                gfx::TransferPtr(new Button(gfx::TransferPtr(new Text("Start", font, 24.0F)), UISize(150, 50))),
-                gfx::TransferPtr(new Button(gfx::TransferPtr(new Text("Settings", font, 24.0F)), UISize(150, 50))),
-                gfx::TransferPtr(new Button(gfx::TransferPtr(new Text("Exit", font, 24.0F)), UISize(150, 50))),
-            }, HorizontalAlignment::center(), 5.0F))
+            sp<VStack>::of(ViewBuilder::arrayOf(
+                sp<Button>::of(sp<Text>::of("Start", font, 24.0F), UISize(150, 50)),
+                sp<Button>::of(sp<Text>::of("Settings", font, 24.0F), UISize(150, 50)),
+                sp<Button>::of(sp<Text>::of("Exit", font, 24.0F), UISize(150, 50))
+            ), HorizontalAlignment::center(), 5.0F)
             ->frame(std::nullopt, std::nullopt);
     }
 

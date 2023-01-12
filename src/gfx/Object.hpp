@@ -68,6 +68,7 @@ namespace gfx {
             }
         }
 
+    public:
         constexpr auto get() const noexcept -> T* {
             return pObject;
         }
@@ -140,6 +141,11 @@ namespace gfx {
         }
 
         auto operator<=>(const SharedPtr<T>& other) const = default;
+
+    public:
+        static auto of(auto&&... args) -> SharedPtr<T> {
+            return TransferPtr(new T(std::forward<decltype(args)>(args)...));
+        }
 
     private:
         T* pObject = nullptr;
