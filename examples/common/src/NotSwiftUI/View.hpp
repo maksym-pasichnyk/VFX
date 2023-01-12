@@ -287,13 +287,13 @@ struct HStack : View {
 private:
     std::vector<sp<View>> children;
     VerticalAlignment alignment;
-    std::optional<float_t> spacing;
+    float_t spacing;
 
     std::vector<UISize> sizes = {};
 
 public:
     explicit HStack(std::vector<sp<View>> children, VerticalAlignment alignment = VerticalAlignment::center(), std::optional<float_t> spacing = {})
-    : children(std::move(children)), alignment(alignment), spacing(spacing) {}
+    : children(std::move(children)), alignment(alignment), spacing(spacing.value_or(0.0F)) {}
 
     void _draw(const sp<UIContext> &context, const UISize &size) override {
         float_t stackY = alignment.defaultValue(size);
@@ -308,11 +308,15 @@ public:
             children[i]->draw(context, childSize);
             context->restoreState();
 
-            currentX += childSize.width;
+            currentX += childSize.width + spacing;
         }
     }
 
     auto _size(const ProposedSize &proposed) -> UISize override {
+        if (children.empty()) {
+            return UISize(0.0F, 0.0F);
+        }
+
         layout(proposed);
 
         float_t width = ranges::accumulate(sizes, 0.0F, [](auto $0, auto $1) -> float_t {
@@ -321,6 +325,9 @@ public:
         float_t height = ranges::accumulate(sizes, 0.0F, [](auto $0, auto $1) {
             return std::max($0, $1.height);
         });
+
+        width += spacing * static_cast<float_t>(children.size() - 1);
+
         return UISize(width, height);
     }
 
@@ -338,7 +345,7 @@ public:
             return flexibility[$0] < flexibility[$1];
         });
 
-        auto remainingWidth = proposed.width.value();
+        auto remainingWidth = proposed.width.value() - spacing * static_cast<float_t>(children.size() - 1);
 
         sizes.resize(children.size(), UISize(0, 0));
         while (!remainingIndices.empty()) {
@@ -362,13 +369,13 @@ struct VStack : View {
 private:
     std::vector<sp<View>> children;
     HorizontalAlignment alignment;
-    std::optional<float_t> spacing;
+    float_t spacing;
 
     std::vector<UISize> sizes = {};
 
 public:
     explicit VStack(std::vector<sp<View>> children, HorizontalAlignment alignment = HorizontalAlignment::center(), std::optional<float_t> spacing = {})
-    : children(std::move(children)), alignment(alignment), spacing(spacing) {}
+    : children(std::move(children)), alignment(alignment), spacing(spacing.value_or(0.0F)) {}
 
 private:
     void _draw(const sp<UIContext> &context, const UISize &size) override {
@@ -384,11 +391,15 @@ private:
             children[i]->draw(context, childSize);
             context->restoreState();
 
-            currentY += childSize.height;
+            currentY += childSize.height + spacing;
         }
     }
 
     auto _size(const ProposedSize &proposed) -> UISize override {
+        if (children.empty()) {
+            return UISize(0.0F, 0.0F);
+        }
+
         layout(proposed);
 
         float_t width = ranges::accumulate(sizes, 0.0F, [](auto $0, auto $1) -> float_t {
@@ -397,6 +408,9 @@ private:
         float_t height = ranges::accumulate(sizes, 0.0F, [](auto $0, auto $1) {
             return $0 + $1.height;
         });
+
+        height += spacing * static_cast<float_t>(children.size() - 1);
+
         return UISize(width, height);
     }
 
@@ -414,7 +428,7 @@ private:
             return flexibility[$0] < flexibility[$1];
         });
 
-        auto remainingHeight = proposed.height.value();
+        auto remainingHeight = proposed.height.value() - spacing * static_cast<float_t>(children.size() - 1);
 
         sizes.resize(children.size(), UISize(0, 0));
         while (!remainingIndices.empty()) {

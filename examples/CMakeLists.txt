@@ -4,6 +4,7 @@ add_subdirectory(circles-02)
 add_subdirectory(geometry-03)
 add_subdirectory(particles-04)
 add_subdirectory(nodes-05)
+add_subdirectory(menu-06)
 
 target_compile_shaders(common
     "${CMAKE_SOURCE_DIR}/assets/shaders/gui.frag"
