@@ -37,6 +37,7 @@ struct Game : Application {
 public:
     Game() : Application("Menu-06") {
         uiRenderer = sp<UIRenderer>::of(device);
+        uiContext = sp<UIContext>::of(uiRenderer->drawList());
 
         auto font = uiRenderer->drawList()->_Data->Font;
 
@@ -86,10 +87,8 @@ public:
         commandBuffer->setScissor(0, rendering_area);
         commandBuffer->setViewport(0, rendering_viewport);
 
-        auto ctx = gfx::TransferPtr(new UIContext(uiRenderer->drawList()));
-
         uiRenderer->resetForNewFrame();
-        content->_draw(ctx, getUISize(getWindowSize()));
+        content->_draw(uiContext, getUISize(getWindowSize()));
         uiRenderer->draw(commandBuffer);
 
         commandBuffer->endRendering();
@@ -103,6 +102,7 @@ public:
 
 private:
     sp<View> content;
+    sp<UIContext> uiContext;
     sp<UIRenderer> uiRenderer;
 };
 
