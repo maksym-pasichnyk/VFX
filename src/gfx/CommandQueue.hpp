@@ -1,38 +1,22 @@
 #pragma once
 
-#include "Object.hpp"
 #include "Device.hpp"
 
-#include <map>
-#include <set>
-#include <tuple>
-#include <vector>
-#include <concepts>
-#include <vulkan/vulkan.hpp>
-
 namespace gfx {
-    struct Buffer;
-    struct Device;
-    struct Drawable;
-    struct CommandQueue;
-    struct DescriptorSet;
-    struct RenderPipelineState;
-    struct ComputePipelineState;
+    struct CommandQueueShared {
+        Device device;
+        vk::CommandPool raw;
 
-    struct CommandQueue final : Referencing {
-        friend Device;
-        friend CommandBuffer;
-        friend RenderCommandEncoder;
+        explicit CommandQueueShared(Device device, vk::CommandPool raw);
+        ~CommandQueueShared();
+    };
 
-    private:
-        explicit CommandQueue(SharedPtr<Device> device);
-        ~CommandQueue() override;
+    struct CommandQueue final {
+        std::shared_ptr<CommandQueueShared> shared;
 
-    public:
-        auto commandBuffer() -> SharedPtr<CommandBuffer>;
+        explicit CommandQueue();
+        explicit CommandQueue(std::shared_ptr<CommandQueueShared> shared);
 
-    private:
-        SharedPtr<Device> mDevice;
-        vk::CommandPool mCommandPool = {};
+        auto commandBuffer() -> CommandBuffer;
     };
 }

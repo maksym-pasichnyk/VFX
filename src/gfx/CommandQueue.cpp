@@ -1,6 +1,6 @@
+#include "Device.hpp"
 #include "Swapchain.hpp"
 #include "Buffer.hpp"
-#include "Device.hpp"
 #include "Texture.hpp"
 #include "Drawable.hpp"
 #include "CommandQueue.hpp"
@@ -11,18 +11,14 @@
 
 #include "spdlog/spdlog.h"
 
-gfx::CommandQueue::CommandQueue(SharedPtr<Device> device) : mDevice(std::move(device)) {
-    vk::CommandPoolCreateInfo pool_create_info = {};
-    pool_create_info.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
-    pool_create_info.setQueueFamilyIndex(mDevice->mGraphicsQueueFamilyIndex);
-
-    mCommandPool = mDevice->mDevice.createCommandPool(pool_create_info, nullptr, mDevice->mDispatchLoaderDynamic);
+gfx::CommandQueueShared::CommandQueueShared(Device device, vk::CommandPool raw) : device(std::move(device)), raw(raw) {}
+gfx::CommandQueueShared::~CommandQueueShared() {
+    device.handle().destroyCommandPool(raw, nullptr, device.dispatcher());
 }
 
-gfx::CommandQueue::~CommandQueue() {
-    mDevice->mDevice.destroyCommandPool(mCommandPool, nullptr, mDevice->mDispatchLoaderDynamic);
-}
+gfx::CommandQueue::CommandQueue() : shared(nullptr) {}
+gfx::CommandQueue::CommandQueue(std::shared_ptr<CommandQueueShared> shared) : shared(std::move(shared)) {}
 
-auto gfx::CommandQueue::commandBuffer() -> SharedPtr<gfx::CommandBuffer> {
-    return TransferPtr(new CommandBuffer(mDevice, this));
+auto gfx::CommandQueue::commandBuffer() -> gfx::CommandBuffer {
+    return CommandBuffer(std::make_shared<CommandBufferShared>(shared->device, *this));
 }

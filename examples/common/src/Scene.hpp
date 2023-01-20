@@ -1,10 +1,10 @@
 #pragma once
 
-#include "gfx/Object.hpp"
+#include "Object.hpp"
 
 #include <vector>
 
-struct Scene : gfx::Referencing {
+struct Scene : Object {
 private:
     std::vector<sp<Node>> mNodes;
 

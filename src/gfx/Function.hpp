@@ -1,27 +1,17 @@
 #pragma once
 
-#include "Object.hpp"
+#include "Library.hpp"
 #include "spirv_reflect.h"
 
 #include <string>
 
 namespace gfx {
-    struct Device;
-    struct Library;
-    struct RenderPipelineState;
-    struct ComputePipelineState;
-    struct Function final : Referencing {
-        friend Device;
-        friend Library;
-        friend RenderPipelineState;
-        friend ComputePipelineState;
+    struct Function final {
+        Library library;
+        std::string name;
+        SpvReflectEntryPoint* entry_point;
 
-    private:
-        std::string mFunctionName;
-        SharedPtr<Library> mLibrary;
-        SpvReflectEntryPoint* mEntryPoint = {};
-
-    private:
-        explicit Function(SharedPtr<Library> library, std::string name);
+        explicit Function() = default;
+        explicit Function(const Library& library, std::string name, SpvReflectEntryPoint* entry_point);
     };
 }

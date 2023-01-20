@@ -1,26 +1,15 @@
 #pragma once
 
-#include "Object.hpp"
+#include "Texture.hpp"
 
 namespace gfx {
-    struct Texture;
-    struct Swapchain;
-    struct CommandBuffer;
-    struct Drawable final : Referencing {
-        friend Swapchain;
-        friend CommandBuffer;
+    struct Drawable final {
+        Texture texture;
+        uint32_t drawableIndex;
+        vk::SwapchainKHR swapchain;
 
-    private:
-        Swapchain* pLayer = {};
-        SharedPtr<Texture> mTexture = {};
-        uint32_t mDrawableIndex = {};
-
-    private:
-        Drawable(Swapchain* pLayer, SharedPtr<Texture> texture, uint32_t drawableIndex);
-
-    public:
-        auto texture() -> SharedPtr<Texture>;
-        auto drawableIndex() -> uint32_t;
+        explicit Drawable() : swapchain(nullptr), texture(), drawableIndex(-1) {}
+        explicit Drawable(vk::SwapchainKHR swapchain, Texture texture, uint32_t drawableIndex);
     };
 
 }

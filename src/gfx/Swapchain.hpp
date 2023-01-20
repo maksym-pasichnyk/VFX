@@ -1,60 +1,28 @@
 #pragma once
 
-#include "Object.hpp"
-
-#include <vulkan/vulkan.hpp>
-
-struct SDL_Window;
+#include "Device.hpp"
+#include "Surface.hpp"
 
 namespace gfx {
-    struct Device;
-    struct Context;
-    struct Texture;
     struct Drawable;
-    struct Swapchain;
-    struct CommandBuffer;
 
-    struct Swapchain final : Referencing {
-        friend CommandBuffer;
+    struct SwapchainShared {
+        Device device;
+        Surface surface;
+        vk::SwapchainKHR raw;
+        std::vector<Drawable> drawables;
 
-    private:
-        vk::SurfaceKHR mSurface = {};
-        SharedPtr<Device> mDevice = {};
-        SharedPtr<Context> mContext = {};
-        std::vector<SharedPtr<Drawable>> mDrawables = {};
+        explicit SwapchainShared(Device device, Surface surface, vk::SwapchainKHR raw, std::vector<Drawable> drawables);
+        ~SwapchainShared();
+    };
 
-        vk::Format mPixelFormat = {};
-        vk::Extent2D mDrawableSize = {};
-        vk::SwapchainKHR mSwapchain = {};
-        vk::ColorSpaceKHR mColorSpace = {};
+    struct Swapchain final {
+        std::shared_ptr<SwapchainShared> shared;
 
-        bool mDisplaySyncEnabled = {};
-        uint32_t mMaximumDrawableCount = 3;
+        explicit Swapchain() : shared(nullptr) {}
+        explicit Swapchain(std::shared_ptr<SwapchainShared> shared) : shared(std::move(shared)) {}
 
-    private:
-        explicit Swapchain(SharedPtr<Context> context, SDL_Window* window);
-        ~Swapchain() override;
-
-    private:
-        void createDrawables();
-
-    public:
-        void releaseDrawables();
-        void setDevice(SharedPtr<Device> device);
-        auto device() -> SharedPtr<Device>;
-        auto nextDrawable() -> SharedPtr<Drawable>;
+        auto nextDrawable() -> Drawable;
         auto drawableSize() -> vk::Extent2D;
-        void setDrawableSize(const vk::Extent2D& drawableSize);
-        auto pixelFormat() -> vk::Format;
-        void setPixelFormat(vk::Format format);
-        auto colorSpace() -> vk::ColorSpaceKHR;
-        void setColorSpace(vk::ColorSpaceKHR colorSpace);
-        auto displaySyncEnabled() -> bool;
-        void setDisplaySyncEnabled(bool displaySyncEnabled);
-        auto maximumDrawableCount() -> uint32_t;
-        void setMaximumDrawableCount(uint32_t maximumDrawableCount);
-
-    public:
-        static auto alloc(SharedPtr<Context> context, SDL_Window* window) -> SharedPtr<Swapchain>;
     };
 }

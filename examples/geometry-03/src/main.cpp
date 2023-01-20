@@ -19,14 +19,13 @@ public:
 
 private:
     void buildShaders() {
-        auto vertexLibrary = device->newLibrary(Assets::readFile("shaders/geometry.vert.spv"));
-        auto fragmentLibrary = device->newLibrary(Assets::readFile("shaders/geometry.frag.spv"));
+        auto vertexLibrary = device.newLibrary(Assets::readFile("shaders/geometry.vert.spv"));
+        auto fragmentLibrary = device.newLibrary(Assets::readFile("shaders/geometry.frag.spv"));
 
-        auto vertexFunction = vertexLibrary->newFunction("main");
-        auto fragmentFunction = fragmentLibrary->newFunction("main");
-
-        gfx::RenderPipelineStateDescription description = {};
-        description.vertexDescription = gfx::RenderPipelineVertexDescription{
+        gfx::RenderPipelineStateDescription description;
+        description.vertexFunction = vertexLibrary.newFunction("main");
+        description.fragmentFunction = fragmentLibrary.newFunction("main");
+        description.vertexDescription = {
             .layouts = {{
                 vk::VertexInputBindingDescription{0, sizeof(Vertex), vk::VertexInputRate::eVertex}
             }},
@@ -40,10 +39,7 @@ private:
         description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
         description.attachments[0].setBlendEnable(false);
 
-        description.setVertexFunction(vertexFunction);
-        description.setFragmentFunction(fragmentFunction);
-
-        renderPipelineState = device->newRenderPipelineState(description);
+        renderPipelineState = device.newRenderPipelineState(description);
     }
 
     void buildBuffers() {
@@ -151,7 +147,7 @@ private:
                 primitives.emplace_back(baseIndex, baseVertex, numIndices, numVertices);
             }
 
-            auto gfxMesh = gfx::TransferPtr(new Mesh(std::move(vertices), std::move(indices), std::move(primitives), std::move(joints), std::move(weights)));
+            auto gfxMesh = sp<Mesh>::of(std::move(vertices), std::move(indices), std::move(primitives), std::move(joints), std::move(weights));
             gfxMesh->uploadMeshData(device);
             meshes.emplace_back(std::move(gfxMesh));
         }
@@ -173,7 +169,7 @@ private:
                 }
             }
 
-            skins.emplace_back(gfx::TransferPtr(new Skin(skin.skeleton, skin.joints, std::move(inverseBindMatrices))));
+            skins.emplace_back(sp<Skin>::of(skin.skeleton, skin.joints, std::move(inverseBindMatrices)));
         }
 
         std::vector<sp<Node>> nodes = {};
@@ -213,7 +209,7 @@ private:
             if (node.mesh >= 0) {
                 mesh = meshes.at(node.mesh);
             }
-            nodes.emplace_back(gfx::TransferPtr(new Node(std::move(skin), std::move(mesh), position, rotation, scale)));
+            nodes.emplace_back(sp<Node>::of(std::move(skin), std::move(mesh), position, rotation, scale));
         }
 
         for (size_t i = 0; i < model.nodes.size(); ++i) {
@@ -223,7 +219,7 @@ private:
         }
 
         for (auto& scene : model.scenes) {
-            scenes.emplace_back(gfx::TransferPtr(new Scene(cxx::iter(scene.nodes).map([&](int i) { return nodes[i]; }).collect())));
+            scenes.emplace_back(sp<Scene>::of(cxx::iter(scene.nodes).map([&](int i) { return nodes[i]; }).collect()));
         }
 
         for (auto& animation : model.animations) {
@@ -291,7 +287,7 @@ private:
                 channels.emplace_back(channel.target_path, channel.sampler, channel.target_node);
             }
 
-            animations.emplace_back(gfx::TransferPtr(new Animation(animation.name, std::move(samplers), std::move(channels), start, end)));
+            animations.emplace_back(sp<Animation>::of(animation.name, std::move(samplers), std::move(channels), start, end));
         }
     }
 
@@ -304,8 +300,8 @@ public:
     }
 
     void render() override {
-        auto drawable = swapchain->nextDrawable();
-        auto drawableSize = swapchain->drawableSize();
+        auto drawable = swapchain.nextDrawable();
+        auto drawableSize = swapchain.drawableSize();
 
         vk::Rect2D rendering_area = {};
         rendering_area.setOffset(vk::Offset2D{0, 0});
@@ -318,34 +314,34 @@ public:
         rendering_viewport.setMaxDepth(1.0f);
 
         gfx::RenderingInfo rendering_info = {};
-        rendering_info.setRenderArea(rendering_area);
-        rendering_info.setLayerCount(1);
-        rendering_info.colorAttachments()[0].setTexture(drawable->texture());
-        rendering_info.colorAttachments()[0].setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
-        rendering_info.colorAttachments()[0].setLoadOp(vk::AttachmentLoadOp::eClear);
-        rendering_info.colorAttachments()[0].setStoreOp(vk::AttachmentStoreOp::eStore);
+        rendering_info.renderArea = rendering_area;
+        rendering_info.layerCount = 1;
+        rendering_info.colorAttachments[0].texture = drawable.texture;
+        rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+        rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
         ShaderData shader_data = {};
         shader_data.g_proj_matrix = g_proj_matrix;
         shader_data.g_view_matrix = g_view_matrix;
 
-        commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-        commandBuffer->setRenderPipelineState(renderPipelineState);
-        commandBuffer->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
+        commandBuffer.setRenderPipelineState(renderPipelineState);
+        commandBuffer.pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
 
-        commandBuffer->beginRendering(rendering_info);
-        commandBuffer->setScissor(0, rendering_area);
-        commandBuffer->setViewport(0, rendering_viewport);
+        commandBuffer.beginRendering(rendering_info);
+        commandBuffer.setScissor(0, rendering_area);
+        commandBuffer.setViewport(0, rendering_viewport);
         meshes.front()->draw(commandBuffer);
-        commandBuffer->endRendering();
+        commandBuffer.endRendering();
 
-        commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
-        commandBuffer->end();
-        commandBuffer->submit();
-        commandBuffer->present(drawable);
-        commandBuffer->waitUntilCompleted();
+        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer.end();
+        commandBuffer.submit();
+        commandBuffer.present(drawable);
+        commandBuffer.waitUntilCompleted();
     }
 
 private:
@@ -358,7 +354,7 @@ private:
     std::vector<sp<Scene>> scenes = {};
     std::vector<sp<Animation>> animations = {};
 
-    sp<gfx::RenderPipelineState> renderPipelineState{};
+    gfx::RenderPipelineState renderPipelineState;
 };
 
 auto main() -> int32_t {

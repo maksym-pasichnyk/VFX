@@ -1,9 +1,10 @@
 #include "tiny_gltf.h"
-#include "fmt/format.h"
 #include "UIContext.hpp"
 #include "UIRenderer.hpp"
 #include "Application.hpp"
 #include "NotSwiftUI/View.hpp"
+
+#include <unordered_map>
 
 struct Button : View {
 private:
@@ -33,6 +34,62 @@ public:
     }
 };
 
+struct egui {
+    struct SliderState {
+        bool dragging = false;
+    };
+
+    inline static std::unordered_map<void*, SliderState> sliderStates;
+
+    static void slider(sp<UIContext> ctx, std::reference_wrapper<float> current, float min, float max) {
+        auto& state = sliderStates[&current.get()];
+
+        UIPoint cursor(100.0F, 100.0F);
+
+        float sliderHeight = 5.0F;
+        float sliderWidth = 200.0F;
+        float knobRadius = 10.0F;
+
+        float sliderHalfHeight = sliderHeight * 0.5F;
+
+        int x, y;
+        Uint32 buttons = SDL_GetMouseState(&x, &y);
+
+        if (state.dragging) {
+            if (buttons & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+                auto mousePos = UIPoint(x, y) - cursor;
+                current.get() = (mousePos.x / sliderWidth) * (max - min) + min;
+            } else {
+                state.dragging = false;
+            }
+        } else {
+            if (buttons & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+                auto mousePos = UIPoint(x, y) - cursor;
+                if (mousePos.x >= 0.0F && mousePos.x <= sliderWidth && mousePos.y >= -knobRadius && mousePos.y <= knobRadius) {
+                    state.dragging = true;
+                    current.get() = (mousePos.x / sliderWidth) * (max - min) + min;
+                }
+            }
+        }
+
+        current.get() = std::clamp(current.get(), min, max);
+
+        ctx->saveState();
+        ctx->translateBy(cursor.x, cursor.y);
+        ctx->translateBy(0.0F, -sliderHalfHeight);
+        ctx->drawRectFilled(UISize(sliderWidth, sliderHeight), 0.0F);
+        ctx->translateBy(0.0F, +sliderHalfHeight);
+        ctx->setFillColor(UIColor(1.0F, 0.0F, 0.0F, 1.0F));
+        ctx->translateBy(-knobRadius, -knobRadius);
+        float knobX = (current - min) / (max - min) * sliderWidth;
+        ctx->translateBy(+knobX, 0.0F);
+        ctx->drawCircleFilled(10.0F);
+        ctx->translateBy(-knobX, 0.0F);
+        ctx->translateBy(+knobRadius, +knobRadius);
+        ctx->restoreState();
+    }
+};
+
 struct Game : Application {
 public:
     Game() : Application("Menu-06") {
@@ -59,8 +116,8 @@ public:
     }
 
     void render() override {
-        auto drawable = swapchain->nextDrawable();
-        auto drawableSize = swapchain->drawableSize();
+        auto drawable = swapchain.nextDrawable();
+        auto drawableSize = swapchain.drawableSize();
 
         vk::Rect2D rendering_area = {};
         rendering_area.setOffset(vk::Offset2D{0, 0});
@@ -73,31 +130,34 @@ public:
         rendering_viewport.setMaxDepth(1.0f);
 
         gfx::RenderingInfo rendering_info = {};
-        rendering_info.setRenderArea(rendering_area);
-        rendering_info.setLayerCount(1);
-        rendering_info.colorAttachments()[0].setTexture(drawable->texture());
-        rendering_info.colorAttachments()[0].setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
-        rendering_info.colorAttachments()[0].setLoadOp(vk::AttachmentLoadOp::eClear);
-        rendering_info.colorAttachments()[0].setStoreOp(vk::AttachmentStoreOp::eStore);
+        rendering_info.renderArea = rendering_area;
+        rendering_info.layerCount = 1;
+        rendering_info.colorAttachments[0].texture = drawable.texture;
+        rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+        rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
-        commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-        commandBuffer->beginRendering(rendering_info);
-        commandBuffer->setScissor(0, rendering_area);
-        commandBuffer->setViewport(0, rendering_viewport);
+        commandBuffer.beginRendering(rendering_info);
+        commandBuffer.setScissor(0, rendering_area);
+        commandBuffer.setViewport(0, rendering_viewport);
+
+        static float value = 0.0F;
 
         uiRenderer->resetForNewFrame();
+        egui::slider(uiContext, std::ref(value), -1.0F, 1.0F);
         content->_draw(uiContext, getUISize(getWindowSize()));
         uiRenderer->draw(commandBuffer);
 
-        commandBuffer->endRendering();
+        commandBuffer.endRendering();
 
-        commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
-        commandBuffer->end();
-        commandBuffer->submit();
-        commandBuffer->present(drawable);
-        commandBuffer->waitUntilCompleted();
+        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer.end();
+        commandBuffer.submit();
+        commandBuffer.present(drawable);
+        commandBuffer.waitUntilCompleted();
     }
 
 private:

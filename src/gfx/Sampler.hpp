@@ -1,30 +1,24 @@
 #pragma once
 
-#include "Object.hpp"
-
-#include <vulkan/vulkan.hpp>
+#include "Device.hpp"
 
 namespace gfx {
-    struct Device;
-    struct CommandBuffer;
-    struct DescriptorSet;
-    struct RenderCommandEncoder;
+    struct SamplerShared {
+        Device device;
+        vk::Sampler raw;
 
-    struct Sampler final : Referencing {
-        friend Device;
-        friend CommandBuffer;
-        friend DescriptorSet;
-        friend RenderCommandEncoder;
+        explicit SamplerShared();
+        explicit SamplerShared(Device device, vk::Sampler raw);
 
-    private:
-        SharedPtr<Device> mDevice;
-        vk::Sampler mSampler;
+        ~SamplerShared();
+    };
 
-    private:
-        explicit Sampler(SharedPtr<Device> device, const vk::SamplerCreateInfo& info);
-        ~Sampler() override;
+    struct Sampler final {
+        std::shared_ptr<SamplerShared> shared;
 
-    public:
+        explicit Sampler() : shared(nullptr) {}
+        explicit Sampler(std::shared_ptr<SamplerShared> shared);
+
         void setLabel(const std::string& name);
     };
 }

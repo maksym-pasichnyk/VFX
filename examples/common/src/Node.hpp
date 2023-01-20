@@ -1,12 +1,13 @@
 #pragma once
 
-#include "gfx/Object.hpp"
+#include "Object.hpp"
 #include "glm/glm.hpp"
 #include "glm/ext.hpp"
 
+#include <list>
 #include <vector>
 
-struct Node : gfx::Referencing {
+struct Node : Object {
 private:
     Node* mParent = {};
 
@@ -31,11 +32,11 @@ public:
             return;
         }
         if (mParent) {
-            erase(mParent->mChildren, gfx::RetainPtr(this));
+            erase(mParent->mChildren, RetainPtr(this));
         }
         mParent = node.get();
         if (mParent) {
-            mParent->mChildren.emplace_back(gfx::RetainPtr(this));
+            mParent->mChildren.emplace_back(RetainPtr(this));
         }
     }
 };

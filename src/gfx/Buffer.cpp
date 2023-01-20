@@ -1,43 +1,36 @@
-#include "Buffer.hpp"
 #include "Device.hpp"
+#include "Buffer.hpp"
 
-gfx::Buffer::Buffer(SharedPtr<Device> device, const vk::BufferCreateInfo& buffer_create_info, const VmaAllocationCreateInfo& allocation_create_info)
-: mDevice(std::move(device)) {
-    vmaCreateBuffer(
-        mDevice->mAllocator,
-        reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info),
-        &allocation_create_info,
-        reinterpret_cast<VkBuffer*>(&mBuffer),
-        &mAllocation,
-        nullptr
-    );
-}
-
-gfx::Buffer::~Buffer() {
-    vmaDestroyBuffer(mDevice->mAllocator, mBuffer, mAllocation);
+gfx::BufferShared::BufferShared(gfx::Device device) : device(std::move(device)), raw(nullptr), allocation(nullptr) {}
+gfx::BufferShared::BufferShared(gfx::Device device, vk::Buffer raw, VmaAllocation allocation) : device(std::move(device)), raw(raw), allocation(allocation) {}
+gfx::BufferShared::~BufferShared() {
+    vmaDestroyBuffer(device.allocator(), raw, allocation);
 }
 
 auto gfx::Buffer::contents() -> void* {
     VmaAllocationInfo allocation_info = {};
-    vmaGetAllocationInfo(mDevice->mAllocator, mAllocation, &allocation_info);
+    vmaGetAllocationInfo(shared->device.allocator(), shared->allocation, &allocation_info);
     return allocation_info.pMappedData;
 }
 
 auto gfx::Buffer::length() -> vk::DeviceSize {
     VmaAllocationInfo allocation_info = {};
-    vmaGetAllocationInfo(mDevice->mAllocator, mAllocation, &allocation_info);
+    vmaGetAllocationInfo(shared->device.allocator(), shared->allocation, &allocation_info);
     return allocation_info.size;
 }
 
 auto gfx::Buffer::didModifyRange(vk::DeviceSize offset, vk::DeviceSize size) -> void {
-    vmaFlushAllocation(mDevice->mAllocator, mAllocation, offset, size);
+    vmaFlushAllocation(shared->device.allocator(), shared->allocation, offset, size);
 }
 
 void gfx::Buffer::setLabel(const std::string& name) {
     vk::DebugMarkerObjectNameInfoEXT info = {};
     info.setObjectType(vk::DebugReportObjectTypeEXT::eBuffer);
-    info.setObject(uint64_t(VkBuffer(mBuffer)));
+    info.setObject(uint64_t(VkBuffer(shared->raw)));
     info.setPObjectName(name.c_str());
 
-    mDevice->mDevice.debugMarkerSetObjectNameEXT(info, mDevice->mDispatchLoaderDynamic);
+    shared->device.handle().debugMarkerSetObjectNameEXT(info, shared->device.dispatcher());
 }
+
+gfx::Buffer::Buffer() : shared(nullptr) {}
+gfx::Buffer::Buffer(std::shared_ptr<BufferShared> shared) : shared(std::move(shared)) {}

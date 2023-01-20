@@ -1,72 +1,43 @@
 #pragma once
 
-#include "Object.hpp"
-
-#include <vk_mem_alloc.h>
-#include <vulkan/vulkan.hpp>
+#include "Device.hpp"
 
 namespace gfx {
-    struct Swapchain;
-    struct Device;
-    struct Drawable;
-    struct CommandQueue;
-    struct CommandBuffer;
-    struct DescriptorSet;
-    struct RenderCommandEncoder;
+    struct TextureSettings {
+        uint32_t width = {};
+        uint32_t height = {};
+        vk::Format format = {};
+        vk::ImageUsageFlags usage = {};
+        vk::ComponentMapping mapping = {};
+    };
 
-    struct TextureDescription {
-        friend Texture;
+    struct TextureShared {
+        Device device;
+        vk::Image image;
+        vk::Format format;
+        vk::Extent3D extent;
+        vk::ImageView image_view;
+        vk::ImageSubresourceRange subresource;
 
-    private:
-        uint32_t mWidth = {};
-        uint32_t mHeight = {};
-        vk::Format mFormat = {};
-        vk::ImageUsageFlags mImageUsageFlags = {};
-        vk::ComponentMapping mComponentMapping = {};
+        VmaAllocation allocation;
 
-    public:
-        void setWidth(uint32_t width) {
-            mWidth = width;
-        }
-        void setHeight(uint32_t height) {
-            mHeight = height;
-        }
-        void setFormat(vk::Format format) {
-            mFormat = format;
-        }
-        void setImageUsageFlags(vk::ImageUsageFlags imageUsageFlags) {
-            mImageUsageFlags = imageUsageFlags;
-        }
-        void setComponentMapping(vk::ComponentMapping componentMapping) {
-            mComponentMapping = componentMapping;
+        explicit TextureShared(Device device);
+        explicit TextureShared(Device device, vk::Image image, vk::Format format, vk::Extent3D extent, vk::ImageView image_view, vk::ImageSubresourceRange subresource, VmaAllocation allocation);
+
+        ~TextureShared() {
+            device.handle().destroyImageView(image_view, VK_NULL_HANDLE, device.dispatcher());
+            if (allocation) {
+                vmaDestroyImage(device.allocator(), image, allocation);
+            }
         }
     };
 
-    struct Texture final : Referencing {
-        friend Swapchain;
-        friend Device;
-        friend DescriptorSet;
-        friend CommandBuffer;
-        friend RenderCommandEncoder;
+    struct Texture final {
+        std::shared_ptr<TextureShared> shared;
 
-    private:
-        SharedPtr<Device> mDevice;
+        explicit Texture();
+        explicit Texture(std::shared_ptr<TextureShared> shared);
 
-        vk::Image mImage = {};
-        vk::Format mFormat = {};
-        vk::Extent3D mExtent = {};
-        vk::ImageView mImageView = {};
-        vk::ImageSubresourceRange mImageSubresourceRange = {};
-
-        VmaAllocation mAllocation = {};
-
-    private:
-        explicit Texture(SharedPtr<Device> device);
-        explicit Texture(SharedPtr<Device> device, const TextureDescription& description);
-
-        ~Texture() override;
-
-    public:
         void replaceRegion(const void* data, uint64_t size);
         void setLabel(const std::string& name);
     };

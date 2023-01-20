@@ -2,16 +2,21 @@
 #include "Library.hpp"
 #include "Function.hpp"
 
-gfx::Library::Library(SharedPtr<Device> device, const vk::ShaderModuleCreateInfo& info) : mDevice(std::move(device)) {
-    mShaderModule = mDevice->mDevice.createShaderModule(info, VK_NULL_HANDLE, mDevice->mDispatchLoaderDynamic);
-    spvReflectCreateShaderModule(info.codeSize, info.pCode, &mSpvReflectShaderModule);
+gfx::LibraryShared::LibraryShared(gfx::Device device) : device(std::move(device)) {}
+
+gfx::LibraryShared::~LibraryShared() {
+    device.handle().destroyShaderModule(raw, nullptr, device.dispatcher());
+    spvReflectDestroyShaderModule(&spvReflectShaderModule);
 }
 
-gfx::Library::~Library() {
-    spvReflectDestroyShaderModule(&mSpvReflectShaderModule);
-    mDevice->mDevice.destroyShaderModule(mShaderModule, VK_NULL_HANDLE, mDevice->mDispatchLoaderDynamic);
-}
+gfx::Library::Library() : shared(nullptr) {}
+gfx::Library::Library(std::shared_ptr<LibraryShared> shared) : shared(std::move(shared)) {}
 
-auto gfx::Library::newFunction(std::string name) -> SharedPtr<Function> {
-    return TransferPtr(new Function(RetainPtr(this), std::move(name)));
+auto gfx::Library::newFunction(std::string name) -> Function {
+    for (auto& sep : std::span(shared->spvReflectShaderModule.entry_points, shared->spvReflectShaderModule.entry_point_count)) {
+        if (name == sep.name) {
+            return Function(*this, std::move(name), &sep);
+        }
+    }
+    throw std::runtime_error("Entry point not found");
 }

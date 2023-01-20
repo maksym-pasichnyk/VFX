@@ -1,24 +1,24 @@
 #pragma once
 
-#include "Object.hpp"
-
-#include <vector>
-#include <vulkan/vulkan.hpp>
+#include "Device.hpp"
 
 namespace gfx {
     struct Device;
-    struct Function;
-    struct ComputePipelineState final : Referencing {
-        friend Device;
 
-    public:
-        SharedPtr<Device> mDevice;
-        vk::Pipeline mPipeline = {};
-        vk::PipelineLayout mPipelineLayout = {};
-        std::vector<vk::DescriptorSetLayout> mDescriptorSetLayouts = {};
+    struct ComputePipelineStateShared {
+        Device device;
+        vk::Pipeline pipeline;
+        vk::PipelineLayout pipeline_layout;
+        std::vector<vk::DescriptorSetLayout> bind_group_layouts;
 
-    private:
-        explicit ComputePipelineState(SharedPtr<Device> device, const SharedPtr<Function>& function);
-        ~ComputePipelineState() override;
+        explicit ComputePipelineStateShared(Device device);
+        ~ComputePipelineStateShared();
+    };
+
+    struct ComputePipelineState final {
+        std::shared_ptr<ComputePipelineStateShared> shared;
+
+        explicit ComputePipelineState();
+        explicit ComputePipelineState(std::shared_ptr<ComputePipelineStateShared> shared);
     };
 }

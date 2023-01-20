@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gfx/Object.hpp"
+#include "Object.hpp"
 #include "glm/glm.hpp"
 
 #include <string>
@@ -29,7 +29,7 @@ public:
         : interpolation(std::move(interpolation)), inputs(std::move(inputs)), outputs(std::move(outputs)) {}
 };
 
-struct Animation : gfx::Referencing {
+struct Animation : Object {
 private:
     std::string name;
     std::vector<AnimationSampler> samplers;

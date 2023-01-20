@@ -1,15 +1,15 @@
 #pragma once
 
-#include "Object.hpp"
+#include "Device.hpp"
 #include "Function.hpp"
+#include "DescriptorSet.hpp"
 
-#include <vector>
 #include <optional>
-#include <vulkan/vulkan.hpp>
 
 namespace gfx {
     struct Device;
     struct Function;
+    struct BindGroupLayout;
 
     struct RenderPipelineColorBlendAttachmentStateArray {
         std::vector<vk::PipelineColorBlendAttachmentState> elements = {};
@@ -70,7 +70,8 @@ namespace gfx {
     };
 
     struct RenderPipelineStateDescription {
-        SharedPtr<Function> mFunctions[2] = {};
+        Function vertexFunction;
+        Function fragmentFunction;
 
         uint32_t viewMask = {};
         RenderPipelineColorAttachmentFormatArray colorAttachmentFormats = {};
@@ -88,28 +89,22 @@ namespace gfx {
         vk::PipelineDepthStencilStateCreateInfo depthStencilState = {};
         std::optional<RenderPipelineVertexDescription> vertexDescription = {};
         RenderPipelineColorBlendAttachmentStateArray attachments = {};
-
-    public:
-        void setVertexFunction(SharedPtr<Function> function) {
-            mFunctions[0] = std::move(function);
-        }
-
-        void setFragmentFunction(SharedPtr<Function> function) {
-            mFunctions[1] = std::move(function);
-        }
     };
 
-    struct RenderPipelineState final : Referencing {
-        friend Device;
+    struct RenderPipelineStateShared {
+        Device device;
+        vk::Pipeline pipeline;
+        vk::PipelineLayout pipeline_layout;
+        std::vector<vk::DescriptorSetLayout> bind_group_layouts;
 
-    public:
-        SharedPtr<Device> mDevice;
-        vk::Pipeline mPipeline = {};
-        vk::PipelineLayout mPipelineLayout = {};
-        std::vector<vk::DescriptorSetLayout> mDescriptorSetLayouts = {};
+        explicit RenderPipelineStateShared(Device device);
+        ~RenderPipelineStateShared();
+    };
 
-    private:
-        explicit RenderPipelineState(SharedPtr<Device> device, const RenderPipelineStateDescription& description);
-        ~RenderPipelineState() override;
+    struct RenderPipelineState final {
+        std::shared_ptr<RenderPipelineStateShared> shared;
+
+        explicit RenderPipelineState() : shared(nullptr) {}
+        explicit RenderPipelineState(std::shared_ptr<RenderPipelineStateShared> shared) : shared(std::move(shared)) {}
     };
 }

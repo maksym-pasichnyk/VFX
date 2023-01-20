@@ -1,11 +1,11 @@
 #pragma once
 
-#include "gfx/Object.hpp"
+#include "Object.hpp"
 #include "glm/glm.hpp"
 
 #include <vector>
 
-struct Skin : gfx::Referencing {
+struct Skin : Object {
 private:
     int32_t mSkeleton;
     std::vector<int32_t> mJoints;

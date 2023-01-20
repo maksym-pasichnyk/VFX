@@ -8,28 +8,28 @@
 struct Game : Application {
 public:
     Game() : Application("Circles-02") {
-        uiRenderer = gfx::TransferPtr(new UIRenderer(device));
+        uiRenderer = sp<UIRenderer>::of(device);
 
         content =
-            gfx::TransferPtr(new HStack({
-                gfx::TransferPtr(new VStack({
-                    gfx::TransferPtr(new HStack({
-                        gfx::TransferPtr(new Circle()),
-                        gfx::TransferPtr(new Circle()),
-                        gfx::TransferPtr(new Circle()),
-                    })),
-                    gfx::TransferPtr(new HStack({
-                        gfx::TransferPtr(new Circle()),
-                        gfx::TransferPtr(new Circle()),
-                        gfx::TransferPtr(new Circle()),
-                    })),
-                    gfx::TransferPtr(new HStack({
-                        gfx::TransferPtr(new Circle()),
-                        gfx::TransferPtr(new Circle()),
-                        gfx::TransferPtr(new Circle()),
-                    })),
-                })),
-            }))
+            sp<HStack>::of(ViewBuilder::arrayOf(
+                sp<VStack>::of(ViewBuilder::arrayOf(
+                    sp<HStack>::of(ViewBuilder::arrayOf(
+                        sp<Circle>::of(),
+                        sp<Circle>::of(),
+                        sp<Circle>::of()
+                    )),
+                    sp<HStack>::of(ViewBuilder::arrayOf(
+                        sp<Circle>::of(),
+                        sp<Circle>::of(),
+                        sp<Circle>::of()
+                    )),
+                    sp<HStack>::of(ViewBuilder::arrayOf(
+                        sp<Circle>::of(),
+                        sp<Circle>::of(),
+                        sp<Circle>::of()
+                    ))
+                ))
+            ))
             ->border(UIColor(1, 1, 1, 0.25F), 4)
             ->frame(std::nullopt, std::nullopt);
     }
@@ -43,8 +43,8 @@ public:
     }
 
     void render() override {
-        auto drawable = swapchain->nextDrawable();
-        auto drawableSize = swapchain->drawableSize();
+        auto drawable = swapchain.nextDrawable();
+        auto drawableSize = swapchain.drawableSize();
 
         vk::Rect2D rendering_area = {};
         rendering_area.setOffset(vk::Offset2D{0, 0});
@@ -57,33 +57,33 @@ public:
         rendering_viewport.setMaxDepth(1.0f);
 
         gfx::RenderingInfo rendering_info = {};
-        rendering_info.setRenderArea(rendering_area);
-        rendering_info.setLayerCount(1);
-        rendering_info.colorAttachments()[0].setTexture(drawable->texture());
-        rendering_info.colorAttachments()[0].setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
-        rendering_info.colorAttachments()[0].setLoadOp(vk::AttachmentLoadOp::eClear);
-        rendering_info.colorAttachments()[0].setStoreOp(vk::AttachmentStoreOp::eStore);
+        rendering_info.renderArea = rendering_area;
+        rendering_info.layerCount = 1;
+        rendering_info.colorAttachments[0].texture = drawable.texture;
+        rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+        rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
-        commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-        commandBuffer->beginRendering(rendering_info);
-        commandBuffer->setScissor(0, rendering_area);
-        commandBuffer->setViewport(0, rendering_viewport);
+        commandBuffer.beginRendering(rendering_info);
+        commandBuffer.setScissor(0, rendering_area);
+        commandBuffer.setViewport(0, rendering_viewport);
 
-        auto ctx = gfx::TransferPtr(new UIContext(uiRenderer->drawList()));
+        auto ctx = sp<UIContext>::of(uiRenderer->drawList());
 
         uiRenderer->resetForNewFrame();
-        content->draw(ctx, getUISize(getWindowSize()));
+        content->_draw(ctx, getUISize(getWindowSize()));
         uiRenderer->draw(commandBuffer);
 
-        commandBuffer->endRendering();
+        commandBuffer.endRendering();
 
-        commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
-        commandBuffer->end();
-        commandBuffer->submit();
-        commandBuffer->present(drawable);
-        commandBuffer->waitUntilCompleted();
+        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer.end();
+        commandBuffer.submit();
+        commandBuffer.present(drawable);
+        commandBuffer.waitUntilCompleted();
     }
 
 private:

@@ -3,14 +3,14 @@
 #include "UISize.hpp"
 #include "UIPoint.hpp"
 #include "UIColor.hpp"
-#include "gfx/Object.hpp"
+#include "Object.hpp"
 
 #include <stack>
 
 #include "imgui.h"
 #include "imgui_internal.h"
 
-struct UIContext : gfx::Referencing {
+struct UIContext : Object {
 private:
     struct State {
         float_t x = 0.0F;

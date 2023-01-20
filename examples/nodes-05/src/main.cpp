@@ -7,8 +7,8 @@
 struct Game : Application {
 public:
     Game() : Application("Nodes-05") {
-        uiRenderer = gfx::TransferPtr(new UIRenderer(device));
-        graphView = gfx::TransferPtr(new GraphView());
+        uiRenderer = sp<UIRenderer>::of(device);
+        graphView = sp<GraphView>::of();
 
         auto nodeA = graphView->addNode("Node A");
         nodeA->addOutput("Return Value", GraphView::Port::Capacity::eMulti);
@@ -37,8 +37,8 @@ public:
     void render() override {
         uiRenderer->setCurrentContext();
 
-        auto drawable = swapchain->nextDrawable();
-        auto drawableSize = swapchain->drawableSize();
+        auto drawable = swapchain.nextDrawable();
+        auto drawableSize = swapchain.drawableSize();
 
         vk::Rect2D rendering_area = {};
         rendering_area.setOffset(vk::Offset2D{0, 0});
@@ -51,41 +51,41 @@ public:
         rendering_viewport.setMaxDepth(1.0f);
 
         gfx::RenderingInfo rendering_info = {};
-        rendering_info.setRenderArea(rendering_area);
-        rendering_info.setLayerCount(1);
-        rendering_info.colorAttachments()[0].setTexture(drawable->texture());
-        rendering_info.colorAttachments()[0].setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
-        rendering_info.colorAttachments()[0].setLoadOp(vk::AttachmentLoadOp::eClear);
-        rendering_info.colorAttachments()[0].setStoreOp(vk::AttachmentStoreOp::eStore);
+        rendering_info.renderArea = rendering_area;
+        rendering_info.layerCount = 1;
+        rendering_info.colorAttachments[0].texture = drawable.texture;
+        rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+        rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
-        commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-        commandBuffer->beginRendering(rendering_info);
-        commandBuffer->setScissor(0, rendering_area);
-        commandBuffer->setViewport(0, rendering_viewport);
+        commandBuffer.beginRendering(rendering_info);
+        commandBuffer.setScissor(0, rendering_area);
+        commandBuffer.setViewport(0, rendering_viewport);
 
-        auto ctx = gfx::TransferPtr(new UIContext(uiRenderer->drawList()));
+        auto ctx = sp<UIContext>::of(uiRenderer->drawList());
 
         auto body = graphView
             ->overlay(
-                gfx::TransferPtr(new Text(fmt::format("FPS {:.0F}", 1.0F / average), ctx->drawList()->_Data->Font, 24.0F))
+                sp<Text>::of(fmt::format("FPS {:.0F}", 1.0F / average), ctx->drawList()->_Data->Font, 24.0F)
                     ->fixedSize(true, true),
                 Alignment::topLeading()
             )
             ->frame(std::nullopt, std::nullopt);
 
         uiRenderer->resetForNewFrame();
-        body->draw(ctx, body->size(ProposedSize(getUISize(getWindowSize()))));
+        body->_draw(ctx, body->_size(ProposedSize(getUISize(getWindowSize()))));
         uiRenderer->draw(commandBuffer);
 
-        commandBuffer->endRendering();
+        commandBuffer.endRendering();
 
-        commandBuffer->changeTextureLayout(drawable->texture(), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
-        commandBuffer->end();
-        commandBuffer->submit();
-        commandBuffer->present(drawable);
-        commandBuffer->waitUntilCompleted();
+        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer.end();
+        commandBuffer.submit();
+        commandBuffer.present(drawable);
+        commandBuffer.waitUntilCompleted();
     }
 
     void mouseUp(SDL_MouseButtonEvent* event) override {

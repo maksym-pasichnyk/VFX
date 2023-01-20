@@ -24,7 +24,7 @@ add_library(imgui STATIC "${imgui_SOURCE_DIR}/imconfig.h" "${imgui_SOURCE_DIR}/i
 set_target_properties(imgui PROPERTIES CXX_EXTENSIONS OFF CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
 target_include_directories(imgui PUBLIC  ${imgui_SOURCE_DIR})
 
-add_library(common STATIC src/Assets.hpp src/Delegate.hpp src/Signal.hpp src/simd.hpp src/UIContext.hpp src/NotSwiftUI/Alignment.hpp src/NotSwiftUI/View.hpp src/UISize.hpp src/UIPoint.hpp src/UIColor.hpp src/Iter.hpp src/common.cpp src/Primitive.hpp src/Skin.hpp src/Node.hpp src/Mesh.hpp src/Scene.hpp src/Animation.hpp src/UIRenderer.hpp src/UIRenderer.cpp src/GraphView.hpp src/Application.hpp)
+add_library(common STATIC src/Assets.hpp src/Delegate.hpp src/Signal.hpp src/simd.hpp src/UIContext.hpp src/NotSwiftUI/Alignment.hpp src/NotSwiftUI/View.hpp src/UISize.hpp src/UIPoint.hpp src/UIColor.hpp src/Iter.hpp src/common.cpp src/Primitive.hpp src/Skin.hpp src/Node.hpp src/Mesh.hpp src/Scene.hpp src/Animation.hpp src/UIRenderer.hpp src/UIRenderer.cpp src/GraphView.hpp src/Application.hpp src/Object.hpp)
 set_target_properties(common PROPERTIES CXX_EXTENSIONS OFF CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
 target_compile_options(common PUBLIC -fenable-matrix -Wno-nullability-completeness)
 target_link_libraries(common PUBLIC gfx fmt glm imgui range-v3 tinygltf)

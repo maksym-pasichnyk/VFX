@@ -2,7 +2,7 @@
 
 #include "ParticleSystem.hpp"
 
-struct ParticleEmitter : gfx::Referencing {
+struct ParticleEmitter : Object {
 protected:
     sp<ParticleSystem> mParticleSystem;
     float_t mEmitRate = {};

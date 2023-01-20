@@ -2,12 +2,14 @@
 
 #include "Core.hpp"
 #include "UISize.hpp"
+#include "spdlog/spdlog.h"
 
 #include <SDL_video.h>
 #include <SDL_vulkan.h>
 
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
+#include <SDL_events.h>
 
 struct ShaderData {
     alignas(16) glm::mat4x4 g_proj_matrix;
@@ -19,16 +21,28 @@ public:
     explicit Application(const char* title) {
         window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI);
 
-        context = gfx::Context::alloc();
-        device = context->devices().front();
-        commandQueue = device->newCommandQueue();
-        commandBuffer = commandQueue->commandBuffer();
+        gfx::InstanceSettings desc = {};
+        desc.name = title;
+        desc.version = 1;
 
-        swapchain = gfx::Swapchain::alloc(context, window);
-        swapchain->setDevice(device);
-        swapchain->setColorSpace(vk::ColorSpaceKHR::eSrgbNonlinear);
-        swapchain->setPixelFormat(vk::Format::eB8G8R8A8Unorm);
-        swapchain->setDisplaySyncEnabled(true);
+        instance = gfx::Instance::init(desc);
+        adapter = instance.enumerateAdapters().front();
+        device = instance.createDevice(adapter);
+
+        VkSurfaceKHR raw_surface;
+        SDL_Vulkan_CreateSurface(window, instance.handle(), &raw_surface);
+        surface = instance.wrapSurface(raw_surface);
+
+        gfx::SurfaceConfiguration config;
+        config.format = vk::Format::eB8G8R8A8Unorm;
+        config.color_space = vk::ColorSpaceKHR::eSrgbNonlinear ;
+        config.image_count = 3;
+        config.present_mode = vk::PresentModeKHR::eFifo;
+        config.clipped = true;
+        swapchain = device.createSwapchain(surface, config);
+
+        commandQueue = device.newCommandQueue();
+        commandBuffer = commandQueue.commandBuffer();
     }
 
     ~Application() {
@@ -106,8 +120,8 @@ public:
     }
 
     virtual void performResize(uint32_t windowId) {
-        swapchain->setDrawableSize(getDrawableSize());
-        swapchain->releaseDrawables();
+//        swapchain->setDrawableSize(getDrawableSize());
+//        swapchain->releaseDrawables();
     }
 
 private:
@@ -194,9 +208,12 @@ protected:
     int32_t accumulateCount = {};
     int32_t accumulateIndex = {};
 
-    sp<gfx::Device> device;
-    sp<gfx::Context> context;
-    sp<gfx::Swapchain> swapchain;
-    sp<gfx::CommandQueue> commandQueue;
-    sp<gfx::CommandBuffer> commandBuffer;
+    vk::PhysicalDevice adapter;
+    gfx::Device device;
+    gfx::Instance instance;
+    gfx::Surface surface;
+
+    gfx::Swapchain swapchain;
+    gfx::CommandQueue commandQueue;
+    gfx::CommandBuffer commandBuffer;
 };

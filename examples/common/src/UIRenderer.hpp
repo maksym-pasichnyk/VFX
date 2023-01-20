@@ -3,9 +3,9 @@
 #include "Core.hpp"
 #include "UIContext.hpp"
 
-struct UIRenderer : gfx::Referencing {
+struct UIRenderer : Object {
 public:
-    explicit UIRenderer(sp<gfx::Device> device);
+    explicit UIRenderer(gfx::Device device);
 
 private:
     void buildFonts();
@@ -16,7 +16,7 @@ public:
     void setCurrentContext();
 
     auto drawList() -> ImDrawList*;
-    void draw(const sp<gfx::CommandBuffer>& cmd);
+    void draw(gfx::CommandBuffer cmd);
     void setScale(float_t scale);
     void setScreenSize(const UISize& size);
 
@@ -29,11 +29,11 @@ private:
     ImGuiContext mGuiContext = {&mFontAtlas};
     ImDrawListSharedData mDrawListSharedData = {};
 
-    sp<gfx::Device> mDevice;
-    sp<gfx::Buffer> mIndexBuffer = {};
-    sp<gfx::Buffer> mVertexBuffer = {};
-    sp<gfx::Texture> mFontTexture = {};
-    sp<gfx::Sampler> mFontSampler = {};
-    sp<gfx::DescriptorSet> mDescriptorSet = {};
-    sp<gfx::RenderPipelineState> mRenderPipelineState = {};
+    gfx::Device mDevice;
+    gfx::Buffer mIndexBuffer;
+    gfx::Buffer mVertexBuffer;
+    gfx::Texture mFontTexture;
+    gfx::Sampler mFontSampler;
+    gfx::DescriptorSet mDescriptorSet;
+    gfx::RenderPipelineState mRenderPipelineState;
 };

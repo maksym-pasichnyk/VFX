@@ -1,34 +1,28 @@
 #pragma once
 
-#include "Object.hpp"
+#include "Device.hpp"
 
-#include <map>
 #include <spirv_reflect.h>
-#include <vulkan/vulkan.hpp>
 
 namespace gfx {
     struct Device;
-    struct Library;
     struct Function;
-    struct RenderPipelineState;
-    struct ComputePipelineState;
 
-    struct Library final : Referencing {
-        friend Device;
-        friend Function;
-        friend RenderPipelineState;
-        friend ComputePipelineState;
+    struct LibraryShared {
+        Device device;
+        vk::ShaderModule raw;
+        SpvReflectShaderModule spvReflectShaderModule;
 
-    private:
-        SharedPtr<Device> mDevice = {};
-        vk::ShaderModule mShaderModule = {};
-        SpvReflectShaderModule mSpvReflectShaderModule = {};
+        explicit LibraryShared(Device device);
+        ~LibraryShared();
+    };
 
-    private:
-        explicit Library(SharedPtr<Device> device, const vk::ShaderModuleCreateInfo& info);
-        ~Library() override;
+    struct Library final {
+        std::shared_ptr<LibraryShared> shared;
 
-    public:
-        auto newFunction(std::string name) -> SharedPtr<Function>;
+        explicit Library();
+        explicit Library(std::shared_ptr<LibraryShared> shared);
+
+        auto newFunction(std::string name) -> Function;
     };
 }

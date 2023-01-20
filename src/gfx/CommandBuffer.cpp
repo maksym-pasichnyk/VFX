@@ -1,6 +1,6 @@
+#include "Device.hpp"
 #include "Swapchain.hpp"
 #include "Buffer.hpp"
-#include "Device.hpp"
 #include "Texture.hpp"
 #include "Drawable.hpp"
 #include "CommandQueue.hpp"
@@ -11,86 +11,86 @@
 
 #include "spdlog/spdlog.h"
 
-gfx::CommandBuffer::CommandBuffer(SharedPtr<Device> device, CommandQueue* commandQueue)
-: mDevice(std::move(device))
-, pCommandQueue(commandQueue) {
+gfx::CommandBufferShared::CommandBufferShared(gfx::Device device, gfx::CommandQueue queue) : device(device), queue(queue) {
     vk::CommandBufferAllocateInfo allocate_info = {};
-    allocate_info.setCommandPool(commandQueue->mCommandPool);
+    allocate_info.setCommandPool(queue.shared->raw);
     allocate_info.setLevel(vk::CommandBufferLevel::ePrimary);
     allocate_info.setCommandBufferCount(1);
-
-    vk::resultCheck(mDevice->mDevice.allocateCommandBuffers(&allocate_info, &mCommandBuffer, mDevice->mDispatchLoaderDynamic), "allocateCommandBuffers");
+    vk::resultCheck(device.handle().allocateCommandBuffers(&allocate_info, &raw, device.dispatcher()), "allocateCommandBuffers");
 
     vk::FenceCreateInfo fence_create_info = {};
-    mFence = mDevice->mDevice.createFence(fence_create_info, nullptr, mDevice->mDispatchLoaderDynamic);
+    fence = device.handle().createFence(fence_create_info, nullptr, device.dispatcher());
 
     vk::SemaphoreCreateInfo semaphore_create_info = {};
-    mSemaphore = mDevice->mDevice.createSemaphore(semaphore_create_info, nullptr, mDevice->mDispatchLoaderDynamic);
+    semaphore = device.handle().createSemaphore(semaphore_create_info, nullptr, device.dispatcher());
 }
 
-gfx::CommandBuffer::~CommandBuffer() {
-    mDevice->mDevice.destroySemaphore(mSemaphore, nullptr, mDevice->mDispatchLoaderDynamic);
-    mDevice->mDevice.destroyFence(mFence, nullptr, mDevice->mDispatchLoaderDynamic);
+gfx::CommandBufferShared::~CommandBufferShared() {
+    device.handle().destroySemaphore(semaphore, nullptr, device.dispatcher());
+    device.handle().destroyFence(fence, nullptr, device.dispatcher());
 }
 
 void gfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
-    mCommandBuffer.begin(info, mDevice->mDispatchLoaderDynamic);
+    shared->raw.begin(info, shared->device.dispatcher());
 }
 
 void gfx::CommandBuffer::end() {
-    mCommandBuffer.end(mDevice->mDispatchLoaderDynamic);
+    shared->raw.end(shared->device.dispatcher());
 }
 
 void gfx::CommandBuffer::submit() {
     vk::SubmitInfo submit_info = {};
     submit_info.setCommandBufferCount(1);
-    submit_info.setPCommandBuffers(&mCommandBuffer);
+    submit_info.setPCommandBuffers(&shared->raw);
     submit_info.setSignalSemaphoreCount(1);
-    submit_info.setPSignalSemaphores(&mSemaphore);
+    submit_info.setPSignalSemaphores(&shared->semaphore);
 
-    vk::resultCheck(mDevice->mDevice.resetFences(1, &mFence, mDevice->mDispatchLoaderDynamic), "Submit");
-    mDevice->mGraphicsQueue.submit(submit_info, mFence, mDevice->mDispatchLoaderDynamic);
+    vk::resultCheck(shared->device.handle().resetFences(1, &shared->fence, shared->device.dispatcher()), "Submit");
+
+    // todo: get valid device for submit
+    shared->device.shared->raw_queue.submit(submit_info, shared->fence, shared->device.dispatcher());
 }
 
-void gfx::CommandBuffer::present(const SharedPtr<gfx::Drawable>& drawable) {
+void gfx::CommandBuffer::present(const gfx::Drawable& drawable) {
     vk::PresentInfoKHR present_info = {};
-    present_info.setWaitSemaphores(mSemaphore);
+    present_info.setWaitSemaphores(shared->semaphore);
     present_info.setSwapchainCount(1);
-    present_info.setPSwapchains(&drawable->pLayer->mSwapchain);
-    present_info.setPImageIndices(&drawable->mDrawableIndex);
+    present_info.setPSwapchains(&drawable.swapchain);
+    present_info.setPImageIndices(&drawable.drawableIndex);
 
-    vk::Result result = mDevice->mPresentQueue.presentKHR(present_info, mDevice->mDispatchLoaderDynamic);
+    // todo: get valid device for present
+    vk::Result result = shared->device.shared->raw_queue.presentKHR(present_info, shared->device.dispatcher());
     if (result != vk::Result::eErrorOutOfDateKHR && result != vk::Result::eSuboptimalKHR && result != vk::Result::eSuccess) {
         throw std::runtime_error(vk::to_string(result));
     }
 }
 
-void gfx::CommandBuffer::setComputePipelineState(const SharedPtr<ComputePipelineState>& state) {
-    mCommandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, state->mPipeline, mDevice->mDispatchLoaderDynamic);
+void gfx::CommandBuffer::setComputePipelineState(ComputePipelineState const& state) {
+    shared->raw.bindPipeline(vk::PipelineBindPoint::eCompute, state.shared->pipeline, shared->device.dispatcher());
 
-    mPipeline = state->mPipeline;
-    mPipelineLayout = state->mPipelineLayout;
-    mPipelineBindPoint = vk::PipelineBindPoint::eCompute;
+    shared->pipeline = state.shared->pipeline;
+    shared->pipeline_layout = state.shared->pipeline_layout;
+    shared->pipeline_bind_point = vk::PipelineBindPoint::eCompute;
 }
 
-void gfx::CommandBuffer::bindDescriptorSet(const SharedPtr<DescriptorSet>& descriptorSet, uint32_t slot) {
-    mCommandBuffer.bindDescriptorSets(mPipelineBindPoint, mPipelineLayout, slot, 1, &descriptorSet->mDescriptorSet, 0, nullptr, mDevice->mDispatchLoaderDynamic);
+void gfx::CommandBuffer::bindDescriptorSet(const DescriptorSet& descriptorSet, uint32_t slot) {
+    shared->raw.bindDescriptorSets(shared->pipeline_bind_point, shared->pipeline_layout, slot, 1, &descriptorSet.shared->raw, 0, nullptr, shared->device.dispatcher());
 }
 
 void gfx::CommandBuffer::pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data) {
-    mCommandBuffer.pushConstants(mPipelineLayout, stageFlags, offset, size, data, mDevice->mDispatchLoaderDynamic);
+    shared->raw.pushConstants(shared->pipeline_layout, stageFlags, offset, size, data, shared->device.dispatcher());
 }
 
 void gfx::CommandBuffer::dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
-    mCommandBuffer.dispatch(groupCountX, groupCountY, groupCountZ, mDevice->mDispatchLoaderDynamic);
+    shared->raw.dispatch(groupCountX, groupCountY, groupCountZ, shared->device.dispatcher());
 }
 
 void gfx::CommandBuffer::waitUntilCompleted() {
-    vk::Result result = pCommandQueue->mDevice->mDevice.waitForFences(mFence, VK_TRUE, std::numeric_limits<uint64_t>::max(), mDevice->mDispatchLoaderDynamic);
+    vk::Result result = shared->device.handle().waitForFences(shared->fence, VK_TRUE, std::numeric_limits<uint64_t>::max(), shared->device.dispatcher());
     vk::resultCheck(result, "waitForFences");
 }
 
-void gfx::CommandBuffer::changeTextureLayout(const SharedPtr<Texture>& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask) {
+void gfx::CommandBuffer::imageBarrier(Texture const& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask) {
     vk::ImageMemoryBarrier2 barrier = {};
     barrier.setSrcStageMask(srcStageMask);
     barrier.setSrcAccessMask(srcAccessMask);
@@ -100,131 +100,129 @@ void gfx::CommandBuffer::changeTextureLayout(const SharedPtr<Texture>& texture, 
     barrier.setNewLayout(newLayout);
     barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
     barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-    barrier.setImage(texture->mImage);
-    barrier.setSubresourceRange(texture->mImageSubresourceRange);
+    barrier.setImage(texture.shared->image);
+    barrier.setSubresourceRange(texture.shared->subresource);
 
     vk::DependencyInfo dependency_info = {};
     dependency_info.setImageMemoryBarrierCount(1);
     dependency_info.setPImageMemoryBarriers(&barrier);
 
-    mCommandBuffer.pipelineBarrier2(dependency_info, mDevice->mDispatchLoaderDynamic);
+    shared->raw.pipelineBarrier2(dependency_info, shared->device.dispatcher());
 }
 
-#pragma region RenderCommandEncoder
 void gfx::CommandBuffer::beginRendering(const RenderingInfo& info) {
     vk::RenderingAttachmentInfo depthAttachment = {};
     vk::RenderingAttachmentInfo stencilAttachment = {};
     std::vector<vk::RenderingAttachmentInfo> colorAttachments = {};
 
-    colorAttachments.resize(info.mColorAttachments.elements.size());
-    for (uint64_t i = 0; i < info.mColorAttachments.elements.size(); ++i) {
+    colorAttachments.resize(info.colorAttachments.elements.size());
+    for (uint64_t i = 0; i < info.colorAttachments.elements.size(); ++i) {
         auto rgba = std::array{
-            info.mColorAttachments.elements[i].mClearColor.red,
-            info.mColorAttachments.elements[i].mClearColor.greed,
-            info.mColorAttachments.elements[i].mClearColor.blue,
-            info.mColorAttachments.elements[i].mClearColor.alpha
+            info.colorAttachments.elements[i].clearColor.red,
+            info.colorAttachments.elements[i].clearColor.greed,
+            info.colorAttachments.elements[i].clearColor.blue,
+            info.colorAttachments.elements[i].clearColor.alpha
         };
 
         vk::ClearColorValue color = {};
         color.setFloat32(rgba);
 
-        if (info.mColorAttachments.elements[i].mTexture) {
-            colorAttachments[i].setImageView(info.mColorAttachments.elements[i].mTexture->mImageView);
-            colorAttachments[i].setImageLayout(info.mColorAttachments.elements[i].mImageLayout);
+        if (info.colorAttachments.elements[i].texture) {
+            colorAttachments[i].setImageView(info.colorAttachments.elements[i].texture->shared->image_view);
+            colorAttachments[i].setImageLayout(info.colorAttachments.elements[i].imageLayout);
         }
-        if (info.mColorAttachments.elements[i].mResolveTexture) {
-            colorAttachments[i].setResolveMode(info.mColorAttachments.elements[i].mResolveMode);
-            colorAttachments[i].setResolveImageView(info.mColorAttachments.elements[i].mResolveTexture->mImageView);
-            colorAttachments[i].setResolveImageLayout(info.mColorAttachments.elements[i].mResolveImageLayout);
+        if (info.colorAttachments.elements[i].resolveTexture) {
+            colorAttachments[i].setResolveMode(info.colorAttachments.elements[i].resolveMode);
+            colorAttachments[i].setResolveImageView(info.colorAttachments.elements[i].resolveTexture->shared->image_view);
+            colorAttachments[i].setResolveImageLayout(info.colorAttachments.elements[i].resolveImageLayout);
         }
-        colorAttachments[i].setLoadOp(info.mColorAttachments.elements[i].mLoadOp);
-        colorAttachments[i].setStoreOp(info.mColorAttachments.elements[i].mStoreOp);
+        colorAttachments[i].setLoadOp(info.colorAttachments.elements[i].loadOp);
+        colorAttachments[i].setStoreOp(info.colorAttachments.elements[i].storeOp);
         colorAttachments[i].clearValue.setColor(color);
     }
 
     vk::RenderingInfo rendering_info = {};
-    rendering_info.setRenderArea(info.mRenderArea);
-    rendering_info.setLayerCount(info.mLayerCount);
-    rendering_info.setViewMask(info.mViewMask);
+    rendering_info.setRenderArea(info.renderArea);
+    rendering_info.setLayerCount(info.layerCount);
+    rendering_info.setViewMask(info.viewMask);
     rendering_info.setColorAttachments(colorAttachments);
 
-    if (info.mDepthAttachment.mTexture || info.mDepthAttachment.mResolveTexture) {
+    if (info.depthAttachment.texture || info.depthAttachment.resolveTexture) {
         vk::ClearDepthStencilValue depth_stencil = {};
-        depth_stencil.setDepth(info.mDepthAttachment.mClearDepth);
+        depth_stencil.setDepth(info.depthAttachment.clearDepth);
 
-        if (info.mDepthAttachment.mTexture) {
-            depthAttachment.setImageView(info.mDepthAttachment.mTexture->mImageView);
-            depthAttachment.setImageLayout(info.mDepthAttachment.mImageLayout);
+        if (info.depthAttachment.texture) {
+            depthAttachment.setImageView(info.depthAttachment.texture->shared->image_view);
+            depthAttachment.setImageLayout(info.depthAttachment.imageLayout);
         }
-        if (info.mDepthAttachment.mResolveTexture) {
-            depthAttachment.setResolveMode(info.mDepthAttachment.mResolveMode);
-            depthAttachment.setResolveImageView(info.mDepthAttachment.mResolveTexture->mImageView);
-            depthAttachment.setResolveImageLayout(info.mDepthAttachment.mResolveImageLayout);
+        if (info.depthAttachment.resolveTexture) {
+            depthAttachment.setResolveMode(info.depthAttachment.resolveMode);
+            depthAttachment.setResolveImageView(info.depthAttachment.resolveTexture->shared->image_view);
+            depthAttachment.setResolveImageLayout(info.depthAttachment.resolveImageLayout);
         }
-        depthAttachment.setLoadOp(info.mDepthAttachment.mLoadOp);
-        depthAttachment.setStoreOp(info.mDepthAttachment.mStoreOp);
+        depthAttachment.setLoadOp(info.depthAttachment.loadOp);
+        depthAttachment.setStoreOp(info.depthAttachment.storeOp);
         depthAttachment.clearValue.setDepthStencil(depth_stencil);
 
         rendering_info.setPDepthAttachment(&depthAttachment);
     }
 
-    if (info.mStencilAttachment.mTexture || info.mStencilAttachment.mResolveTexture) {
+    if (info.stencilAttachment.texture || info.stencilAttachment.resolveTexture) {
         vk::ClearDepthStencilValue depth_stencil = {};
-        depth_stencil.setDepth(info.mStencilAttachment.mClearStencil);
+        depth_stencil.setDepth(info.stencilAttachment.clearStencil);
 
-        if (info.mStencilAttachment.mTexture) {
-            stencilAttachment.setImageView(info.mStencilAttachment.mTexture->mImageView);
-            stencilAttachment.setImageLayout(info.mStencilAttachment.mImageLayout);
+        if (info.stencilAttachment.texture) {
+            stencilAttachment.setImageView(info.stencilAttachment.texture->shared->image_view);
+            stencilAttachment.setImageLayout(info.stencilAttachment.imageLayout);
         }
-        if (info.mStencilAttachment.mResolveTexture) {
-            stencilAttachment.setResolveMode(info.mStencilAttachment.mResolveMode);
-            stencilAttachment.setResolveImageView(info.mStencilAttachment.mResolveTexture->mImageView);
-            stencilAttachment.setResolveImageLayout(info.mStencilAttachment.mResolveImageLayout);
+        if (info.stencilAttachment.resolveTexture) {
+            stencilAttachment.setResolveMode(info.stencilAttachment.resolveMode);
+            stencilAttachment.setResolveImageView(info.stencilAttachment.resolveTexture->shared->image_view);
+            stencilAttachment.setResolveImageLayout(info.stencilAttachment.resolveImageLayout);
         }
-        stencilAttachment.setLoadOp(info.mStencilAttachment.mLoadOp);
-        stencilAttachment.setStoreOp(info.mStencilAttachment.mStoreOp);
+        stencilAttachment.setLoadOp(info.stencilAttachment.loadOp);
+        stencilAttachment.setStoreOp(info.stencilAttachment.storeOp);
         stencilAttachment.clearValue.setDepthStencil(depth_stencil);
 
         rendering_info.setPStencilAttachment(&stencilAttachment);
     }
 
-    mCommandBuffer.beginRendering(rendering_info, mDevice->mDispatchLoaderDynamic);
+    shared->raw.beginRendering(rendering_info, shared->device.dispatcher());
 
 }
 
 void gfx::CommandBuffer::endRendering() {
-    mCommandBuffer.endRendering(mDevice->mDispatchLoaderDynamic);
+    shared->raw.endRendering(shared->device.dispatcher());
 }
 
-void gfx::CommandBuffer::setRenderPipelineState(const SharedPtr<RenderPipelineState>& state) {
-    mCommandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, state->mPipeline, mDevice->mDispatchLoaderDynamic);
+void gfx::CommandBuffer::setRenderPipelineState(const RenderPipelineState& state) {
+    shared->raw.bindPipeline(vk::PipelineBindPoint::eGraphics, state.shared->pipeline, shared->device.dispatcher());
 
-    mPipeline = state->mPipeline;
-    mPipelineLayout = state->mPipelineLayout;
-    mPipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+    shared->pipeline = state.shared->pipeline;
+    shared->pipeline_layout = state.shared->pipeline_layout;
+    shared->pipeline_bind_point = vk::PipelineBindPoint::eGraphics;
 }
 
 void gfx::CommandBuffer::setScissor(uint32_t firstScissor, const vk::Rect2D& rect) {
-    mCommandBuffer.setScissor(firstScissor, 1, &rect, mDevice->mDispatchLoaderDynamic);
+    shared->raw.setScissor(firstScissor, 1, &rect, shared->device.dispatcher());
 }
 
 void gfx::CommandBuffer::setViewport(uint32_t firstViewport, const vk::Viewport& viewport) {
-    mCommandBuffer.setViewport(firstViewport, 1, &viewport, mDevice->mDispatchLoaderDynamic);
+    shared->raw.setViewport(firstViewport, 1, &viewport, shared->device.dispatcher());
 }
 
-void gfx::CommandBuffer::bindIndexBuffer(const SharedPtr<Buffer>& buffer, vk::DeviceSize offset, vk::IndexType indexType) {
-    mCommandBuffer.bindIndexBuffer(buffer->mBuffer, offset, indexType, mDevice->mDispatchLoaderDynamic);
+void gfx::CommandBuffer::bindIndexBuffer(const Buffer& buffer, vk::DeviceSize offset, vk::IndexType indexType) {
+    shared->raw.bindIndexBuffer(buffer.shared->raw, offset, indexType, shared->device.dispatcher());
 }
 
-void gfx::CommandBuffer::bindVertexBuffer(int firstBinding, const SharedPtr<Buffer>& buffer, vk::DeviceSize offset) {
-    mCommandBuffer.bindVertexBuffers(firstBinding, 1, &buffer->mBuffer, &offset, mDevice->mDispatchLoaderDynamic);
+void gfx::CommandBuffer::bindVertexBuffer(int firstBinding, const Buffer& buffer, vk::DeviceSize offset) {
+    shared->raw.bindVertexBuffers(firstBinding, 1, &buffer.shared->raw, &offset, shared->device.dispatcher());
 }
 
 void gfx::CommandBuffer::draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
-    mCommandBuffer.draw(vertexCount, instanceCount, firstVertex, firstInstance, mDevice->mDispatchLoaderDynamic);
+    shared->raw.draw(vertexCount, instanceCount, firstVertex, firstInstance, shared->device.dispatcher());
 }
 
 void gfx::CommandBuffer::drawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
-    mCommandBuffer.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, mDevice->mDispatchLoaderDynamic);
+    shared->raw.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, shared->device.dispatcher());
 }
-#pragma endregion RenderCommandEncoder

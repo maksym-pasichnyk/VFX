@@ -35,7 +35,7 @@ struct ProposedSize {
     }
 };
 
-struct View : gfx::Referencing {
+struct View : Object {
 public:
     auto frame(std::optional<float_t> width, std::optional<float_t> height, Alignment alignment = Alignment::center()) -> sp<FixedFrame>;
     auto frame(std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment = Alignment::center()) -> sp<FlexibleFrame>;
@@ -463,11 +463,11 @@ private:
 };
 
 inline auto View::frame(std::optional<float_t> width, std::optional<float_t> height, Alignment alignment) -> sp<FixedFrame> {
-    return sp<FixedFrame>::of(gfx::RetainPtr(this), width, height, alignment);
+    return sp<FixedFrame>::of(RetainPtr(this), width, height, alignment);
 }
 
 inline auto View::frame(std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment) -> sp<FlexibleFrame> {
-    return sp<FlexibleFrame>::of(gfx::RetainPtr(this), minWidth, idealWidth, maxWidth, minHeight, idealHeight, maxHeight, alignment);
+    return sp<FlexibleFrame>::of(RetainPtr(this), minWidth, idealWidth, maxWidth, minHeight, idealHeight, maxHeight, alignment);
 }
 
 inline auto View::border(const UIColor& color, float_t width) -> sp<View> {
@@ -475,11 +475,11 @@ inline auto View::border(const UIColor& color, float_t width) -> sp<View> {
 }
 
 inline auto View::overlay(sp<View> overlay, Alignment alignment) -> sp<Overlay> {
-    return sp<Overlay>::of(gfx::RetainPtr(this), overlay, alignment);
+    return sp<Overlay>::of(RetainPtr(this), overlay, alignment);
 }
 
 inline auto View::fixedSize(bool horizontal, bool vertical) -> sp<FixedSize> {
-    return sp<FixedSize>::of(gfx::RetainPtr(this), horizontal, vertical);
+    return sp<FixedSize>::of(RetainPtr(this), horizontal, vertical);
 }
 
 struct ForegroundColor : View {
@@ -504,10 +504,10 @@ public:
 };
 
 inline auto View::foregroundColor(const UIColor& color) -> sp<ForegroundColor> {
-    return sp<ForegroundColor>::of(gfx::RetainPtr(this), color);
+    return sp<ForegroundColor>::of(RetainPtr(this), color);
 }
 
 inline auto Shape::body() -> sp<View> {
-    return sp<ShapeView<Shape>>::of(gfx::RetainPtr(this));
+    return sp<ShapeView<Shape>>::of(RetainPtr(this));
 }
 

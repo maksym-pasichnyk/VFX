@@ -1,35 +1,36 @@
 #pragma once
 
-#include "Object.hpp"
+#include "Instance.hpp"
 
 #include <vector>
-#include <vulkan/vulkan.hpp>
 
 namespace gfx {
     struct Buffer;
     struct Device;
     struct Texture;
     struct Sampler;
-    struct CommandBuffer;
-    struct DescriptorSet final : Referencing {
-        friend Device;
-        friend CommandBuffer;
 
-    private:
-        SharedPtr<Device> mDevice = {};
-        vk::DescriptorSet mDescriptorSet = {};
-        vk::DescriptorPool mDescriptorPool = {};
+    struct DescriptorSetShared {
+        Device device;
+        vk::DescriptorSet raw;
+        vk::DescriptorPool pool;
 
-    private:
-        explicit DescriptorSet(SharedPtr<Device> device);
-        ~DescriptorSet() override;
+        explicit DescriptorSetShared(Device device, vk::DescriptorSet raw, vk::DescriptorPool pool);
+        ~DescriptorSetShared();
+    };
+
+    struct DescriptorSet final {
+        std::shared_ptr<DescriptorSetShared> shared;
+
+        explicit DescriptorSet();
+        explicit DescriptorSet(std::shared_ptr<DescriptorSetShared> shared);
 
     public:
-        void setBuffer(const SharedPtr<Buffer>& buffer, uint64_t offset, uint32_t binding);
-        void setStorageBuffer(const SharedPtr<Buffer>& buffer, uint64_t offset, uint32_t binding);
-        void setTexture(const SharedPtr<Texture>& texture, uint32_t binding);
-        void setSampler(const SharedPtr<Sampler>& sampler, uint32_t binding);
-        void setStorageImage(const SharedPtr<Texture>& texture, uint32_t binding);
+        void setBuffer(const Buffer& buffer, uint64_t offset, uint32_t binding);
+        void setStorageBuffer(const Buffer& buffer, uint64_t offset, uint32_t binding);
+        void setTexture(const Texture& texture, uint32_t binding);
+        void setSampler(Sampler const& sampler, uint32_t binding);
+        void setStorageImage(const Texture& texture, uint32_t binding);
         void setLabel(const std::string& name);
     };
 }

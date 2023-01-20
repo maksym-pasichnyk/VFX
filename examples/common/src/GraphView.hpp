@@ -24,7 +24,7 @@ public:
     struct Node;
     struct Link;
 
-    struct Port : gfx::Referencing {
+    struct Port : Object {
         friend Node;
         friend GraphView;
 
@@ -53,7 +53,7 @@ public:
             : pNode(node), mIndex(index), mName(std::move(name)), mCapacity(capacity), mDirection(direction) {}
     };
 
-    struct Node : gfx::Referencing {
+    struct Node : Object {
         friend GraphView;
 
     private:
@@ -93,11 +93,11 @@ public:
         }
 
         void addInput(std::string name, Port::Capacity capacity) {
-            mInputs.emplace_back(gfx::TransferPtr(new Port(this, mInputs.size(), std::move(name), capacity, Port::Direction::eInput)));
+            mInputs.emplace_back(TransferPtr(new Port(this, mInputs.size(), std::move(name), capacity, Port::Direction::eInput)));
         }
 
         void addOutput(std::string name, Port::Capacity capacity) {
-            mOutputs.emplace_back(gfx::TransferPtr(new Port(this, mOutputs.size(), std::move(name), capacity, Port::Direction::eOutput)));
+            mOutputs.emplace_back(TransferPtr(new Port(this, mOutputs.size(), std::move(name), capacity, Port::Direction::eOutput)));
         }
 
     private:
@@ -194,7 +194,7 @@ public:
         }
     };
 
-    struct Link : gfx::Referencing {
+    struct Link : Object {
         friend GraphView;
 
     private:
@@ -345,7 +345,7 @@ private:
             removeLinks(portB);
         }
 
-        auto link = mLinks.emplace_back(gfx::TransferPtr(new Link(portA, portB)));
+        auto link = mLinks.emplace_back(TransferPtr(new Link(portA, portB)));
         portA->mLinks.emplace(link);
         portB->mLinks.emplace(link);
         return link;
@@ -381,7 +381,7 @@ private:
 
 public:
     auto addNode(std::string text) -> sp<Node> {
-        return mNodes.emplace_back(gfx::TransferPtr(new Node(std::move(text))));
+        return mNodes.emplace_back(TransferPtr(new Node(std::move(text))));
     }
 
     void update() {

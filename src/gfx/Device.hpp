@@ -1,75 +1,64 @@
 #pragma once
 
-#include "vk_mem_alloc.h"
-#include "Object.hpp"
-
-#include <vulkan/vulkan.hpp>
+#include "Instance.hpp"
 
 namespace gfx {
     struct Buffer;
-    struct Context;
     struct Texture;
+    struct Surface;
     struct Sampler;
     struct Library;
     struct Function;
     struct Drawable;
     struct Swapchain;
     struct CommandQueue;
-    struct CommandBuffer;
     struct DescriptorSet;
-    struct TextureDescription;
+    struct TextureSettings;
     struct RenderPipelineState;
     struct ComputePipelineState;
-    struct RenderCommandEncoder;
     struct RenderPipelineStateDescription;
 
-    struct Device final : Referencing {
-        friend Buffer;
-        friend Context;
-        friend Texture;
-        friend Sampler;
-        friend Library;
-        friend Function;
-        friend Drawable;
-        friend Swapchain;
-        friend CommandQueue;
-        friend CommandBuffer;
-        friend DescriptorSet;
-        friend RenderPipelineState;
-        friend ComputePipelineState;
-        friend RenderPipelineStateDescription;
+    struct DeviceShared {
+        Instance instance;
+        raii::Device raii;
+        vk::PhysicalDevice adapter;
+        uint32_t family_index;
+        uint32_t queue_index;
+        vk::Queue raw_queue;
+        VmaAllocator allocator;
 
-    private:
-        Context* pContext = {};
-        VmaAllocator mAllocator = {};
+        explicit DeviceShared(Instance instance, raii::Device raii, vk::PhysicalDevice adapter, uint32_t family_index, uint32_t queue_index, vk::Queue raw_queue, VmaAllocator allocator);
 
-        vk::Device mDevice = {};
-        vk::PhysicalDevice mPhysicalDevice = {};
-        vk::DispatchLoaderDynamic mDispatchLoaderDynamic = {};
+        ~DeviceShared();
+    };
 
-        uint32_t mPresentQueueFamilyIndex = {};
-        uint32_t mComputeQueueFamilyIndex = {};
-        uint32_t mGraphicsQueueFamilyIndex = {};
+    struct SurfaceConfiguration {
+        vk::Format          format       = {};
+        vk::ColorSpaceKHR   color_space  = {};
+        uint32_t            image_count  = {};
+        vk::PresentModeKHR  present_mode = {};
+        bool                clipped      = {};
+    };
 
-        vk::Queue mComputeQueue = {};
-        vk::Queue mPresentQueue = {};
-        vk::Queue mGraphicsQueue = {};
+    struct Device final {
+        std::shared_ptr<DeviceShared> shared;
 
-    private:
-        explicit Device(Context* context, vk::PhysicalDevice gpu);
-        ~Device() override;
+        explicit Device();
+        explicit Device(std::shared_ptr<DeviceShared> shared);
 
-    public:
+        auto handle() -> vk::Device;
+        auto dispatcher() -> const vk::raii::DeviceDispatcher&;
+        auto allocator() -> VmaAllocator;
         void waitIdle();
-
-        auto newTexture(const TextureDescription& description) -> SharedPtr<Texture>;
-        auto newSampler(const vk::SamplerCreateInfo& info) -> SharedPtr<Sampler>;
-        auto newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAllocationCreateFlags options = 0) -> SharedPtr<Buffer>;
-        auto newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, VmaAllocationCreateFlags options = 0) -> SharedPtr<Buffer>;
-        auto newLibrary(const std::vector<char>& bytes) -> SharedPtr<Library>;
-        auto newRenderPipelineState(const RenderPipelineStateDescription& description) -> SharedPtr<RenderPipelineState>;
-        auto newComputePipelineState(const SharedPtr<Function>& function) -> SharedPtr<ComputePipelineState>;
-        auto newCommandQueue() -> SharedPtr<CommandQueue>;
-        auto newDescriptorSet(vk::DescriptorSetLayout layout, const std::vector<vk::DescriptorPoolSize>& sizes) -> SharedPtr<DescriptorSet>;
+        auto newTexture(const TextureSettings& description) -> Texture;
+        auto newSampler(const vk::SamplerCreateInfo& info) -> Sampler;
+        auto newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAllocationCreateFlags options = 0) -> Buffer;
+        auto newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, VmaAllocationCreateFlags options = 0) -> Buffer;
+        auto newLibrary(const std::vector<char>& bytes) -> Library;
+        auto newRenderPipelineState(const RenderPipelineStateDescription& description) -> RenderPipelineState;
+        auto newComputePipelineState(const Function& function) -> ComputePipelineState;
+        auto newCommandQueue() -> CommandQueue;
+        auto newDescriptorSet(vk::DescriptorSetLayout layout, const std::vector<vk::DescriptorPoolSize>& sizes) -> DescriptorSet;
+        auto createSwapchain(Surface const& surface, const SurfaceConfiguration& config) -> Swapchain;
     };
 }
