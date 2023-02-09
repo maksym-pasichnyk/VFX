@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Core.hpp"
+#include "Object.hpp"
+#include "Graphics.hpp"
 #include "Primitive.hpp"
 
 #include "glm/glm.hpp"
@@ -8,6 +9,7 @@
 struct Vertex {
     alignas(16) glm::vec3 position;
     alignas(16) glm::vec4 color;
+    alignas(16) glm::vec2 uv;
 };
 
 struct Mesh : Object {

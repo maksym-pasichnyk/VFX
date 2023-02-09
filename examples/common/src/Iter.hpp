@@ -4,9 +4,7 @@
 
 namespace cxx {
     template<typename T>
-    struct Iter {
-        T impl;
-
+    struct Iter : T {
         template<typename Fn>
         static constexpr auto wrap(Fn&& fn) {
             return [fn = std::forward<Fn>(fn)](auto&& args) {
@@ -18,32 +16,24 @@ namespace cxx {
             };
         }
 
-        friend constexpr auto begin(const Iter& iter) noexcept {
-            return std::ranges::begin(iter.impl);
-        }
-
-        friend constexpr auto end(const Iter& iter) noexcept {
-            return std::ranges::end(iter.impl);
-        }
-
         template<typename Fn>
         constexpr auto any(Fn&& fn) {
-            return ranges::any_of(impl, wrap(std::forward<Fn>(fn)));
+            return ranges::any_of(*this, wrap(std::forward<Fn>(fn)));
         }
 
         template<typename Fn>
         constexpr auto all(Fn&& fn) {
-            return ranges::all_of(impl, wrap(std::forward<Fn>(fn)));
+            return ranges::all_of(*this, wrap(std::forward<Fn>(fn)));
         }
 
         template<typename Fn>
         constexpr auto where(Fn&& fn) {
-            return ::cxx::Iter{ranges::views::filter(impl, wrap(std::forward<Fn>(fn)))};
+            return ::cxx::Iter{ranges::views::filter(*this, wrap(std::forward<Fn>(fn)))};
         }
 
         template<typename Fn>
         constexpr auto map(Fn&& fn) {
-            return ::cxx::Iter{ranges::views::transform(impl, wrap(std::forward<Fn>(fn)))};
+            return ::cxx::Iter{ranges::views::transform(*this, wrap(std::forward<Fn>(fn)))};
         }
 
         template<typename Fn>
@@ -53,34 +43,34 @@ namespace cxx {
 
         template<typename R, typename Fn>
         constexpr auto reduce(R&& init, Fn&& fn) -> R {
-            return ranges::accumulate(impl, init, wrap(std::forward<Fn>(fn)));
+            return ranges::accumulate(*this, init, wrap(std::forward<Fn>(fn)));
         }
 
         template<typename Fn>
         constexpr void for_each(Fn&& fn) {
-            ranges::for_each(impl, wrap(std::forward<Fn>(fn)));
+            ranges::for_each(*this, wrap(std::forward<Fn>(fn)));
         }
 
         constexpr auto zip(auto&& ... iter) {
-            return ::cxx::Iter{ranges::views::zip(impl, std::forward<decltype(iter)>(iter)...)};
+            return ::cxx::Iter{ranges::views::zip(*this, std::forward<decltype(iter)>(iter)...)};
         }
 
         constexpr auto join() {
-            return ::cxx::Iter{ranges::views::join(impl)};
+            return ::cxx::Iter{ranges::views::join(*this)};
         }
 
         template<typename Tp>
         constexpr auto to() -> Tp {
-            return ranges::to<Tp>(impl);
+            return ranges::to<Tp>(*this);
         }
 
         template<typename U>
         constexpr auto split(U&& val) {
-            return ::cxx::Iter{ranges::views::split(impl, std::forward<U>(val))};
+            return ::cxx::Iter{ranges::views::split(*this, std::forward<U>(val))};
         }
 
         constexpr auto collect() {
-            return ranges::to_vector(impl);
+            return ranges::to_vector(*this);
         }
     };
 
@@ -89,11 +79,11 @@ namespace cxx {
 
     template<typename T>
     inline auto iter(T& range) {
-        return Iter<T&>{range};
+        return Iter{ranges::views::ref(range)};
     }
 
     template<typename T>
     inline auto iter(T&& range) {
-        return Iter<T>{std::forward<T>(range)};
+        return Iter{ranges::make_view_closure(std::forward<T>(range))};
     }
 }

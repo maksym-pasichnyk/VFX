@@ -223,8 +223,8 @@ public:
         return Size{w, h};
     }
 
-
-protected:
+//todo: make this private
+//protected:
     bool running{};
     SDL_Window* window;
 

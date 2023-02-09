@@ -18,11 +18,8 @@ gfx::CommandBufferShared::CommandBufferShared(gfx::Device device, gfx::CommandQu
     allocate_info.setCommandBufferCount(1);
     vk::resultCheck(device.handle().allocateCommandBuffers(&allocate_info, &raw, device.dispatcher()), "allocateCommandBuffers");
 
-    vk::FenceCreateInfo fence_create_info = {};
-    fence = device.handle().createFence(fence_create_info, nullptr, device.dispatcher());
-
-    vk::SemaphoreCreateInfo semaphore_create_info = {};
-    semaphore = device.handle().createSemaphore(semaphore_create_info, nullptr, device.dispatcher());
+    fence = device.handle().createFence(vk::FenceCreateInfo(), nullptr, device.dispatcher());
+    semaphore = device.handle().createSemaphore(vk::SemaphoreCreateInfo(), nullptr, device.dispatcher());
 }
 
 gfx::CommandBufferShared::~CommandBufferShared() {

@@ -1,16 +1,12 @@
 #pragma once
 
 #include <vector>
-#include <fstream>
-#include <filesystem>
+#include "fstream.hpp"
+#include "filesystem.hpp"
 
 struct Assets {
-    static auto readFile(const std::filesystem::path& path) -> std::vector<char> {
-        auto full_path = std::filesystem::current_path() / "assets" / path;
-
-        std::vector<char> out(std::filesystem::file_size(full_path));
-        std::ifstream file{full_path, std::ios::binary};
-        file.read(out.data(), std::streamsize(out.size()));
-        return out;
+    static auto readFile(const cxx::filesystem::path& path) -> std::vector<char> {
+        cxx::ifstream file{path};
+        return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
     }
 };
