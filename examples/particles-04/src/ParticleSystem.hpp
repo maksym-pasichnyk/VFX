@@ -1,9 +1,10 @@
 #pragma once
 
-#include "Core.hpp"
+#include "Object.hpp"
 #include "Assets.hpp"
 #include "Signal.hpp"
 #include "Particle.hpp"
+#include "Graphics.hpp"
 
 struct ParticleSystem : Object {
 private:

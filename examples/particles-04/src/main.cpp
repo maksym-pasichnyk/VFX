@@ -1,9 +1,6 @@
 #include "Assets.hpp"
 #include "GraphView.hpp"
-#include "UIContext.hpp"
-#include "UIRenderer.hpp"
 #include "Application.hpp"
-
 #include "ParticleSystem.hpp"
 #include "ParticleEmitter.hpp"
 #include "RocketParticleEmitter.hpp"

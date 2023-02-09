@@ -1,14 +1,15 @@
 #pragma once
 
-#include "Core.hpp"
-#include "UISize.hpp"
-#include "spdlog/spdlog.h"
-
-#include <SDL_video.h>
-#include <SDL_vulkan.h>
+#include "Graphics.hpp"
+#include "UIContext.hpp"
+#include "UIRenderer.hpp"
+#include "NotSwiftUI/NotSwiftUI.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
+
+#include <SDL_video.h>
+#include <SDL_vulkan.h>
 #include <SDL_events.h>
 
 struct ShaderData {
@@ -43,6 +44,9 @@ public:
 
         commandQueue = device.newCommandQueue();
         commandBuffer = commandQueue.commandBuffer();
+
+        uiRenderer = sp<UIRenderer>::of(device);
+        uiContext = sp<UIContext>::of(uiRenderer->drawList());
     }
 
     ~Application() {
@@ -69,6 +73,9 @@ public:
             average = accumulateTotal / static_cast<float_t>(accumulateCount);
 
             _pollEvents();
+
+            uiRenderer->setCurrentContext();
+            uiRenderer->setScreenSize(getUISize(getWindowSize()));
 
             update(elapsed);
             render();
@@ -113,18 +120,13 @@ public:
     virtual void mouseUp(SDL_MouseButtonEvent* event) {}
     virtual void mouseDown(SDL_MouseButtonEvent* event) {}
     virtual void mouseWheel(SDL_MouseWheelEvent* event) {}
-
-public:
-    virtual void performClose(uint32_t windowId) {
-
-    }
-
+    virtual void performClose(uint32_t windowId) {}
     virtual void performResize(uint32_t windowId) {
 //        swapchain->setDrawableSize(getDrawableSize());
 //        swapchain->releaseDrawables();
     }
 
-private:
+protected:
     void _pollEvents() {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -176,6 +178,17 @@ private:
         }
     }
 
+    auto _drawView(const sp<View>& view) {
+        auto uiSize = getUISize(getWindowSize());
+        auto childSize = view->_size(ProposedSize(uiSize));
+        auto translate = view->translation(childSize, uiSize, Alignment::center());
+
+        uiContext->saveState();
+        uiContext->translateBy(translate.x, translate.y);
+        view->_draw(uiContext, childSize);
+        uiContext->restoreState();
+    }
+
 public:
     static auto getPerspectiveProjection(float_t fovy, float_t aspect, float_t zNear, float_t zFar) -> glm::mat4x4 {
         float_t range = tan(fovy * 0.5F);
@@ -194,9 +207,12 @@ public:
         };
     }
 
-    static auto getUISize(const vk::Extent2D& size) -> UISize {
-        return UISize(size.width, size.height);
+    static auto getUISize(const vk::Extent2D& size) -> Size {
+        auto w = static_cast<float_t>(size.width);
+        auto h = static_cast<float_t>(size.height);
+        return Size{w, h};
     }
+
 
 protected:
     bool running{};
@@ -216,4 +232,7 @@ protected:
     gfx::Swapchain swapchain;
     gfx::CommandQueue commandQueue;
     gfx::CommandBuffer commandBuffer;
+
+    sp<UIContext> uiContext;
+    sp<UIRenderer> uiRenderer;
 };

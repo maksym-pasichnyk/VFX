@@ -141,6 +141,6 @@ void UIRenderer::setScale(float_t scale) {
     mScale = scale;
 }
 
-void UIRenderer::setScreenSize(const UISize& size) {
+void UIRenderer::setScreenSize(const Size& size) {
     mScreenSize = size;
 }

@@ -1,7 +1,6 @@
 #pragma once
 
-#include "UIContext.hpp"
-#include "NotSwiftUI/View.hpp"
+#include "NotSwiftUI/NotSwiftUI.hpp"
 
 #include <set>
 #include <list>
@@ -58,8 +57,8 @@ public:
 
     private:
         std::string mText;
-        UISize mSize = UISize(450.0F, 250.0F);
-        UIPoint mPosition = UIPoint(0.0F, 0.0F);
+        Size mSize = Size{450.0F, 250.0F};
+        Point mPosition = Point::zero();
 
         std::vector<sp<Port>> mInputs = {};
         std::vector<sp<Port>> mOutputs = {};
@@ -68,19 +67,19 @@ public:
         explicit Node(std::string text) : mText(std::move(text)) {}
 
     public:
-        auto size() -> const UISize& {
+        auto size() -> const Size& {
             return mSize;
         }
 
-        void setSize(const UISize& size) {
+        void setSize(const Size& size) {
             mSize = size;
         }
 
-        auto position() -> const UIPoint& {
+        auto position() -> const Point& {
             return mPosition;
         }
 
-        void setPosition(const UIPoint& point) {
+        void setPosition(const Point& point) {
             mPosition = point;
         }
 
@@ -106,34 +105,34 @@ public:
 
             context->saveState();
             context->translateBy(mPosition.x, mPosition.y);
-            context->setFillColor(UIColor::rgba32(28, 28, 28, 245));
+            context->setFillColor(Color::rgba32(28, 28, 28, 245));
             context->drawRectFilled(mSize, 5.0F);
             if (selected) {
-                context->setFillColor(UIColor::rgba32(4, 156, 227, 255));
+                context->setFillColor(Color::rgba32(4, 156, 227, 255));
             } else {
-                context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
+                context->setFillColor(Color::rgba32(0, 0, 0, 255));
             }
             context->drawRect(mSize, 2.0F, 5.0F);
-            context->drawLine(UIPoint(0, 50.0F), UIPoint(mSize.width, 50.0F), 2.0F);
-            context->setFillColor(UIColor(1, 1, 1, 1));
+            context->drawLine(Point{0, 50.0F}, Point{mSize.width, 50.0F}, 2.0F);
+            context->setFillColor(Color::rgba32(255, 255, 255, 255));
             context->translateBy(mSize.width * 0.5F, 50.0F * 0.5F);
             context->translateBy(-textSize1.x * 0.5F, -textSize1.y * 0.5F);
             context->drawText(mText, 36.0F);
             context->restoreState();
 
             for (auto& port : mInputs) {
-                UIPoint slot = _getSlotPosition(port);
+                Point slot = _getSlotPosition(port);
 
                 context->saveState();
                 context->translateBy(slot.x, slot.y);
 
                 context->translateBy(-10.0F, -10.0F);
-                context->setFillColor(UIColor::rgba32(37, 150, 190, 255));
+                context->setFillColor(Color::rgba32(37, 150, 190, 255));
                 context->drawCircleFilled(10.0F);
 
                 if (port->mLinks.empty()) {
                     context->translateBy(2.0F, 2.0F);
-                    context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
+                    context->setFillColor(Color::rgba32(0, 0, 0, 255));
                     context->drawCircleFilled(8.0F);
                 }
 
@@ -151,18 +150,18 @@ public:
             }
 
             for (auto& port : mOutputs) {
-                UIPoint slot = _getSlotPosition(port);
+                Point slot = _getSlotPosition(port);
 
                 context->saveState();
                 context->translateBy(slot.x, slot.y);
                 context->translateBy(-10.0F, -10.0F);
 
-                context->setFillColor(UIColor::rgba32(37, 150, 190, 255));
+                context->setFillColor(Color::rgba32(37, 150, 190, 255));
                 context->drawCircleFilled(10.0F);
 
                 if (port->mLinks.empty()) {
                     context->translateBy(2.0F, 2.0F);
-                    context->setFillColor(UIColor::rgba32(0, 0, 0, 255));
+                    context->setFillColor(Color::rgba32(0, 0, 0, 255));
                     context->drawCircleFilled(8.0F);
                 }
 
@@ -181,15 +180,15 @@ public:
             }
         }
 
-        auto _getSlotPosition(const sp<Port>& port) -> UIPoint {
+        auto _getSlotPosition(const sp<Port>& port) -> Point {
             if (port->mDirection == Port::Direction::eInput) {
                 float_t x = mPosition.x + 10.0F + 10.0F + 10.0F;
                 float_t y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * static_cast<float_t>(port->mIndex);
-                return UIPoint(x, y);
+                return Point{x, y};
             } else {
                 float_t x = mPosition.x + 10.0F + mSize.width - 20.0F - 10.0F;
                 float_t y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * static_cast<float_t>(port->mIndex);
-                return UIPoint(x, y);
+                return Point{x, y};
             }
         }
     };
@@ -209,15 +208,15 @@ public:
 private:
     float_t mZoomScale = 2.0F;
     float_t mTargetZoomScale = 2.0F;
-    UIPoint mTargetZoomPoint = UIPoint();
+    Point mTargetZoomPoint = Point();
 
     std::list<sp<Node>> mNodes = {};
     std::list<sp<Link>> mLinks = {};
 
-    UIPoint mGridOffset = UIPoint();
-    UIPoint mStartPosition = UIPoint();
-    UIPoint mMousePosition = UIPoint();
-    UIPoint mCursorPosition = UIPoint();
+    Point mGridOffset = Point();
+    Point mStartPosition = Point();
+    Point mMousePosition = Point();
+    Point mCursorPosition = Point();
     Interaction mInteraction = Interaction::eNone;
 
     sp<Node> mSelectedNode = {};
@@ -225,26 +224,26 @@ private:
     sp<Link> mSelectedLink = {};
 
 private:
-    auto _size(const ProposedSize &proposed) -> UISize override {
+    auto _size(const ProposedSize &proposed) -> Size override {
         return proposed.orMax();
     }
 
-    void _draw(const sp<UIContext> &context, const UISize& size) override {
+    void _draw(const sp<UIContext> &context, const Size& size) override {
         float invScale = 1.0F / mZoomScale;
 
         context->saveState();
-        context->setFillColor(UIColor::rgba32(45, 45, 45, 255));
+        context->setFillColor(Color::rgba32(45, 45, 45, 255));
         context->drawRectFilled(size);
-        context->setFillColor(UIColor(0.0F, 0.0F, 0.0F, 0.25F));
+        context->setFillColor(Color{0.0F, 0.0F, 0.0F, 0.25F});
 
         float_t cellSize = 50.0F * invScale;
         float_t x = std::fmod(mGridOffset.x * invScale, cellSize);
         float_t y = std::fmod(mGridOffset.y * invScale, cellSize);
         for (; x < size.width; x += cellSize) {
-            context->drawLine(UIPoint(x, 0.0F), UIPoint(x, size.height), 1.0F);
+            context->drawLine(Point{x, 0.0F}, Point{x, size.height}, 1.0F);
         }
         for (; y < size.height; y += cellSize) {
-            context->drawLine(UIPoint(0.0F, y), UIPoint(size.width, y), 1.0F);
+            context->drawLine(Point{0.0F, y}, Point{size.width, y}, 1.0F);
         }
         context->restoreState();
 
@@ -253,8 +252,8 @@ private:
         context->scaleBy(invScale, invScale);
 
         for (auto& link : mLinks) {
-            UIPoint pointA = link->mPortA->pNode->_getSlotPosition(link->mPortA);
-            UIPoint pointD = link->mPortB->pNode->_getSlotPosition(link->mPortB);
+            Point pointA = link->mPortA->pNode->_getSlotPosition(link->mPortA);
+            Point pointD = link->mPortB->pNode->_getSlotPosition(link->mPortB);
 
             drawLink(context, pointA, pointD);
 
@@ -288,9 +287,9 @@ private:
         context->restoreState();
     }
 
-    void drawLink(const sp<UIContext> &context, const UIPoint& pointA, const UIPoint& pointD, ImU32 color = IM_COL32(255, 255, 255, 255)) {
-        UIPoint pointB = pointA + UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
-        UIPoint pointC = pointD - UIPoint(std::abs(pointD.x - pointA.x), 0.0F);
+    void drawLink(const sp<UIContext> &context, const Point& pointA, const Point& pointD, ImU32 color = IM_COL32(255, 255, 255, 255)) {
+        Point pointB = pointA + Point{std::abs(pointD.x - pointA.x), 0.0F};
+        Point pointC = pointD - Point{std::abs(pointD.x - pointA.x), 0.0F};
 
         ImVec2 p1 = ImVec2(mGridOffset.x + pointA.x, mGridOffset.y + pointA.y);
         ImVec2 p2 = ImVec2(mGridOffset.x + pointB.x, mGridOffset.y + pointB.y);
@@ -303,8 +302,10 @@ private:
     }
 
     auto findNodeAt(int32_t x, int32_t y) -> sp<Node> {
+        auto uiPoint = Point{static_cast<float_t>(x), static_cast<float_t>(y)};
+
         for (auto& node : ranges::reverse_view(mNodes)) {
-            UIPoint p = UIPoint(x, y) - node->mPosition;
+            Point p = uiPoint - node->mPosition;
             if (p.x < 0.0F || p.x > node->mSize.width) {
                 continue;
             }
@@ -317,14 +318,16 @@ private:
     }
 
     auto findPortAt(const sp<Node>& node, int32_t x, int32_t y) -> sp<Port> {
+        auto uiPoint = Point{static_cast<float_t>(x), static_cast<float_t>(y)};
+
         for (auto& port : node->mInputs) {
-            UIPoint p = UIPoint(x, y) - node->_getSlotPosition(port);
+            Point p = uiPoint - node->_getSlotPosition(port);
             if (std::abs(p.x) <= 10.0F && std::abs(p.y) <= 10.0F) {
                 return port;
             }
         }
         for (auto& port : node->mOutputs) {
-            UIPoint p = UIPoint(x, y) - node->_getSlotPosition(port);
+            Point p = uiPoint - node->_getSlotPosition(port);
             if (std::abs(p.x) <= 10.0F && std::abs(p.y) <= 10.0F) {
                 return port;
             }
@@ -402,8 +405,10 @@ public:
         int32_t x, y;
         SDL_GetMouseState(&x, &y);
 
+        auto uiPoint = Point{static_cast<float_t>(x), static_cast<float_t>(y)};
+
         mStartPosition = mMousePosition;
-        mMousePosition = UIPoint(x, y);
+        mMousePosition = uiPoint;
         mCursorPosition = mMousePosition * mZoomScale - mGridOffset;
 
         auto drag = (mMousePosition - mStartPosition) * mZoomScale;
@@ -483,7 +488,7 @@ public:
         if (mInteraction == Interaction::eNone || mInteraction == Interaction::eZoom) {
             mInteraction = Interaction::eZoom;
 
-            mTargetZoomScale -= event->y;
+            mTargetZoomScale -= static_cast<float_t>(event->y);
             mTargetZoomScale = std::min(std::max(mTargetZoomScale, 1.0F), 5.0F);
             mTargetZoomPoint = mGridOffset + mMousePosition * (mTargetZoomScale - mZoomScale);
         }

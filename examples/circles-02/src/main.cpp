@@ -1,37 +1,29 @@
-#include "tiny_gltf.h"
-#include "fmt/format.h"
-#include "UIContext.hpp"
-#include "UIRenderer.hpp"
 #include "Application.hpp"
-#include "NotSwiftUI/View.hpp"
 
 struct Game : Application {
 public:
     Game() : Application("Circles-02") {
-        uiRenderer = sp<UIRenderer>::of(device);
-
         content =
-            sp<HStack>::of(ViewBuilder::arrayOf(
-                sp<VStack>::of(ViewBuilder::arrayOf(
-                    sp<HStack>::of(ViewBuilder::arrayOf(
-                        sp<Circle>::of(),
-                        sp<Circle>::of(),
-                        sp<Circle>::of()
-                    )),
-                    sp<HStack>::of(ViewBuilder::arrayOf(
-                        sp<Circle>::of(),
-                        sp<Circle>::of(),
-                        sp<Circle>::of()
-                    )),
-                    sp<HStack>::of(ViewBuilder::arrayOf(
-                        sp<Circle>::of(),
-                        sp<Circle>::of(),
-                        sp<Circle>::of()
-                    ))
-                ))
-            ))
-            ->border(UIColor(1, 1, 1, 0.25F), 4)
-            ->frame(std::nullopt, std::nullopt);
+            HStack(VerticalAlignment::center(), std::nullopt, {
+                VStack(HorizontalAlignment::center(), std::nullopt, {
+                    HStack(VerticalAlignment::center(), std::nullopt, {
+                        Shape(sp<Circle>::of()),
+                        Shape(sp<Circle>::of()),
+                        Shape(sp<Circle>::of()),
+                    }),
+                    HStack(VerticalAlignment::center(), std::nullopt, {
+                        Shape(sp<Circle>::of()),
+                        Shape(sp<Circle>::of()),
+                        Shape(sp<Circle>::of()),
+                    }),
+                    HStack(VerticalAlignment::center(), std::nullopt, {
+                        Shape(sp<Circle>::of()),
+                        Shape(sp<Circle>::of()),
+                        Shape(sp<Circle>::of()),
+                    })
+                })
+            })
+            ->border(Color{1, 1, 1, 0.25F}, 4);
     }
 
 public:
@@ -74,7 +66,7 @@ public:
         auto ctx = sp<UIContext>::of(uiRenderer->drawList());
 
         uiRenderer->resetForNewFrame();
-        content->_draw(ctx, getUISize(getWindowSize()));
+        _drawView(content);
         uiRenderer->draw(commandBuffer);
 
         commandBuffer.endRendering();
@@ -88,7 +80,6 @@ public:
 
 private:
     sp<View> content;
-    sp<UIRenderer> uiRenderer;
 };
 
 auto main() -> int32_t {

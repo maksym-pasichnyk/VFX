@@ -4,32 +4,30 @@
 #include "UIRenderer.hpp"
 #include "Application.hpp"
 
+#include "fmt/core.h"
+
 struct Game : Application {
 public:
     Game() : Application("Nodes-05") {
-        uiRenderer = sp<UIRenderer>::of(device);
         graphView = sp<GraphView>::of();
 
         auto nodeA = graphView->addNode("Node A");
         nodeA->addOutput("Return Value", GraphView::Port::Capacity::eMulti);
-        nodeA->setPosition(UIPoint(125, 110));
+        nodeA->setPosition(Point{125, 110});
 
         auto nodeB = graphView->addNode("Node B");
         nodeB->addOutput("Return Value", GraphView::Port::Capacity::eMulti);
-        nodeB->setPosition(UIPoint(125, 710));
+        nodeB->setPosition(Point{125, 710});
 
         auto nodeC = graphView->addNode("Node C");
         nodeC->addInput("A", GraphView::Port::Capacity::eSingle);
         nodeC->addInput("B", GraphView::Port::Capacity::eSingle);
         nodeC->addOutput("Return Value", GraphView::Port::Capacity::eMulti);
-        nodeC->setPosition(UIPoint(825, 330));
+        nodeC->setPosition(Point{825, 330});
     }
 
 public:
     void update(float_t dt) override {
-        uiRenderer->setCurrentContext();
-        uiRenderer->setScreenSize(getUISize(getWindowSize()));
-
         ImGui::GetIO().DeltaTime = dt;
         graphView->update();
     }
@@ -65,18 +63,14 @@ public:
         commandBuffer.setScissor(0, rendering_area);
         commandBuffer.setViewport(0, rendering_viewport);
 
-        auto ctx = sp<UIContext>::of(uiRenderer->drawList());
-
-        auto body = graphView
-            ->overlay(
-                sp<Text>::of(fmt::format("FPS {:.0F}", 1.0F / average), ctx->drawList()->_Data->Font, 24.0F)
-                    ->fixedSize(true, true),
-                Alignment::topLeading()
-            )
-            ->frame(std::nullopt, std::nullopt);
+        auto font = uiContext->drawList()->_Data->Font;
+        auto view = graphView->overlay(
+            Text(fmt::format("FPS {:.0F}", 1.0F / average), font, 24.0F)->fixedSize(true, true),
+            Alignment::topLeading()
+        );
 
         uiRenderer->resetForNewFrame();
-        body->_draw(ctx, body->_size(ProposedSize(getUISize(getWindowSize()))));
+        _drawView(view);
         uiRenderer->draw(commandBuffer);
 
         commandBuffer.endRendering();
@@ -102,8 +96,6 @@ public:
 
 private:
     sp<GraphView> graphView;
-    sp<UIContext> uiContext;
-    sp<UIRenderer> uiRenderer;
 };
 
 auto main() -> int32_t {

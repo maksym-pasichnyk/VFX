@@ -1,10 +1,5 @@
-#include "simd.hpp"
-#include "tiny_gltf.h"
-#include "fmt/format.h"
-
 #include "Assets.hpp"
 #include "Application.hpp"
-#include "NotSwiftUI/View.hpp"
 
 struct Game : Application {
 public:
@@ -79,8 +74,8 @@ private:
 
     void buildBuffers() {
         struct Vertex {
-            simd::float3 position;
-            simd::float3 color;
+            alignas(16) glm::vec3 position;
+            alignas(16) glm::vec3 color;
         };
 
         Vertex vertices[] = {

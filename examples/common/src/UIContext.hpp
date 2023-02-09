@@ -1,9 +1,9 @@
 #pragma once
 
-#include "UISize.hpp"
-#include "UIPoint.hpp"
-#include "UIColor.hpp"
 #include "Object.hpp"
+#include "NotSwiftUI/Core/Size.hpp"
+#include "NotSwiftUI/Core/Point.hpp"
+#include "NotSwiftUI/Core/Color.hpp"
 
 #include <stack>
 
@@ -17,7 +17,7 @@ private:
         float_t y = 0.0F;
         float_t scaleX = 1.0F;
         float_t scaleY = 1.0F;
-        UIColor fillColor = UIColor(1.0F, 1.0F, 1.0F, 1.0F);
+        Color fillColor = {1.0F, 1.0F, 1.0F, 1.0F};
     };
 
     ImDrawList* pDrawList;
@@ -33,7 +33,7 @@ public:
         return pDrawList;
     }
 
-    void setFillColor(const UIColor& color) {
+    void setFillColor(const Color& color) {
         mCurrentState.fillColor = color;
     }
 
@@ -68,7 +68,7 @@ public:
         virtual void stroke(ImDrawList* drawList) = 0;
     };
 
-    void drawRect(const UISize& size, float_t width, float_t rounding = 0.0F) {
+    void drawRect(const Size& size, float_t width, float_t rounding = 0.0F) {
         if (mCurrentState.fillColor.a == 0.0F) {
             return;
         }
@@ -86,7 +86,7 @@ public:
         pDrawList->AddRect(ImVec2(x0, y0), ImVec2(x1, y1), imColor, rounding, ImDrawFlags_RoundCornersAll, width);
     }
 
-    void drawRectFilled(const UISize& size, float_t rounding = 0.0F) {
+    void drawRectFilled(const Size& size, float_t rounding = 0.0F) {
         ImU32 imColor = static_cast<ImU32>(ImColor(
             mCurrentState.fillColor.r,
             mCurrentState.fillColor.g,
@@ -124,7 +124,7 @@ public:
         pDrawList->AddCircleFilled(ImVec2(x, y), radius, imColor, 100);
     }
 
-    void drawLine(const UIPoint& p1, const UIPoint& p2, float width) {
+    void drawLine(const Point& p1, const Point& p2, float width) {
         ImU32 imColor = static_cast<ImU32>(ImColor(
             mCurrentState.fillColor.r,
             mCurrentState.fillColor.g,

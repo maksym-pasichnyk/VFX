@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Core.hpp"
+#include "Object.hpp"
+#include "Graphics.hpp"
 #include "UIContext.hpp"
 
 struct UIRenderer : Object {
@@ -18,11 +19,11 @@ public:
     auto drawList() -> ImDrawList*;
     void draw(gfx::CommandBuffer cmd);
     void setScale(float_t scale);
-    void setScreenSize(const UISize& size);
+    void setScreenSize(const Size& size);
 
 private:
     float_t mScale = 1.0F;
-    UISize mScreenSize = UISize(0.0F, 0.0F);
+    Size mScreenSize = Size::zero();
 
     ImDrawList mDrawList;
     ImFontAtlas mFontAtlas = {};
