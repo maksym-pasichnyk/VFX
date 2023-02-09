@@ -3,6 +3,7 @@
 #include "texture/SpriteAtlas.hpp"
 
 #include "fstream.hpp"
+#include "spdlog/spdlog.h"
 
 static std::string MISSING_MODEL_MESH = R"("{
     "textures": {
@@ -27,10 +28,12 @@ static std::string MISSING_MODEL_MESH = R"("{
 
 extern sp<MappedRegistry<sp<Block>>> BLOCK;
 
-ModelBakery::ModelBakery() {
+void ModelBakery::reload(gfx::Device device) {
     for (const auto& block : BLOCK->values()) {
         getTopLevel(BLOCK->getKey(block).value(), block->getStateDefinition());
     }
+
+    atlases.clear();
 
     auto modelLoader = std::bind_front(std::mem_fn(&ModelBakery::getModel), this);
     auto materials = cxx::iter(ranges::views::values(unbakedTopLevelModels))
@@ -41,7 +44,7 @@ ModelBakery::ModelBakery() {
 
     auto atlas = sp<SpriteAtlas>::of("textures/atlas/blocks.png");
     atlas->pack(materials);
-    atlas->reload();
+    atlas->reload(device);
 
     atlases.emplace_back(atlas);
 }

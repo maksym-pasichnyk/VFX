@@ -17,8 +17,9 @@ auto ModelManager::stateToModelLocation(const sp<BlockState>& state) -> std::str
     return fmt::format("{}#{}", name, fmt::join(values, ","));
 }
 
-void ModelManager::reload() {
+void ModelManager::reload(gfx::Device device) {
     modelBakery = sp<ModelBakery>::of();
+    modelBakery->reload(device);
     modelBakery->uploadTextures(textureManager);
 
 //    missing = modelBakery->getBakedTopLevelModels().at("missing");

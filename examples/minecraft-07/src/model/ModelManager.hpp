@@ -18,7 +18,7 @@ private:
 public:
     explicit ModelManager(const sp<TextureManager>& textureManager);
 
-    void reload();
+    void reload(gfx::Device device);
     auto getModel(const std::string& name) const -> sp<BakedModel>;
     auto getModel(const sp<BlockState>& state) const -> sp<BakedModel>;
 

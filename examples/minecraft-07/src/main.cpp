@@ -1,30 +1,24 @@
 #include "Mesh.hpp"
 #include "Assets.hpp"
 #include "Application.hpp"
-
 #include "block/Block.hpp"
 #include "block/Material.hpp"
-#include "registry/DefaultedRegistry.hpp"
-
 #include "model/ModelManager.hpp"
 #include "loaders/BlockLoader.hpp"
 #include "loaders/MaterialLoader.hpp"
 #include "texture/TextureManager.hpp"
+#include "registry/DefaultedRegistry.hpp"
 
 #include "fmt/format.h"
-#include "glm/gtx/euler_angles.hpp"
 #include "filesystem.hpp"
+#include "glm/gtx/euler_angles.hpp"
 
 sp<MappedRegistry<sp<Block>>> BLOCK = sp<MappedRegistry<sp<Block>>>::of();
 sp<MappedRegistry<sp<Material>>> MATERIAL = sp<MappedRegistry<sp<Material>>>::of();
 
-Application* global;
-
 struct Game : Application {
 public:
     Game() : Application("Minecraft-07") {
-        global = this;
-
         buildShaders();
         buildBuffers();
 
@@ -94,7 +88,7 @@ private:
 
         textureManager = sp<TextureManager>::of();
         modelManager = sp<ModelManager>::of(textureManager);
-        modelManager->reload();
+        modelManager->reload(device);
 
         std::vector<uint32_t> indices;
         std::vector<Vertex> vertices;

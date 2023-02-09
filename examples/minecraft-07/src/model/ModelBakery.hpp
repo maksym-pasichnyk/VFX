@@ -1,26 +1,30 @@
 #pragma once
 
 #include "Iter.hpp"
-#include "../block/Block.hpp"
-#include "texture/Sprite.hpp"
 #include "FaceInfo.hpp"
-#include "BlockModel.hpp"
-#include "BakedModel.hpp"
-#include "../block/BlockState.hpp"
+
 #include "JsonParser.hpp"
 #include "JsonElement.hpp"
-#include "texture/TextureManager.hpp"
-#include "block/StateDefinition.hpp"
+
+#include "BlockModel.hpp"
+#include "BakedModel.hpp"
 #include "SimpleBakedModel.hpp"
-#include "registry/ResourceLocation.hpp"
-#include "registry/DefaultedRegistry.hpp"
 #include "WeightedBakedModel.hpp"
 #include "BlockModelDefinition.hpp"
+
+#include "block/Block.hpp"
+#include "block/BlockState.hpp"
+#include "block/StateDefinition.hpp"
+
+#include "texture/Sprite.hpp"
+#include "texture/SpriteAtlas.hpp"
+#include "texture/TextureManager.hpp"
+#include "registry/ResourceLocation.hpp"
+#include "registry/DefaultedRegistry.hpp"
 
 #include <map>
 #include <string>
 #include <functional>
-#include "spdlog/spdlog.h"
 
 struct ModelLoader : std::function<sp<BlockModel>(const std::string& name)> {
     using function::function;
@@ -38,8 +42,7 @@ private:
     std::map<std::string, sp<UnbakedModel>> unbakedTopLevelModels = {};
 
 public:
-    explicit ModelBakery();
-
+    void reload(gfx::Device device);
     void getTopLevel(const std::string& name, const sp<StateDefinition<Block>>& stateDefinition);
     void uploadTextures(const sp<TextureManager>& textureManager);
     auto getBakedTopLevelModels() const -> const std::map<std::string, sp<BakedModel>>&;

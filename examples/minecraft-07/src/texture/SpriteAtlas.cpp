@@ -8,9 +8,6 @@
 
 #include "Application.hpp"
 
-// todo: remove this
-extern Application* global;
-
 static auto load(const std::string& name) -> sp<NativeImage> {
     return NativeImage::read(fmt::format("textures/{}.png", getResourceLocation(name)));
 }
@@ -52,23 +49,13 @@ void SpriteAtlas::pack(const std::vector<std::string>& resources) {
     missing = sprites.at("missing");
 }
 
-extern
-
-void SpriteAtlas::reload() {
+void SpriteAtlas::reload(gfx::Device device) {
     std::vector<uint32_t> data = {};
     data.resize(textureSizeX * textureSizeY, 0xFFFFFFFF);
     for (auto& [_, sprite] : sprites) {
         sprite->copy(data);
     }
-
-//    glGenTextures(1, &texture);
-//    glBindTexture(GL_TEXTURE_2D, texture);
-//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textureSizeX, textureSizeY, 0, GL_RGBA, GL_UNSIGNED_BYTE, data.data());
-//    glBindTexture(GL_TEXTURE_2D, 0);
-
-    texture = global->device.newTexture(gfx::TextureSettings{
+    texture = device.newTexture(gfx::TextureSettings{
         .width = uint32_t(textureSizeX),
         .height = uint32_t(textureSizeY),
         .format = vk::Format::eR8G8B8A8Unorm,

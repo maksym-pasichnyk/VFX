@@ -1,4 +1,5 @@
 #include "Application.hpp"
+#include "filesystem.hpp"
 
 struct Game : Application {
 public:
@@ -64,7 +65,10 @@ private:
     sp<View> uiContent;
 };
 
-auto main() -> int32_t {
+auto main(int argc, char** argv) -> int32_t {
+    cxx::filesystem::init(argv[0]);
+    cxx::filesystem::mount("assets", {}, true);
+
     setenv("GFX_ENABLE_API_VALIDATION", "1", 1);
 
     Game app{};

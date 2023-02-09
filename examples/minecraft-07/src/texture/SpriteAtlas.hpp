@@ -11,7 +11,7 @@ public:
     explicit SpriteAtlas(std::string path);
 
     void pack(const std::vector<std::string>& resources);
-    void reload();
+    void reload(gfx::Device device);
     auto getSprite(const std::string& name) -> sp<Sprite>;
     auto getTexture() -> gfx::Texture override;
     auto getPath() const -> const std::string&;
