@@ -32,14 +32,6 @@ namespace gfx {
         ~DeviceShared();
     };
 
-    struct SurfaceConfiguration {
-        vk::Format          format       = {};
-        vk::ColorSpaceKHR   color_space  = {};
-        uint32_t            image_count  = {};
-        vk::PresentModeKHR  present_mode = {};
-        bool                clipped      = {};
-    };
-
     struct Device final {
         std::shared_ptr<DeviceShared> shared;
 
@@ -59,6 +51,6 @@ namespace gfx {
         auto newComputePipelineState(const Function& function) -> ComputePipelineState;
         auto newCommandQueue() -> CommandQueue;
         auto newDescriptorSet(vk::DescriptorSetLayout layout, const std::vector<vk::DescriptorPoolSize>& sizes) -> DescriptorSet;
-        auto createSwapchain(Surface const& surface, const SurfaceConfiguration& config) -> Swapchain;
+        auto createSwapchain(Surface const& surface) -> Swapchain;
     };
 }

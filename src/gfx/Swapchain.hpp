@@ -6,13 +6,21 @@
 namespace gfx {
     struct Drawable;
 
+    struct SurfaceConfiguration {
+        vk::Format          format       = {};
+        vk::ColorSpaceKHR   color_space  = {};
+        uint32_t            image_count  = {};
+        vk::PresentModeKHR  present_mode = {};
+        bool                clipped      = {};
+    };
+
     struct SwapchainShared {
         Device device;
         Surface surface;
         vk::SwapchainKHR raw;
         std::vector<Drawable> drawables;
 
-        explicit SwapchainShared(Device device, Surface surface, vk::SwapchainKHR raw, std::vector<Drawable> drawables);
+        explicit SwapchainShared(Device device, Surface surface);
         ~SwapchainShared();
     };
 
@@ -24,5 +32,7 @@ namespace gfx {
 
         auto nextDrawable() -> Drawable;
         auto drawableSize() -> vk::Extent2D;
+
+        void configure(const SurfaceConfiguration& config);
     };
 }

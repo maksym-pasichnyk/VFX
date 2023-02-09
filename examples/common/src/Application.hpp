@@ -20,7 +20,7 @@ struct ShaderData {
 struct Application {
 public:
     explicit Application(const char* title) {
-        window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI);
+        window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
 
         gfx::InstanceSettings desc = {};
         desc.name = title;
@@ -32,15 +32,18 @@ public:
 
         VkSurfaceKHR raw_surface;
         SDL_Vulkan_CreateSurface(window, instance.handle(), &raw_surface);
+
+        // todo: merge surface with swapchain?
         surface = instance.wrapSurface(raw_surface);
+        swapchain = device.createSwapchain(surface);
 
         gfx::SurfaceConfiguration config;
         config.format = vk::Format::eB8G8R8A8Unorm;
-        config.color_space = vk::ColorSpaceKHR::eSrgbNonlinear ;
+        config.color_space = vk::ColorSpaceKHR::eSrgbNonlinear;
         config.image_count = 3;
         config.present_mode = vk::PresentModeKHR::eFifo;
         config.clipped = true;
-        swapchain = device.createSwapchain(surface, config);
+        swapchain.configure(config);
 
         commandQueue = device.newCommandQueue();
         commandBuffer = commandQueue.commandBuffer();
@@ -122,8 +125,14 @@ public:
     virtual void mouseWheel(SDL_MouseWheelEvent* event) {}
     virtual void performClose(uint32_t windowId) {}
     virtual void performResize(uint32_t windowId) {
-//        swapchain->setDrawableSize(getDrawableSize());
-//        swapchain->releaseDrawables();
+        gfx::SurfaceConfiguration config;
+        config.format = vk::Format::eB8G8R8A8Unorm;
+        config.color_space = vk::ColorSpaceKHR::eSrgbNonlinear;
+        config.image_count = 3;
+        config.present_mode = vk::PresentModeKHR::eFifo;
+        config.clipped = true;
+
+        swapchain.configure(config);
     }
 
 protected:
@@ -141,7 +150,8 @@ protected:
                             performClose(event.window.windowID);
                             break;
                         }
-                        case SDL_WINDOWEVENT_RESIZED: {
+//                        case SDL_WINDOWEVENT_RESIZED:
+                        case SDL_WINDOWEVENT_SIZE_CHANGED: {
                             performResize(event.window.windowID);
                             break;
                         }

@@ -1,5 +1,4 @@
 #include "Assets.hpp"
-#include "GraphView.hpp"
 #include "Application.hpp"
 #include "ParticleSystem.hpp"
 #include "ParticleEmitter.hpp"
