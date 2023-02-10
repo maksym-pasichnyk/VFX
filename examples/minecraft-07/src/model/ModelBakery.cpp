@@ -5,35 +5,10 @@
 #include "fstream.hpp"
 #include "spdlog/spdlog.h"
 
-static std::string MISSING_MODEL_MESH = R"("{
-    "textures": {
-       "particle": "missing",
-       "missing": "missing"
-    },
-    "elements": [
-         {
-            "from": [ 0, 0, 0 ],
-            "to": [ 16, 16, 16 ],
-            "faces": {
-                "down":  { "uv": [ 0, 0, 16, 16 ], "cullface": "down",  "texture": "#missing" },
-                "up":    { "uv": [ 0, 0, 16, 16 ], "cullface": "up",    "texture": "#missing" },
-                "north": { "uv": [ 0, 0, 16, 16 ], "cullface": "north", "texture": "#missing" },
-                "south": { "uv": [ 0, 0, 16, 16 ], "cullface": "south", "texture": "#missing" },
-                "west":  { "uv": [ 0, 0, 16, 16 ], "cullface": "west",  "texture": "#missing" },
-                "east":  { "uv": [ 0, 0, 16, 16 ], "cullface": "east",  "texture": "#missing' }
-            }
-        }
-    ]
-})";
-
-extern sp<MappedRegistry<sp<Block>>> BLOCK;
-
-void ModelBakery::reload(gfx::Device device) {
+void ModelBakery::reload(sp<MappedRegistry<sp<Block>>> BLOCK, gfx::Device device) {
     for (const auto& block : BLOCK->values()) {
-        getTopLevel(BLOCK->getKey(block).value(), block->getStateDefinition());
+        getTopLevel(BLOCK, BLOCK->getKey(block).value(), block->getStateDefinition());
     }
-
-    atlases.clear();
 
     auto modelLoader = std::bind_front(std::mem_fn(&ModelBakery::getModel), this);
     auto materials = cxx::iter(ranges::views::values(unbakedTopLevelModels))
@@ -45,11 +20,10 @@ void ModelBakery::reload(gfx::Device device) {
     auto atlas = sp<SpriteAtlas>::of("textures/atlas/blocks.png");
     atlas->pack(materials);
     atlas->reload(device);
-
     atlases.emplace_back(atlas);
 }
 
-void ModelBakery::getTopLevel(const std::string& name, const sp<StateDefinition<Block>>& stateDefinition) {
+void ModelBakery::getTopLevel(sp<MappedRegistry<sp<Block>>> BLOCK, const std::string& name, const sp<StateDefinition<Block>>& stateDefinition) {
     try {
         auto path = "states/" + getResourceLocation(name) + ".json";
         auto stream = cxx::ifstream(path);
@@ -59,7 +33,7 @@ void ModelBakery::getTopLevel(const std::string& name, const sp<StateDefinition<
         cxx::iter(modelDefinition->variants).for_each([&](auto& key, auto& value) {
             auto predicate = getPredicate(stateDefinition, key);
             for (auto& state : cxx::iter(possibleStates).where(predicate)) {
-                auto location = ModelManager::stateToModelLocation(state);
+                auto location = ModelManager::stateToModelLocation(BLOCK, state);
                 unbakedTopLevelModels.insert_or_assign(location, value);
             }
         });
@@ -134,8 +108,7 @@ auto ModelBakery::getPredicate(const sp<StateDefinition<Block>>& stateDefinition
         .where([](const auto& parts) { return !parts.empty(); })
         .map([&](const auto& parts) {
             auto property = stateDefinition->getProperty(parts.at(0));
-            auto value = parts.at(1);//getPropertyValue(property, parts.at(1));
-            return std::pair{property, value};
+            return std::pair{property, parts.at(1)};
         })
         .to<std::map<sp<Property>, std::string>>();
 

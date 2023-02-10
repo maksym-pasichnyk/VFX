@@ -1,11 +1,9 @@
 #pragma once
 
-#include "block/Material.hpp"
 #include "JsonParser.hpp"
+#include "block/Material.hpp"
 #include "block/PushReaction.hpp"
 #include "registry/DefaultedRegistry.hpp"
-
-extern sp<MappedRegistry<sp<Material>>> MATERIAL;
 
 struct MaterialLoader {
     static auto getPushReaction(const JsonObject& object) {
@@ -26,22 +24,16 @@ struct MaterialLoader {
         return builder.build();
     }
 
-    void reload() {
-        cxx::filesystem::iterate_recursive("materials", [&](const std::filesystem::path& path) {
-            auto json = JsonParser::fromStream(cxx::ifstream(path));
-            MATERIAL->registerMapping(path.stem(), deserialize(json));
-        });
+    void reload(sp<MappedRegistry<sp<Material>>> MATERIAL) {
+        cxx::iter(cxx::filesystem::directory_iterator("materials"))
+//            .where([](const auto& entry) { return entry.is_regular_file(); })
+            .where([](const auto& entry) { return entry.path().extension() == ".json"; })
+            .map([](const auto& entry) { return entry.path(); })
+            .for_each([&](const auto& path) {
+                auto stream = cxx::ifstream(path);
+                auto json = JsonParser::fromStream(stream);
 
-//        auto resources = std::filesystem::directory_iterator("assets/materials");
-//        cxx::iter(resources)
-//            .where([](auto& entry) { return entry.is_regular_file(); })
-//            .where([](auto& entry) { return entry.path().extension() == ".json"; })
-//            .map([](auto& entry) { return entry.path(); })
-//            .for_each([&](const auto& path) {
-//                auto stream = std::ifstream(path, std::ios::binary);
-//                auto json = JsonParser::fromStream(stream);
-//
-//                MATERIAL->registerMapping(path.stem(), deserialize(json));
-//            });
+                MATERIAL->registerMapping(path.stem(), deserialize(json));
+            });
     }
 };

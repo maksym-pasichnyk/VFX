@@ -13,11 +13,11 @@
 #include "filesystem.hpp"
 #include "glm/gtx/euler_angles.hpp"
 
-sp<MappedRegistry<sp<Block>>> BLOCK = sp<MappedRegistry<sp<Block>>>::of();
-sp<MappedRegistry<sp<Material>>> MATERIAL = sp<MappedRegistry<sp<Material>>>::of();
-
 struct Game : Application {
 public:
+    sp<MappedRegistry<sp<Block>>> BLOCK = sp<MappedRegistry<sp<Block>>>::of();
+    sp<MappedRegistry<sp<Material>>> MATERIAL = sp<MappedRegistry<sp<Material>>>::of();
+
     Game() : Application("Minecraft-07") {
         buildShaders();
         buildBuffers();
@@ -83,12 +83,12 @@ private:
     }
 
     void buildBuffers() {
-        materialLoader.reload();
-        blockLoader.reload();
+        materialLoader.reload(MATERIAL);
+        blockLoader.reload(BLOCK, MATERIAL);
 
         textureManager = sp<TextureManager>::of();
         modelManager = sp<ModelManager>::of(textureManager);
-        modelManager->reload(device);
+        modelManager->reload(BLOCK, device);
 
         std::vector<uint32_t> indices;
         std::vector<Vertex> vertices;

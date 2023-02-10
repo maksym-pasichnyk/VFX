@@ -15,9 +15,7 @@ struct Block : Object {
 
     void createBlockStateDefinition(const std::vector<sp<Property>>& properties) {
         auto builder = StateDefinition<Block>::Builder(RetainPtr(this));
-        cxx::iter(properties).for_each([&](auto& property) {
-            builder.add(property);
-        });
+        cxx::iter(properties).for_each(std::bind_front(&decltype(builder)::add, &builder));
         stateDefinition = builder.build();
     }
 

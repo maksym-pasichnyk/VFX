@@ -5,11 +5,9 @@
 #include <string>
 #include "spdlog/fmt/fmt.h"
 
-extern sp<MappedRegistry<sp<Block>>> BLOCK;
-
 ModelManager::ModelManager(const sp<TextureManager>& textureManager) : textureManager(textureManager) {}
 
-auto ModelManager::stateToModelLocation(const sp<BlockState>& state) -> std::string {
+auto ModelManager::stateToModelLocation(sp<MappedRegistry<sp<Block>>> BLOCK, const sp<BlockState>& state) -> std::string {
     auto name = BLOCK->getKey(state->getBlock()).value();
     auto values = cxx::iter(state->values).map([](auto& property, auto& value) {
         return fmt::format("{}={}", property->getName(), value);
@@ -17,16 +15,16 @@ auto ModelManager::stateToModelLocation(const sp<BlockState>& state) -> std::str
     return fmt::format("{}#{}", name, fmt::join(values, ","));
 }
 
-void ModelManager::reload(gfx::Device device) {
+void ModelManager::reload(sp<MappedRegistry<sp<Block>>> BLOCK, gfx::Device device) {
     modelBakery = sp<ModelBakery>::of();
-    modelBakery->reload(device);
+    modelBakery->reload(BLOCK, device);
     modelBakery->uploadTextures(textureManager);
 
 //    missing = modelBakery->getBakedTopLevelModels().at("missing");
 
     for (const auto& block : BLOCK->values()) {
         cxx::iter(block->getStateDefinition()->getPossibleStates()).for_each([&](auto& state) {
-            cache.insert_or_assign(state, getModel(stateToModelLocation(state)));
+            cache.insert_or_assign(state, getModel(stateToModelLocation(BLOCK, state)));
         });
     }
 }

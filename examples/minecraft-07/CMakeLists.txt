@@ -34,7 +34,6 @@ add_executable(minecraft-07
     src/model/MultiVariant.hpp
     src/model/Predicate.hpp
     src/block/Property.hpp
-    src/block/PropertyValue.hpp
     src/block/PushReaction.hpp
     src/registry/ResourceLocation.hpp
     src/model/Selector.hpp
@@ -53,7 +52,7 @@ add_executable(minecraft-07
     src/model/WeightedBakedModel.hpp
     src/texture/NativeImage.hpp
     src/texture/NativeImage.cpp
-)
+        src/registry/Registry.hpp src/registry/Holder.hpp src/registry/MappedRegistry.hpp)
 set_target_properties(minecraft-07 PROPERTIES CXX_EXTENSIONS OFF CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(minecraft-07 PRIVATE common gfx)
 target_include_directories(minecraft-07 PRIVATE src)

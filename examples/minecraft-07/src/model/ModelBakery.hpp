@@ -42,8 +42,8 @@ private:
     std::map<std::string, sp<UnbakedModel>> unbakedTopLevelModels = {};
 
 public:
-    void reload(gfx::Device device);
-    void getTopLevel(const std::string& name, const sp<StateDefinition<Block>>& stateDefinition);
+    void reload(sp<MappedRegistry<sp<Block>>> BLOCK, gfx::Device device);
+    void getTopLevel(sp<MappedRegistry<sp<Block>>> BLOCK, const std::string& name, const sp<StateDefinition<Block>>& stateDefinition);
     void uploadTextures(const sp<TextureManager>& textureManager);
     auto getBakedTopLevelModels() const -> const std::map<std::string, sp<BakedModel>>&;
 

@@ -6,8 +6,6 @@
 
 #include "spdlog/spdlog.h"
 
-#include "Application.hpp"
-
 static auto load(const std::string& name) -> sp<NativeImage> {
     return NativeImage::read(fmt::format("textures/{}.png", getResourceLocation(name)));
 }

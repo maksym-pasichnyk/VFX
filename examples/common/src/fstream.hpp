@@ -14,7 +14,7 @@ namespace cxx {
         ~filebuf() override;
 
     public:
-        auto open(const std::string& path) -> bool;
+        auto open(const cxx::filesystem::path& path) -> bool;
         [[nodiscard]] auto is_open() const -> bool;
         [[nodiscard]] auto underflow() -> int_type override;
 
@@ -28,7 +28,7 @@ namespace cxx {
 
     class ifstream : public std::istream {
     public:
-        explicit ifstream(const std::string& path);
+        explicit ifstream(const cxx::filesystem::path& path);
 
         // todo: remove?
         [[nodiscard]] auto length() const -> size_t;

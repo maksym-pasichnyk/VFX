@@ -9,7 +9,7 @@ cxx::filebuf::~filebuf() {
     }
 }
 
-auto cxx::filebuf::open(const std::string& path) -> bool {
+auto cxx::filebuf::open(const cxx::filesystem::path& path) -> bool {
     if (file != nullptr) { return false; }
     file = reinterpret_cast<File*>(PHYSFS_openRead(path.c_str()));
     return file != nullptr;
@@ -35,7 +35,7 @@ auto cxx::filebuf::length() const -> size_t {
     return PHYSFS_fileLength(reinterpret_cast<PHYSFS_File*>(file));
 }
 
-cxx::ifstream::ifstream(const std::string& path) : std::istream(&buf) {
+cxx::ifstream::ifstream(const cxx::filesystem::path& path) : std::istream(&buf) {
     if (!buf.open(path)) {
         setstate(ios_base::failbit);
     }

@@ -18,10 +18,10 @@ private:
 public:
     explicit ModelManager(const sp<TextureManager>& textureManager);
 
-    void reload(gfx::Device device);
+    void reload(sp<MappedRegistry<sp<Block>>> BLOCK, gfx::Device device);
     auto getModel(const std::string& name) const -> sp<BakedModel>;
     auto getModel(const sp<BlockState>& state) const -> sp<BakedModel>;
 
 public:
-    static auto stateToModelLocation(const sp<BlockState>& state) -> std::string;
+    static auto stateToModelLocation(sp<MappedRegistry<sp<Block>>> BLOCK, const sp<BlockState>& state) -> std::string;
 };
