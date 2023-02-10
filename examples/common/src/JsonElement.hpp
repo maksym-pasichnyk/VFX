@@ -25,7 +25,7 @@ struct JsonElement : Enum<long long, double, bool, std::string, JsonArray, JsonO
     using Enum::Enum;
 
     template<typename T>
-    auto get() const -> T {
+    [[nodiscard]] auto get() const -> T {
         if constexpr (std::same_as<T, bool>) {
             return as<bool>();
         } else if constexpr (std::floating_point<T> or std::integral<T>) {
@@ -36,6 +36,18 @@ struct JsonElement : Enum<long long, double, bool, std::string, JsonArray, JsonO
         } else {
             return as<T>();
         }
+    }
+
+    [[nodiscard]] auto contains(const std::string& key) const -> bool {
+        return is<JsonObject>() and as<JsonObject>().contains(key);
+    }
+
+    [[nodiscard]] auto at(const std::string& key) -> JsonElement& {
+        return as<JsonObject>().at(key);
+    }
+
+    [[nodiscard]] auto at(const std::string& key) const -> const JsonElement& {
+        return as<JsonObject>().at(key);
     }
 };
 

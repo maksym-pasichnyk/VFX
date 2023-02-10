@@ -12,13 +12,23 @@ struct Enum : std::variant<T...> {
     }
 
     template<typename U>
-    [[nodiscard]] auto as() -> U& {
+    [[nodiscard]] auto as() & -> U& {
         return std::get<U>(*this);
     }
 
     template<typename U>
-    [[nodiscard]] auto as() const -> const U& {
+    [[nodiscard]] auto as() const& -> const U& {
         return std::get<U>(*this);
+    }
+
+    template<typename U>
+    [[nodiscard]] auto as() && -> U&& {
+        return std::get<U>(std::move(*this));
+    }
+
+    template<typename U>
+    [[nodiscard]] auto as() const&& -> const U&& {
+        return std::get<U>(std::move(*this));
     }
 
     template<typename U>

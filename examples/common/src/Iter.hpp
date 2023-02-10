@@ -10,7 +10,11 @@ namespace cxx {
         template<typename Fn>
         static constexpr auto wrap(Fn&& fn) {
             return [fn = std::forward<Fn>(fn)](auto&& args) {
-                if constexpr (std::is_invocable_v < Fn, decltype(args) >) {
+                if constexpr (std::is_member_object_pointer_v<Fn>) {
+                    return (std::forward<decltype(args)>(args).*fn);
+                } else if constexpr (std::is_member_function_pointer_v<Fn>) {
+                    return (std::forward<decltype(args)>(args).*fn)();
+                } else if constexpr (std::is_invocable_v<Fn,decltype(args)>) {
                     return fn(std::forward<decltype(args)>(args));
                 } else {
                     return std::apply(fn, std::forward<decltype(args)>(args));
@@ -45,7 +49,8 @@ namespace cxx {
 
         template<typename R, typename Fn>
         constexpr auto reduce(R&& init, Fn&& fn) -> R {
-            return ranges::accumulate(range_, init, wrap(std::forward<Fn>(fn)));
+            return ranges::accumulate(range_, std::forward<R>(init), wrap(std::forward<Fn>(fn)));
+//            return ranges::accumulate(range_, init, wrap(std::forward<Fn>(fn)));
         }
 
         template<typename Fn>
@@ -63,6 +68,11 @@ namespace cxx {
 
         template<typename Tp>
         constexpr auto to() -> Tp {
+            return ranges::to<Tp>(range_);
+        }
+
+        template<template<typename...> typename Tp>
+        constexpr auto to() {
             return ranges::to<Tp>(range_);
         }
 

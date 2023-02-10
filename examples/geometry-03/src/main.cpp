@@ -33,6 +33,7 @@ private:
             .attributes = {{
                 vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, position)},
                 vk::VertexInputAttributeDescription{1, 0, vk::Format::eR32G32B32A32Sfloat, offsetof(Vertex, color)},
+                vk::VertexInputAttributeDescription{2, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, uv)},
             }}
         };
         description.inputAssemblyState.setTopology(vk::PrimitiveTopology::eTriangleList);
@@ -41,6 +42,32 @@ private:
         description.attachments[0].setBlendEnable(false);
 
         renderPipelineState = device.newRenderPipelineState(description);
+        descriptorSet = device.newDescriptorSet(renderPipelineState.shared->bind_group_layouts[0], {
+            vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
+            vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 1},
+        });
+
+        sampler = device.newSampler(vk::SamplerCreateInfo{
+            .magFilter = vk::Filter::eNearest,
+            .minFilter = vk::Filter::eNearest,
+            .mipmapMode = vk::SamplerMipmapMode::eLinear,
+            .addressModeU = vk::SamplerAddressMode::eRepeat,
+            .addressModeV = vk::SamplerAddressMode::eRepeat,
+            .addressModeW = vk::SamplerAddressMode::eRepeat,
+        });
+
+        texture = device.newTexture(gfx::TextureSettings{
+            .width = 1,
+            .height = 1,
+            .format = vk::Format::eR8G8B8A8Unorm,
+            .usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+        });
+
+        std::array<uint8_t, 4> orange = {255, 127, 0, 255};
+        texture.replaceRegion(orange.data(), sizeof(orange));
+
+        descriptorSet.setSampler(sampler, 0);
+        descriptorSet.setTexture(texture, 1);
     }
 
     void buildBuffers() {
@@ -330,6 +357,7 @@ public:
         commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
         commandBuffer.setRenderPipelineState(renderPipelineState);
+        commandBuffer.bindDescriptorSet(descriptorSet, 0);
         commandBuffer.pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
 
         commandBuffer.beginRendering(rendering_info);
@@ -355,6 +383,9 @@ private:
     std::vector<sp<Scene>> scenes = {};
     std::vector<sp<Animation>> animations = {};
 
+    gfx::Sampler sampler;
+    gfx::Texture texture;
+    gfx::DescriptorSet descriptorSet;
     gfx::RenderPipelineState renderPipelineState;
 };
 

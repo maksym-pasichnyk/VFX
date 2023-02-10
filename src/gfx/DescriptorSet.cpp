@@ -5,13 +5,12 @@
 #include "Instance.hpp"
 #include "DescriptorSet.hpp"
 
-
 gfx::DescriptorSetShared::DescriptorSetShared(Device device, vk::DescriptorSet raw, vk::DescriptorPool pool) : device(std::move(device)), raw(raw), pool(pool) {}
 gfx::DescriptorSetShared::~DescriptorSetShared() {
     device.handle().destroyDescriptorPool(pool, nullptr, device.dispatcher());
 }
 
-gfx::DescriptorSet::DescriptorSet() : shared(std::move(nullptr)) {}
+gfx::DescriptorSet::DescriptorSet() : shared(nullptr) {}
 gfx::DescriptorSet::DescriptorSet(std::shared_ptr<DescriptorSetShared> shared) : shared(std::move(shared)) {}
 
 void gfx::DescriptorSet::setBuffer(const Buffer& buffer, uint64_t offset, uint32_t binding) {
