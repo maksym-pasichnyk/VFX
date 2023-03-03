@@ -5,7 +5,7 @@
 gfx::LibraryShared::LibraryShared(gfx::Device device) : device(std::move(device)) {}
 
 gfx::LibraryShared::~LibraryShared() {
-    device.handle().destroyShaderModule(raw, nullptr, device.dispatcher());
+    device.shared->raii.raw.destroyShaderModule(raw, nullptr, device.shared->raii.dispatcher);
     spvReflectDestroyShaderModule(&spvReflectShaderModule);
 }
 

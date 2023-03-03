@@ -4,7 +4,7 @@ gfx::BindGroupLayoutShared::BindGroupLayoutShared(Device device, vk::DescriptorS
     : device(std::move(device)), raw(raw), bindings(std::move(bindings)) {}
 
 gfx::BindGroupLayoutShared::~BindGroupLayoutShared() {
-    device.handle().destroyDescriptorSetLayout(raw, nullptr, device.dispatcher());
+    device.shared->raii.raw.destroyDescriptorSetLayout(raw, nullptr, device.shared->raii.dispatcher);
 }
 
 gfx::BindGroupLayout::BindGroupLayout() : shared(nullptr) {}

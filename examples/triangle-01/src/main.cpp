@@ -64,7 +64,7 @@ private:
         description.fragmentFunction = fragmentLibrary.newFunction("main");
 
         description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-        description.attachments[0].setBlendEnable(false);
+        description.colorBlendAttachments[0].setBlendEnable(false);
 
         renderPipelineState = device.newRenderPipelineState(description);
         descriptorSet = device.newDescriptorSet(renderPipelineState.shared->bind_group_layouts[0], {
@@ -98,9 +98,6 @@ private:
 };
 
 auto main(int argc, char** argv) -> int32_t {
-    cxx::filesystem::init(argv[0]);
-    cxx::filesystem::mount("assets", {}, true);
-
     setenv("GFX_ENABLE_API_VALIDATION", "1", 1);
 
     Game app{};

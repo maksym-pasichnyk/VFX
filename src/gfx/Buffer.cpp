@@ -4,23 +4,23 @@
 gfx::BufferShared::BufferShared(gfx::Device device) : device(std::move(device)), raw(nullptr), allocation(nullptr) {}
 gfx::BufferShared::BufferShared(gfx::Device device, vk::Buffer raw, VmaAllocation allocation) : device(std::move(device)), raw(raw), allocation(allocation) {}
 gfx::BufferShared::~BufferShared() {
-    vmaDestroyBuffer(device.allocator(), raw, allocation);
+    vmaDestroyBuffer(device.shared->allocator, raw, allocation);
 }
 
 auto gfx::Buffer::contents() -> void* {
     VmaAllocationInfo allocation_info = {};
-    vmaGetAllocationInfo(shared->device.allocator(), shared->allocation, &allocation_info);
+    vmaGetAllocationInfo(shared->device.shared->allocator, shared->allocation, &allocation_info);
     return allocation_info.pMappedData;
 }
 
 auto gfx::Buffer::length() -> vk::DeviceSize {
     VmaAllocationInfo allocation_info = {};
-    vmaGetAllocationInfo(shared->device.allocator(), shared->allocation, &allocation_info);
+    vmaGetAllocationInfo(shared->device.shared->allocator, shared->allocation, &allocation_info);
     return allocation_info.size;
 }
 
 auto gfx::Buffer::didModifyRange(vk::DeviceSize offset, vk::DeviceSize size) -> void {
-    vmaFlushAllocation(shared->device.allocator(), shared->allocation, offset, size);
+    vmaFlushAllocation(shared->device.shared->allocator, shared->allocation, offset, size);
 }
 
 void gfx::Buffer::setLabel(const std::string& name) {
@@ -29,7 +29,7 @@ void gfx::Buffer::setLabel(const std::string& name) {
     info.setObject(uint64_t(VkBuffer(shared->raw)));
     info.setPObjectName(name.c_str());
 
-    shared->device.handle().debugMarkerSetObjectNameEXT(info, shared->device.dispatcher());
+    shared->device.shared->raii.raw.debugMarkerSetObjectNameEXT(info, shared->device.shared->raii.dispatcher);
 }
 
 gfx::Buffer::Buffer() : shared(nullptr) {}

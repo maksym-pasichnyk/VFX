@@ -44,26 +44,26 @@ private:
         gfx::RenderPipelineStateDescription description;
         description.vertexFunction = vertexLibrary.newFunction("main");
         description.fragmentFunction = fragmentLibrary.newFunction("main");
-        description.vertexDescription = {
-            .layouts = {{
+        description.vertexInputState = {
+            .bindings = {
                 vk::VertexInputBindingDescription{0, sizeof(glm::vec3), vk::VertexInputRate::eVertex},
                 vk::VertexInputBindingDescription{1, sizeof(Instance), vk::VertexInputRate::eInstance}
-            }},
-            .attributes = {{
+            },
+            .attributes = {
                 vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32B32Sfloat, 0},
                 vk::VertexInputAttributeDescription{1, 1, vk::Format::eR32G32B32Sfloat, offsetof(Instance, position)},
                 vk::VertexInputAttributeDescription{2, 1, vk::Format::eR32G32B32A32Sfloat, offsetof(Instance, color)},
-            }}
+            }
         };
-        description.inputAssemblyState.setTopology(vk::PrimitiveTopology::eTriangleList);
 
         description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-        description.depthStencilState.setDepthTestEnable(false);
-        description.attachments[0].setBlendEnable(true);
-        description.attachments[0].setColorBlendOp(vk::BlendOp::eAdd);
-        description.attachments[0].setAlphaBlendOp(vk::BlendOp::eAdd);
-        description.attachments[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
-        description.attachments[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
+        description.depthStencilState.depth_test_enable = true;
+
+        description.colorBlendAttachments[0].setBlendEnable(true);
+        description.colorBlendAttachments[0].setColorBlendOp(vk::BlendOp::eAdd);
+        description.colorBlendAttachments[0].setAlphaBlendOp(vk::BlendOp::eAdd);
+        description.colorBlendAttachments[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
+        description.colorBlendAttachments[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
 
         mRenderPipelineState = mDevice.newRenderPipelineState(description);
     }

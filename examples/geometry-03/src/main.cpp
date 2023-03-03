@@ -5,11 +5,17 @@
 #include "Scene.hpp"
 #include "Assets.hpp"
 #include "Animation.hpp"
-#include "filesystem.hpp"
 #include "Application.hpp"
 
 #include "tiny_gltf.h"
 #include "fmt/format.h"
+
+struct GltfBundle {
+    std::vector<sp<Skin>> skins = {};
+    std::vector<sp<Mesh>> meshes = {};
+    std::vector<sp<Scene>> scenes = {};
+    std::vector<sp<Animation>> animations = {};
+};
 
 struct Game : Application {
 public:
@@ -26,20 +32,19 @@ private:
         gfx::RenderPipelineStateDescription description;
         description.vertexFunction = vertexLibrary.newFunction("main");
         description.fragmentFunction = fragmentLibrary.newFunction("main");
-        description.vertexDescription = {
-            .layouts = {{
+        description.vertexInputState = {
+            .bindings = {
                 vk::VertexInputBindingDescription{0, sizeof(Vertex), vk::VertexInputRate::eVertex}
-            }},
-            .attributes = {{
+            },
+            .attributes = {
                 vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, position)},
                 vk::VertexInputAttributeDescription{1, 0, vk::Format::eR32G32B32A32Sfloat, offsetof(Vertex, color)},
                 vk::VertexInputAttributeDescription{2, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, uv)},
-            }}
+            }
         };
-        description.inputAssemblyState.setTopology(vk::PrimitiveTopology::eTriangleList);
 
         description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-        description.attachments[0].setBlendEnable(false);
+        description.colorBlendAttachments[0].setBlendEnable(false);
 
         renderPipelineState = device.newRenderPipelineState(description);
         descriptorSet = device.newDescriptorSet(renderPipelineState.shared->bind_group_layouts[0], {
@@ -177,7 +182,7 @@ private:
 
             auto gfxMesh = sp<Mesh>::of(std::move(vertices), std::move(indices), std::move(primitives), std::move(joints), std::move(weights));
             gfxMesh->uploadMeshData(device);
-            meshes.emplace_back(std::move(gfxMesh));
+            gltf_bundle.meshes.emplace_back(std::move(gfxMesh));
         }
 
         for (auto& skin : model.skins) {
@@ -197,7 +202,7 @@ private:
                 }
             }
 
-            skins.emplace_back(sp<Skin>::of(skin.skeleton, skin.joints, std::move(inverseBindMatrices)));
+            gltf_bundle.skins.emplace_back(sp<Skin>::of(skin.skeleton, skin.joints, std::move(inverseBindMatrices)));
         }
 
         std::vector<sp<Node>> nodes = {};
@@ -231,11 +236,11 @@ private:
             }
             sp<Skin> skin = {};
             if (node.skin >= 0) {
-                skin = skins.at(node.skin);
+                skin = gltf_bundle.skins.at(node.skin);
             }
             sp<Mesh> mesh = {};
             if (node.mesh >= 0) {
-                mesh = meshes.at(node.mesh);
+                mesh = gltf_bundle.meshes.at(node.mesh);
             }
             nodes.emplace_back(sp<Node>::of(std::move(skin), std::move(mesh), position, rotation, scale));
         }
@@ -247,7 +252,7 @@ private:
         }
 
         for (auto& scene : model.scenes) {
-            scenes.emplace_back(sp<Scene>::of(cxx::iter(scene.nodes).map([&](int i) { return nodes[i]; }).collect()));
+            gltf_bundle.scenes.emplace_back(sp<Scene>::of(cxx::iter(scene.nodes).map([&](int i) { return nodes[i]; }).collect()));
         }
 
         for (auto& animation : model.animations) {
@@ -315,15 +320,15 @@ private:
                 channels.emplace_back(channel.target_path, channel.sampler, channel.target_node);
             }
 
-            animations.emplace_back(sp<Animation>::of(animation.name, std::move(samplers), std::move(channels), start, end));
+            gltf_bundle.animations.emplace_back(sp<Animation>::of(animation.name, std::move(samplers), std::move(channels), start, end));
         }
     }
 
 public:
     void update(float_t dt) override {
-        g_proj_matrix = getPerspectiveProjection(glm::radians(60.0F), getAspectRatio(), 0.03F, 1000.0F);
-        g_view_matrix = glm::lookAtLH(glm::vec3(2.0F, 2.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0, 1, 0));
-        g_view_matrix = glm::rotate(g_view_matrix, angle, glm::vec3(0, 1, 0));
+        camera_projection_matrix = getPerspectiveProjection(glm::radians(60.0F), getAspectRatio(), 0.03F, 1000.0F);
+        world_to_camera_matrix = glm::lookAtLH(glm::vec3(2.0F, 2.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0, 1, 0));
+        world_to_camera_matrix = glm::rotate(world_to_camera_matrix, angle, glm::vec3(0, 1, 0));
         angle += dt * 5.0F;
     }
 
@@ -350,8 +355,8 @@ public:
         rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
         ShaderData shader_data = {};
-        shader_data.g_proj_matrix = g_proj_matrix;
-        shader_data.g_view_matrix = g_view_matrix;
+        shader_data.g_proj_matrix = camera_projection_matrix;
+        shader_data.g_view_matrix = world_to_camera_matrix;
 
         commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
         commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
@@ -363,7 +368,7 @@ public:
         commandBuffer.beginRendering(rendering_info);
         commandBuffer.setScissor(0, rendering_area);
         commandBuffer.setViewport(0, rendering_viewport);
-        meshes.front()->draw(commandBuffer);
+        gltf_bundle.meshes.front()->draw(commandBuffer);
         commandBuffer.endRendering();
 
         commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
@@ -375,13 +380,10 @@ public:
 
 private:
     float_t angle = 0.0F;
-    glm::mat4x4 g_proj_matrix = {};
-    glm::mat4x4 g_view_matrix = {};
+    glm::mat4x4 camera_projection_matrix = {};
+    glm::mat4x4 world_to_camera_matrix = {};
 
-    std::vector<sp<Skin>> skins = {};
-    std::vector<sp<Mesh>> meshes = {};
-    std::vector<sp<Scene>> scenes = {};
-    std::vector<sp<Animation>> animations = {};
+    GltfBundle gltf_bundle;
 
     gfx::Sampler sampler;
     gfx::Texture texture;
@@ -390,9 +392,6 @@ private:
 };
 
 auto main(int argc, char** argv) -> int32_t {
-    cxx::filesystem::init(argv[0]);
-    cxx::filesystem::mount("assets", {}, true);
-
     setenv("GFX_ENABLE_API_VALIDATION", "1", 1);
 
     Game app{};

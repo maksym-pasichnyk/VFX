@@ -3,11 +3,11 @@
 gfx::ComputePipelineStateShared::ComputePipelineStateShared(gfx::Device device) : device(std::move(device)) {}
 gfx::ComputePipelineStateShared::~ComputePipelineStateShared() {
     for (auto& layout : bind_group_layouts) {
-        device.handle().destroyDescriptorSetLayout(layout, nullptr, device.dispatcher());
+        device.shared->raii.raw.destroyDescriptorSetLayout(layout, nullptr, device.shared->raii.dispatcher);
     }
 
-    device.handle().destroyPipelineLayout(pipeline_layout, nullptr, device.dispatcher());
-    device.handle().destroyPipeline(pipeline, nullptr, device.dispatcher());
+    device.shared->raii.raw.destroyPipelineLayout(pipeline_layout, nullptr, device.shared->raii.dispatcher);
+    device.shared->raii.raw.destroyPipeline(pipeline, nullptr, device.shared->raii.dispatcher);
 }
 
 gfx::ComputePipelineState::ComputePipelineState() : shared(nullptr) {}

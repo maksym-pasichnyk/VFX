@@ -5,6 +5,7 @@ add_subdirectory(geometry-03)
 add_subdirectory(particles-04)
 add_subdirectory(nodes-05)
 add_subdirectory(menu-06)
+add_subdirectory(raytrace-07)
 
 target_compile_shaders(common
     "${CMAKE_SOURCE_DIR}/assets/shaders/gui.frag"
@@ -15,4 +16,6 @@ target_compile_shaders(common
     "${CMAKE_SOURCE_DIR}/assets/shaders/geometry.frag"
     "${CMAKE_SOURCE_DIR}/assets/shaders/particles.vert"
     "${CMAKE_SOURCE_DIR}/assets/shaders/particles.frag"
+    "${CMAKE_SOURCE_DIR}/assets/shaders/simple_shader.vert"
+    "${CMAKE_SOURCE_DIR}/assets/shaders/simple_shader.frag"
 )

@@ -7,88 +7,80 @@
 #include <optional>
 
 namespace gfx {
-    struct Device;
-    struct Function;
-    struct BindGroupLayout;
-
     struct RenderPipelineColorBlendAttachmentStateArray {
         std::vector<vk::PipelineColorBlendAttachmentState> elements = {};
 
-        auto operator[](size_t i) -> vk::PipelineColorBlendAttachmentState& {
-            if (elements.size() >= i) {
-                elements.resize(i + 1, vk::PipelineColorBlendAttachmentState{
-                    .colorWriteMask =
-                        vk::ColorComponentFlagBits::eR |
-                        vk::ColorComponentFlagBits::eG |
-                        vk::ColorComponentFlagBits::eB |
-                        vk::ColorComponentFlagBits::eA
-                });
-            }
-            return elements[i];
-        }
+        auto operator[](size_t i) -> vk::PipelineColorBlendAttachmentState&;
     };
 
     struct RenderPipelineColorAttachmentFormatArray {
         std::vector<vk::Format> elements = {};
 
-        auto operator[](size_t i) -> vk::Format& {
-            if (elements.size() >= i) {
-                elements.resize(i + 1, vk::Format::eUndefined);
-            }
-            return elements[i];
-        }
+        auto operator[](size_t i) -> vk::Format&;
     };
 
-    struct RenderPipelineVertexLayoutDescriptionArray {
-        std::vector<vk::VertexInputBindingDescription> elements = {};
-
-        auto operator[](size_t i) -> vk::VertexInputBindingDescription& {
-            if (elements.size() >= i) {
-                elements.resize(i + 1, vk::VertexInputBindingDescription{
-                    .binding = uint32_t(i),
-                    .inputRate = vk::VertexInputRate::eVertex
-                });
-            }
-            return elements[i];
-        }
+    struct InputAssemblyState {
+        vk::PrimitiveTopology   topology                    = vk::PrimitiveTopology::eTriangleList;
+        bool                    primitive_restart_enable    = false;
     };
 
-    struct RenderPipelineVertexAttributeDescriptionArray {
-        std::vector<vk::VertexInputAttributeDescription> elements = {};
-
-        auto operator[](size_t i) -> vk::VertexInputAttributeDescription& {
-            if (elements.size() >= i) {
-                elements.resize(i + 1, vk::VertexInputAttributeDescription{});
-            }
-            return elements[i];
-        }
+    struct TessellationState {
+        uint32_t patch_control_points = 3;
     };
 
-    struct RenderPipelineVertexDescription {
-        RenderPipelineVertexLayoutDescriptionArray layouts = {};
-        RenderPipelineVertexAttributeDescriptionArray attributes = {};
+    struct RasterizationState {
+        bool                    depth_clamp_enable          = false;
+        bool                    discard_enable              = false;
+        vk::PolygonMode         polygon_mode                = vk::PolygonMode::eFill;
+        float                   line_width                  = 1.0F;
+        vk::CullModeFlagBits    cull_mode                   = vk::CullModeFlagBits::eNone;
+        vk::FrontFace           front_face                  = vk::FrontFace::eClockwise;
+        bool                    depth_bias_enable           = false;
+        float                   depth_bias_constant_factor  = 0.0F;
+        float                   depth_bias_clamp            = 0.0F;
+        float                   depth_bias_slope_factor     = 0.0F;
+    };
+
+    struct MultisampleState {
+        vk::SampleCountFlagBits         rasterization_samples       = vk::SampleCountFlagBits::e1;
+        bool                            sample_shading_enable       = false;
+        float                           min_sample_shading          = 1.0F;
+        vk::Optional<vk::SampleMask>    sample_mask                 = nullptr;
+        bool                            alpha_to_coverage_enable    = false;
+        bool                            alpha_to_one_enable         = false;
+    };
+
+    struct DepthStencilState {
+        bool                    depth_test_enable           = false;
+        bool                    depth_write_enable          = false;
+        vk::CompareOp           depth_compare_op            = vk::CompareOp::eAlways;
+        bool                    depth_bounds_test_enable    = false;
+        bool                    stencil_test_enable         = false;
+        vk::StencilOpState      front                       = {};
+        vk::StencilOpState      back                        = {};
+        float                   min_depth_bounds            = 0.0F;
+        float                   max_depth_bounds            = 1.0F;
+    };
+
+    struct VertexInputState {
+        std::vector<vk::VertexInputBindingDescription>      bindings    = {};
+        std::vector<vk::VertexInputAttributeDescription>    attributes  = {};
     };
 
     struct RenderPipelineStateDescription {
-        Function vertexFunction;
-        Function fragmentFunction;
-
-        uint32_t viewMask = {};
-        RenderPipelineColorAttachmentFormatArray colorAttachmentFormats = {};
-        vk::Format depthAttachmentFormat   = vk::Format::eUndefined;
-        vk::Format stencilAttachmentFormat = vk::Format::eUndefined;
-
-        vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState = {
-            .topology = vk::PrimitiveTopology::eTriangleList
-        };
-        vk::PipelineTessellationStateCreateInfo tessellationState = {};
-        vk::PipelineRasterizationStateCreateInfo rasterizationState = {
-            .lineWidth = 1.0f
-        };
-        vk::PipelineMultisampleStateCreateInfo multisampleState = {};
-        vk::PipelineDepthStencilStateCreateInfo depthStencilState = {};
-        std::optional<RenderPipelineVertexDescription> vertexDescription = {};
-        RenderPipelineColorBlendAttachmentStateArray attachments = {};
+        Function                                        vertexFunction;
+        Function                                        fragmentFunction;
+        InputAssemblyState                              inputAssemblyState;
+        TessellationState                               tessellationState;
+        RasterizationState                              rasterizationState;
+        MultisampleState                                multisampleState;
+        DepthStencilState                               depthStencilState;
+        VertexInputState                                vertexInputState;
+        uint32_t                                        viewMask                = {};
+        vk::Format                                      depthAttachmentFormat   = vk::Format::eUndefined;
+        vk::Format                                      stencilAttachmentFormat = vk::Format::eUndefined;
+        RenderPipelineColorAttachmentFormatArray        colorAttachmentFormats  = {};
+        RenderPipelineColorBlendAttachmentStateArray    colorBlendAttachments   = {};
     };
 
     struct RenderPipelineStateShared {

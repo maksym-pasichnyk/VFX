@@ -49,9 +49,6 @@ namespace gfx {
         explicit Device();
         explicit Device(std::shared_ptr<DeviceShared> shared);
 
-        auto handle() -> vk::Device;
-        auto dispatcher() -> const vk::raii::DeviceDispatcher&;
-        auto allocator() -> VmaAllocator;
         void waitIdle();
         auto newTexture(const TextureSettings& description) -> Texture;
         auto newSampler(const vk::SamplerCreateInfo& info) -> Sampler;

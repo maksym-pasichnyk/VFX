@@ -354,18 +354,6 @@ gfx::DeviceShared::~DeviceShared() {
 gfx::Device::Device() : shared(nullptr) {}
 gfx::Device::Device(std::shared_ptr<DeviceShared> shared) : shared(std::move(shared)) {}
 
-auto gfx::Device::handle() -> vk::Device {
-    return shared->raii.raw;
-}
-
-auto gfx::Device::dispatcher() -> const vk::raii::DeviceDispatcher& {
-    return shared->raii.dispatcher;
-}
-
-auto gfx::Device::allocator() -> VmaAllocator {
-    return shared->allocator;
-}
-
 void gfx::Device::waitIdle() {
     shared->raii.raw.waitIdle(shared->raii.dispatcher);
 }
@@ -403,13 +391,13 @@ auto gfx::Device::newTexture(const TextureSettings& description) -> Texture {
     view_create_info.setComponents(description.mapping),
     view_create_info.setSubresourceRange(texture->subresource);
 
-    texture->image_view = handle().createImageView(view_create_info, VK_NULL_HANDLE, dispatcher());
+    texture->image_view = shared->raii.raw.createImageView(view_create_info, VK_NULL_HANDLE, shared->raii.dispatcher);
 
     return Texture(std::move(texture));
 }
 
 auto gfx::Device::newSampler(const vk::SamplerCreateInfo& info) -> Sampler {
-    return Sampler(std::make_shared<SamplerShared>(*this, handle().createSampler(info, VK_NULL_HANDLE, dispatcher())));
+    return Sampler(std::make_shared<SamplerShared>(*this, shared->raii.raw.createSampler(info, VK_NULL_HANDLE, shared->raii.dispatcher)));
 }
 
 auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAllocationCreateFlags options) -> Buffer {
@@ -423,7 +411,7 @@ auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAlloca
 
     auto buffer = std::make_shared<BufferShared>(*this);
 
-    vmaCreateBuffer(allocator(), reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info), &allocation_create_info, reinterpret_cast<VkBuffer*>(&buffer->raw), &buffer->allocation, nullptr);
+    vmaCreateBuffer(shared->allocator, reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info), &allocation_create_info, reinterpret_cast<VkBuffer*>(&buffer->raw), &buffer->allocation, nullptr);
 
     return Buffer(buffer);
 }
@@ -442,7 +430,7 @@ auto gfx::Device::newLibrary(const std::vector<char>& bytes) -> Library {
     module_create_info.setPCode(reinterpret_cast<const uint32_t *>(bytes.data()));
 
     auto library = std::make_shared<LibraryShared>(*this);
-    library->raw = handle().createShaderModule(module_create_info, VK_NULL_HANDLE, dispatcher());
+    library->raw = shared->raii.raw.createShaderModule(module_create_info, VK_NULL_HANDLE, shared->raii.dispatcher);
 
     spvReflectCreateShaderModule(module_create_info.codeSize, module_create_info.pCode, &library->spvReflectShaderModule);
 
@@ -487,17 +475,55 @@ auto gfx::Device::newRenderPipelineState(const gfx::RenderPipelineStateDescripti
     for (uint32_t i = 0; i < state->bind_group_layouts.size(); ++i) {
         vk::DescriptorSetLayoutCreateInfo layout_create_info = {};
         layout_create_info.setBindings(descriptor_sets[i].bindings);
-        state->bind_group_layouts[i] = handle().createDescriptorSetLayout(layout_create_info, nullptr, dispatcher());
+        state->bind_group_layouts[i] = shared->raii.raw.createDescriptorSetLayout(layout_create_info, nullptr, shared->raii.dispatcher);
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_create_info = {};
     pipeline_layout_create_info.setSetLayouts(state->bind_group_layouts);
     pipeline_layout_create_info.setPushConstantRanges(push_constant_ranges);
-    state->pipeline_layout = handle().createPipelineLayout(pipeline_layout_create_info, nullptr, dispatcher());
+    state->pipeline_layout = shared->raii.raw.createPipelineLayout(pipeline_layout_create_info, nullptr, shared->raii.dispatcher);
 
     vk::PipelineViewportStateCreateInfo viewport_state = {};
     viewport_state.setViewportCount(1);
     viewport_state.setScissorCount(1);
+
+    vk::PipelineInputAssemblyStateCreateInfo input_assembly_state = {};
+    input_assembly_state.setTopology(description.inputAssemblyState.topology);
+    input_assembly_state.setPrimitiveRestartEnable(description.inputAssemblyState.primitive_restart_enable);
+
+    vk::PipelineRasterizationStateCreateInfo rasterization_state = {};
+    rasterization_state.setDepthClampEnable(description.rasterizationState.depth_clamp_enable);
+    rasterization_state.setRasterizerDiscardEnable(description.rasterizationState.discard_enable);
+    rasterization_state.setPolygonMode(description.rasterizationState.polygon_mode);
+    rasterization_state.setLineWidth(description.rasterizationState.line_width);
+    rasterization_state.setCullMode(description.rasterizationState.cull_mode);
+    rasterization_state.setFrontFace(description.rasterizationState.front_face);
+    rasterization_state.setDepthBiasEnable(description.rasterizationState.depth_bias_enable);
+    rasterization_state.setDepthBiasConstantFactor(description.rasterizationState.depth_bias_constant_factor);
+    rasterization_state.setDepthBiasClamp(description.rasterizationState.depth_bias_clamp);
+    rasterization_state.setDepthBiasSlopeFactor(description.rasterizationState.depth_bias_slope_factor);
+
+    vk::PipelineTessellationStateCreateInfo tessellation_state = {};
+    tessellation_state.setPatchControlPoints(description.tessellationState.patch_control_points);
+
+    vk::PipelineMultisampleStateCreateInfo multisample_state = {};
+    multisample_state.setRasterizationSamples(description.multisampleState.rasterization_samples);
+    multisample_state.setSampleShadingEnable(description.multisampleState.sample_shading_enable);
+    multisample_state.setMinSampleShading(description.multisampleState.min_sample_shading);
+    multisample_state.setPSampleMask(description.multisampleState.sample_mask);
+    multisample_state.setAlphaToCoverageEnable(description.multisampleState.alpha_to_coverage_enable);
+    multisample_state.setAlphaToOneEnable(description.multisampleState.alpha_to_one_enable);
+
+    vk::PipelineDepthStencilStateCreateInfo depth_stencil_state = {};
+    depth_stencil_state.setDepthTestEnable(description.depthStencilState.depth_test_enable);
+    depth_stencil_state.setDepthWriteEnable(description.depthStencilState.depth_write_enable);
+    depth_stencil_state.setDepthCompareOp(description.depthStencilState.depth_compare_op);
+    depth_stencil_state.setDepthBoundsTestEnable(description.depthStencilState.depth_bounds_test_enable);
+    depth_stencil_state.setMinDepthBounds(description.depthStencilState.min_depth_bounds);
+    depth_stencil_state.setMaxDepthBounds(description.depthStencilState.max_depth_bounds);
+    depth_stencil_state.setStencilTestEnable(description.depthStencilState.stencil_test_enable);
+    depth_stencil_state.setFront(description.depthStencilState.front);
+    depth_stencil_state.setBack(description.depthStencilState.back);
 
     auto dynamicStates = std::array{
         vk::DynamicState::eViewport,
@@ -522,13 +548,11 @@ auto gfx::Device::newRenderPipelineState(const gfx::RenderPipelineStateDescripti
     stages.emplace_back(fragment_stage);
 
     vk::PipelineVertexInputStateCreateInfo vertex_input_state = {};
-    if (description.vertexDescription.has_value()) {
-        vertex_input_state.setVertexBindingDescriptions(description.vertexDescription->layouts.elements);
-        vertex_input_state.setVertexAttributeDescriptions(description.vertexDescription->attributes.elements);
-    }
+    vertex_input_state.setVertexBindingDescriptions(description.vertexInputState.bindings);
+    vertex_input_state.setVertexAttributeDescriptions(description.vertexInputState.attributes);
 
     vk::PipelineColorBlendStateCreateInfo color_blend_state = {};
-    color_blend_state.setAttachments(description.attachments.elements);
+    color_blend_state.setAttachments(description.colorBlendAttachments.elements);
 
     vk::PipelineRenderingCreateInfo rendering = {};
     rendering.setViewMask(description.viewMask);
@@ -540,11 +564,12 @@ auto gfx::Device::newRenderPipelineState(const gfx::RenderPipelineStateDescripti
     pipeline_create_info.setPNext(&rendering);
     pipeline_create_info.setStages(stages);
     pipeline_create_info.setPVertexInputState(&vertex_input_state);
-    pipeline_create_info.setPInputAssemblyState(&description.inputAssemblyState);
+    pipeline_create_info.setPInputAssemblyState(&input_assembly_state);
     pipeline_create_info.setPViewportState(&viewport_state);
-    pipeline_create_info.setPRasterizationState(&description.rasterizationState);
-    pipeline_create_info.setPMultisampleState(&description.multisampleState);
-    pipeline_create_info.setPDepthStencilState(&description.depthStencilState);
+    pipeline_create_info.setPRasterizationState(&rasterization_state);
+    pipeline_create_info.setPTessellationState(&tessellation_state);
+    pipeline_create_info.setPMultisampleState(&multisample_state);
+    pipeline_create_info.setPDepthStencilState(&depth_stencil_state);
     pipeline_create_info.setPColorBlendState(&color_blend_state);
     pipeline_create_info.setPDynamicState(&dynamic_state);
     pipeline_create_info.setLayout(state->pipeline_layout);
@@ -553,7 +578,7 @@ auto gfx::Device::newRenderPipelineState(const gfx::RenderPipelineStateDescripti
     pipeline_create_info.setBasePipelineHandle(nullptr);
     pipeline_create_info.setBasePipelineIndex(0);
 
-    std::ignore = handle().createGraphicsPipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, dispatcher());
+    std::ignore = shared->raii.raw.createGraphicsPipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, shared->raii.dispatcher);
     
     return RenderPipelineState(state);
 }
@@ -593,13 +618,13 @@ auto gfx::Device::newComputePipelineState(const Function& function) -> ComputePi
         vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {};
         descriptor_set_layout_create_info.setBindings(descriptor_sets[i].bindings);
 
-        state->bind_group_layouts[i] = handle().createDescriptorSetLayout(descriptor_set_layout_create_info, nullptr, dispatcher());
+        state->bind_group_layouts[i] = shared->raii.raw.createDescriptorSetLayout(descriptor_set_layout_create_info, nullptr, shared->raii.dispatcher);
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_create_info = {};
     pipeline_layout_create_info.setSetLayouts(state->bind_group_layouts);
     pipeline_layout_create_info.setPushConstantRanges(push_constant_ranges);
-    state->pipeline_layout = handle().createPipelineLayout(pipeline_layout_create_info, nullptr, dispatcher());
+    state->pipeline_layout = shared->raii.raw.createPipelineLayout(pipeline_layout_create_info, nullptr, shared->raii.dispatcher);
 
     vk::PipelineShaderStageCreateInfo shader_stage_create_info{};
     shader_stage_create_info.setStage(vk::ShaderStageFlagBits::eCompute);
@@ -612,7 +637,7 @@ auto gfx::Device::newComputePipelineState(const Function& function) -> ComputePi
     pipeline_create_info.setBasePipelineHandle(nullptr);
     pipeline_create_info.setBasePipelineIndex(0);
 
-    std::ignore = handle().createComputePipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, dispatcher());
+    std::ignore = shared->raii.raw.createComputePipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, shared->raii.dispatcher);
     return ComputePipelineState(state);
 }
 
@@ -621,7 +646,7 @@ auto gfx::Device::newCommandQueue() -> CommandQueue {
     command_pool_create_info.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
     command_pool_create_info.setQueueFamilyIndex(shared->family_index);
 
-    auto pool = handle().createCommandPool(command_pool_create_info, nullptr, dispatcher());
+    auto pool = shared->raii.raw.createCommandPool(command_pool_create_info, nullptr, shared->raii.dispatcher);
 
     return CommandQueue(std::make_shared<CommandQueueShared>(*this, pool));
 }

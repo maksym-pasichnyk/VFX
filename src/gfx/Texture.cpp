@@ -6,6 +6,12 @@
 
 gfx::TextureShared::TextureShared(gfx::Device device) : device(std::move(device)), image(nullptr), format(vk::Format::eUndefined), extent(), image_view(nullptr), subresource(), allocation(nullptr) {}
 gfx::TextureShared::TextureShared(gfx::Device device, vk::Image image, vk::Format format, vk::Extent3D extent, vk::ImageView image_view, vk::ImageSubresourceRange subresource, VmaAllocation allocation) : device(std::move(device)), image(image), format(format), extent(extent), image_view(image_view), subresource(subresource), allocation(allocation) {}
+gfx::TextureShared::~TextureShared() {
+    device.shared->raii.raw.destroyImageView(image_view, VK_NULL_HANDLE, device.shared->raii.dispatcher);
+    if (allocation) {
+        vmaDestroyImage(device.shared->allocator, image, allocation);
+    }
+}
 
 gfx::Texture::Texture() : shared(nullptr) {}
 
@@ -24,7 +30,7 @@ void gfx::Texture::replaceRegion(const void* data, uint64_t size) {
 
     commandBuffer.begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
     commandBuffer.imageBarrier(*this, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits2::eHost, vk::PipelineStageFlagBits2::eTransfer, {}, vk::AccessFlagBits2::eTransferWrite);
-    commandBuffer.shared->raw.copyBufferToImage(storageBuffer.shared->raw, shared->image, vk::ImageLayout::eTransferDstOptimal, 1, &buffer_image_copy, shared->device.dispatcher());
+    commandBuffer.shared->raw.copyBufferToImage(storageBuffer.shared->raw, shared->image, vk::ImageLayout::eTransferDstOptimal, 1, &buffer_image_copy, shared->device.shared->raii.dispatcher);
     commandBuffer.imageBarrier(*this, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead);
     commandBuffer.end();
     commandBuffer.submit();
@@ -37,13 +43,13 @@ void gfx::Texture::setLabel(const std::string& name) {
     image_info.setObject(uint64_t(static_cast<VkImage>(shared->image)));
     image_info.setPObjectName(name.c_str());
 
-    shared->device.handle().debugMarkerSetObjectNameEXT(image_info, shared->device.dispatcher());
+    shared->device.shared->raii.raw.debugMarkerSetObjectNameEXT(image_info, shared->device.shared->raii.dispatcher);
 
     vk::DebugMarkerObjectNameInfoEXT view_info = {};
     view_info.setObjectType(vk::DebugReportObjectTypeEXT::eImageView);
     view_info.setObject(uint64_t(static_cast<VkImageView>(shared->image_view)));
     view_info.setPObjectName(name.c_str());
 
-    shared->device.handle().debugMarkerSetObjectNameEXT(view_info, shared->device.dispatcher());
+    shared->device.shared->raii.raw.debugMarkerSetObjectNameEXT(view_info, shared->device.shared->raii.dispatcher);
 }
 

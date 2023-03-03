@@ -62,25 +62,25 @@ void UIRenderer::buildShaders() {
     gfx::RenderPipelineStateDescription description;
     description.vertexFunction = vertexLibrary.newFunction("main");
     description.fragmentFunction = fragmentLibrary.newFunction("main");
-    description.vertexDescription = {
-        .layouts = {{
+    description.vertexInputState = {
+        .bindings = {
             vk::VertexInputBindingDescription{0, sizeof(ImDrawVert), vk::VertexInputRate::eVertex}
-        }},
-        .attributes = {{
+        },
+        .attributes = {
             vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, pos)},
             vk::VertexInputAttributeDescription{1, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, uv)},
             vk::VertexInputAttributeDescription{2, 0, vk::Format::eR8G8B8A8Unorm, offsetof(ImDrawVert, col)}
-        }}
+        }
     };
-    description.inputAssemblyState.setTopology(vk::PrimitiveTopology::eTriangleList);
 
     description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-    description.depthStencilState.setDepthTestEnable(false);
-    description.attachments[0].setBlendEnable(true);
-    description.attachments[0].setColorBlendOp(vk::BlendOp::eAdd);
-    description.attachments[0].setAlphaBlendOp(vk::BlendOp::eAdd);
-    description.attachments[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
-    description.attachments[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
+    description.depthStencilState.depth_test_enable = false;
+
+    description.colorBlendAttachments[0].setBlendEnable(true);
+    description.colorBlendAttachments[0].setColorBlendOp(vk::BlendOp::eAdd);
+    description.colorBlendAttachments[0].setAlphaBlendOp(vk::BlendOp::eAdd);
+    description.colorBlendAttachments[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
+    description.colorBlendAttachments[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
 
     mRenderPipelineState = mDevice.newRenderPipelineState(description);
     mDescriptorSet = mDevice.newDescriptorSet(mRenderPipelineState.shared->bind_group_layouts.front(), {

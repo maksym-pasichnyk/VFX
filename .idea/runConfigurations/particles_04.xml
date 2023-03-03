@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="particles-04" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" WORKING_DIR="file://$ProjectFileDir$" PASS_PARENT_ENVS_2="true" PROJECT_NAME="gfx" TARGET_NAME="particles-04" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="gfx" RUN_TARGET_NAME="particles-04">
+  <configuration default="false" name="particles-04" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" WORKING_DIR="file://$ProjectFileDir$/assets" PASS_PARENT_ENVS_2="true" PROJECT_NAME="gfx" TARGET_NAME="particles-04" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="gfx" RUN_TARGET_NAME="particles-04">
     <method v="2">
       <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
     </method>

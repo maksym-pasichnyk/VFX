@@ -26,12 +26,12 @@ public:
         desc.name = title;
         desc.version = 1;
 
-        instance = gfx::Instance::init(desc);
+        instance = gfx::createInstance(desc);
         adapter = instance.enumerateAdapters().front();
         device = instance.createDevice(adapter);
 
         VkSurfaceKHR raw_surface;
-        SDL_Vulkan_CreateSurface(window, instance.handle(), &raw_surface);
+        SDL_Vulkan_CreateSurface(window, instance.shared->raii.raw, &raw_surface);
 
         // todo: merge surface with swapchain?
         surface = instance.wrapSurface(raw_surface);
@@ -122,6 +122,7 @@ public:
     virtual void keyDown(SDL_KeyboardEvent* event) {}
     virtual void mouseUp(SDL_MouseButtonEvent* event) {}
     virtual void mouseDown(SDL_MouseButtonEvent* event) {}
+    virtual void mouseMove(SDL_MouseMotionEvent* event) {}
     virtual void mouseWheel(SDL_MouseWheelEvent* event) {}
     virtual void performClose(uint32_t windowId) {}
     virtual void performResize(uint32_t windowId) {
@@ -175,6 +176,10 @@ protected:
                 }
                 case SDL_MOUSEBUTTONDOWN: {
                     mouseDown(&event.button);
+                    break;
+                }
+                case SDL_MOUSEMOTION: {
+                    mouseMove(&event.motion);
                     break;
                 }
                 case SDL_MOUSEWHEEL: {

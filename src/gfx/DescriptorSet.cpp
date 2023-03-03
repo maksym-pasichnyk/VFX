@@ -7,7 +7,7 @@
 
 gfx::DescriptorSetShared::DescriptorSetShared(Device device, vk::DescriptorSet raw, vk::DescriptorPool pool) : device(std::move(device)), raw(raw), pool(pool) {}
 gfx::DescriptorSetShared::~DescriptorSetShared() {
-    device.handle().destroyDescriptorPool(pool, nullptr, device.dispatcher());
+    device.shared->raii.raw.destroyDescriptorPool(pool, nullptr, device.shared->raii.dispatcher);
 }
 
 gfx::DescriptorSet::DescriptorSet() : shared(nullptr) {}
@@ -27,7 +27,7 @@ void gfx::DescriptorSet::setBuffer(const Buffer& buffer, uint64_t offset, uint32
     write_descriptor_set.setDescriptorType(vk::DescriptorType::eUniformBuffer);
     write_descriptor_set.setPBufferInfo(&descriptor_buffer_info);
 
-    shared->device.handle().updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, shared->device.dispatcher());
+    shared->device.shared->raii.raw.updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, shared->device.shared->raii.dispatcher);
 }
 
 void gfx::DescriptorSet::setStorageBuffer(const Buffer& buffer, uint64_t offset, uint32_t binding) {
@@ -44,7 +44,7 @@ void gfx::DescriptorSet::setStorageBuffer(const Buffer& buffer, uint64_t offset,
     write_descriptor_set.setDescriptorType(vk::DescriptorType::eStorageBuffer);
     write_descriptor_set.setPBufferInfo(&descriptor_buffer_info);
 
-    shared->device.handle().updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, shared->device.dispatcher());
+    shared->device.shared->raii.raw.updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, shared->device.shared->raii.dispatcher);
 }
 
 void gfx::DescriptorSet::setTexture(const Texture& texture, uint32_t binding) {
@@ -60,7 +60,7 @@ void gfx::DescriptorSet::setTexture(const Texture& texture, uint32_t binding) {
     write_descriptor_set.setDescriptorType(vk::DescriptorType::eSampledImage);
     write_descriptor_set.setPImageInfo(&descriptor_image_info);
 
-    shared->device.handle().updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, shared->device.dispatcher());
+    shared->device.shared->raii.raw.updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, shared->device.shared->raii.dispatcher);
 }
 
 void gfx::DescriptorSet::setSampler(Sampler const& sampler, uint32_t binding) {
@@ -75,7 +75,7 @@ void gfx::DescriptorSet::setSampler(Sampler const& sampler, uint32_t binding) {
     write_descriptor_set.setDescriptorType(vk::DescriptorType::eSampler);
     write_descriptor_set.setPImageInfo(&descriptor_image_info);
 
-    shared->device.handle().updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, shared->device.dispatcher());
+    shared->device.shared->raii.raw.updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, shared->device.shared->raii.dispatcher);
 }
 
 void gfx::DescriptorSet::setStorageImage(const Texture& texture, uint32_t binding) {
@@ -91,7 +91,7 @@ void gfx::DescriptorSet::setStorageImage(const Texture& texture, uint32_t bindin
     write_descriptor_set.setDescriptorType(vk::DescriptorType::eStorageImage);
     write_descriptor_set.setPImageInfo(&descriptor_image_info);
 
-    shared->device.handle().updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, shared->device.dispatcher());
+    shared->device.shared->raii.raw.updateDescriptorSets(1, &write_descriptor_set, 0, nullptr, shared->device.shared->raii.dispatcher);
 }
 
 void gfx::DescriptorSet::setLabel(const std::string& name) {
@@ -100,12 +100,12 @@ void gfx::DescriptorSet::setLabel(const std::string& name) {
     pool_info.setObject(uint64_t(VkDescriptorPool(shared->pool)));
     pool_info.setPObjectName(name.c_str());
 
-    shared->device.handle().debugMarkerSetObjectNameEXT(pool_info, shared->device.dispatcher());
+    shared->device.shared->raii.raw.debugMarkerSetObjectNameEXT(pool_info, shared->device.shared->raii.dispatcher);
 
     vk::DebugMarkerObjectNameInfoEXT set_info = {};
     set_info.setObjectType(vk::DebugReportObjectTypeEXT::eDescriptorSet);
     set_info.setObject(uint64_t(VkDescriptorSet(shared->raw)));
     set_info.setPObjectName(name.c_str());
 
-    shared->device.handle().debugMarkerSetObjectNameEXT(pool_info, shared->device.dispatcher());
+    shared->device.shared->raii.raw.debugMarkerSetObjectNameEXT(pool_info, shared->device.shared->raii.dispatcher);
 }

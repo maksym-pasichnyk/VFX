@@ -24,12 +24,7 @@ namespace gfx {
         explicit TextureShared(Device device);
         explicit TextureShared(Device device, vk::Image image, vk::Format format, vk::Extent3D extent, vk::ImageView image_view, vk::ImageSubresourceRange subresource, VmaAllocation allocation);
 
-        ~TextureShared() {
-            device.handle().destroyImageView(image_view, VK_NULL_HANDLE, device.dispatcher());
-            if (allocation) {
-                vmaDestroyImage(device.allocator(), image, allocation);
-            }
-        }
+        ~TextureShared();
     };
 
     struct Texture final {

@@ -3,7 +3,7 @@
 
 gfx::SwapchainShared::SwapchainShared(Device device, Surface surface) : device(std::move(device)), surface(std::move(surface)) {}
 gfx::SwapchainShared::~SwapchainShared() {
-    device.handle().destroySwapchainKHR(raw, nullptr, device.dispatcher());
+    device.shared->raii.raw.destroySwapchainKHR(raw, nullptr, device.shared->raii.dispatcher);
 }
 
 auto gfx::Swapchain::drawableSize() -> vk::Extent2D {
@@ -12,27 +12,27 @@ auto gfx::Swapchain::drawableSize() -> vk::Extent2D {
 }
 
 auto gfx::Swapchain::nextDrawable() -> Drawable {
-    auto fence = shared->device.handle().createFenceUnique(vk::FenceCreateInfo(), nullptr, shared->device.dispatcher());
+    auto fence = shared->device.shared->raii.raw.createFenceUnique(vk::FenceCreateInfo(), nullptr, shared->device.shared->raii.dispatcher);
 
     uint32_t index;
-    vk::Result result = shared->device.handle().acquireNextImageKHR(
+    vk::Result result = shared->device.shared->raii.raw.acquireNextImageKHR(
         shared->raw,
         std::numeric_limits<uint64_t>::max(),
         nullptr,
         *fence,
         &index,
-        shared->device.dispatcher()
+        shared->device.shared->raii.dispatcher
     );
     if (result != vk::Result::eErrorOutOfDateKHR && result != vk::Result::eSuboptimalKHR && result != vk::Result::eSuccess) {
         throw std::runtime_error("failed to acquire swapchain image");
     }
-    vk::resultCheck(shared->device.handle().waitForFences(1, &*fence, true, std::numeric_limits<uint64_t>::max(), shared->device.dispatcher()), "waitForFences");
+    vk::resultCheck(shared->device.shared->raii.raw.waitForFences(1, &*fence, true, std::numeric_limits<uint64_t>::max(), shared->device.shared->raii.dispatcher), "waitForFences");
 
     return shared->drawables[uint64_t(index)];
 }
 
 void gfx::Swapchain::configure(const SurfaceConfiguration& config) {
-    auto capabilities = shared->device.shared->adapter.getSurfaceCapabilitiesKHR(shared->surface.shared->raw, shared->device.shared->instance.dispatcher());
+    auto capabilities = shared->device.shared->instance.getSurfaceCapabilitiesKHR(shared->device.shared->adapter, shared->surface.shared->raw);
 
     std::vector<uint32_t> queue_family_indices = {};
 //    if (shared->mGraphicsQueueFamilyIndex != shared->mPresentQueueFamilyIndex) {
@@ -62,11 +62,11 @@ void gfx::Swapchain::configure(const SurfaceConfiguration& config) {
 
     auto old_swapchain = shared->raw;
 
-    shared->raw = shared->device.handle().createSwapchainKHR(swapchain_create_info, nullptr, shared->device.dispatcher());
-    auto images = shared->device.handle().getSwapchainImagesKHR(shared->raw, shared->device.dispatcher());
+    shared->raw = shared->device.shared->raii.raw.createSwapchainKHR(swapchain_create_info, nullptr, shared->device.shared->raii.dispatcher);
+    auto images = shared->device.shared->raii.raw.getSwapchainImagesKHR(shared->raw, shared->device.shared->raii.dispatcher);
 
     if (old_swapchain) {
-        shared->device.handle().destroySwapchainKHR(old_swapchain, nullptr, shared->device.dispatcher());
+        shared->device.shared->raii.raw.destroySwapchainKHR(old_swapchain, nullptr, shared->device.shared->raii.dispatcher);
     }
 
     shared->drawables.resize(images.size());
@@ -83,7 +83,7 @@ void gfx::Swapchain::configure(const SurfaceConfiguration& config) {
         texture->extent.setDepth(1);
         texture->format = config.format;
         texture->image = images[i];
-        texture->image_view = shared->device.handle().createImageView(view_create_info, VK_NULL_HANDLE, shared->device.dispatcher());
+        texture->image_view = shared->device.shared->raii.raw.createImageView(view_create_info, VK_NULL_HANDLE, shared->device.shared->raii.dispatcher);
         texture->allocation = {};
         texture->subresource.setAspectMask(vk::ImageAspectFlagBits::eColor);
         texture->subresource.setLayerCount(1);

@@ -13,7 +13,7 @@
 
 gfx::CommandQueueShared::CommandQueueShared(Device device, vk::CommandPool raw) : device(std::move(device)), raw(raw) {}
 gfx::CommandQueueShared::~CommandQueueShared() {
-    device.handle().destroyCommandPool(raw, nullptr, device.dispatcher());
+    device.shared->raii.raw.destroyCommandPool(raw, nullptr, device.shared->raii.dispatcher);
 }
 
 gfx::CommandQueue::CommandQueue() : shared(nullptr) {}

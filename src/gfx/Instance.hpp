@@ -39,10 +39,10 @@ namespace gfx {
 
     struct InstanceShared {
         raii::Context context;
-        raii::Instance instance;
+        raii::Instance raii;
         vk::DebugUtilsMessengerEXT messenger;
 
-        explicit InstanceShared(raii::Context context, raii::Instance instance, vk::DebugUtilsMessengerEXT messenger);
+        explicit InstanceShared(raii::Context context, raii::Instance raii, vk::DebugUtilsMessengerEXT messenger);
         ~InstanceShared();
     };
 
@@ -52,12 +52,12 @@ namespace gfx {
         explicit Instance() : shared(nullptr) {}
         explicit Instance(std::shared_ptr<InstanceShared> shared) : shared(std::move(shared)) {}
 
-        static auto init(const InstanceSettings& desc) -> Instance;
-
-        auto handle() -> vk::Instance;
-        auto dispatcher() -> const vk::raii::InstanceDispatcher&;
         auto enumerateAdapters() -> std::vector<vk::PhysicalDevice>;
         auto createDevice(vk::PhysicalDevice adapter) -> Device;
         auto wrapSurface(vk::SurfaceKHR surface) -> Surface;
+
+        auto getSurfaceCapabilitiesKHR(vk::PhysicalDevice adapter, vk::SurfaceKHR surface) -> vk::SurfaceCapabilitiesKHR;
     };
+
+    extern auto createInstance(const InstanceSettings& desc) -> Instance;
 }

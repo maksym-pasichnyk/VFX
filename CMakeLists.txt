@@ -17,6 +17,13 @@ include(FetchContent)
 find_package(SDL2 REQUIRED)
 find_package(Vulkan REQUIRED)
 
+find_library(
+    MoltenVK
+    PATHS /Users/maxim/MoltenVK
+)
+
+message(STATUS "MoltenVK: ${MoltenVK}")
+
 set(VMA_VERSION 3.0.1)
 FetchContent_Declare(VulkanMemoryAllocator URL "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/v${VMA_VERSION}.zip" DOWNLOAD_EXTRACT_TIMESTAMP ON)
 FetchContent_MakeAvailable(VulkanMemoryAllocator)
@@ -59,7 +66,7 @@ function(target_compile_shaders TARGET)
     add_dependencies(${TARGET} ${TARGET}_shaders)
 endfunction()
 
-add_library(gfx STATIC src/gfx/Instance.hpp src/gfx/Texture.hpp src/gfx/Buffer.hpp src/gfx/ComputePipelineState.hpp src/gfx/CommandQueue.hpp src/gfx/CommandQueue.cpp src/gfx/Texture.cpp src/gfx/Buffer.cpp src/gfx/Instance.cpp src/gfx/ComputePipelineState.cpp src/gfx/DescriptorSet.cpp src/gfx/DescriptorSet.hpp src/gfx/Swapchain.cpp src/gfx/Swapchain.hpp src/gfx/Device.cpp src/gfx/Device.hpp src/gfx/Drawable.cpp src/gfx/Drawable.hpp src/gfx/Sampler.cpp src/gfx/Sampler.hpp src/gfx/CommandBuffer.cpp src/gfx/CommandBuffer.hpp src/gfx/Library.cpp src/gfx/Library.hpp src/gfx/Function.hpp src/gfx/Function.cpp src/gfx/RenderPipelineState.cpp src/gfx/RenderPipelineState.hpp src/gfx/GFX.hpp src/gfx/Surface.hpp src/gfx/Surface.cpp src/gfx/BindGroupLayout.hpp src/gfx/BindGroupLayout.cpp)
+add_library(gfx STATIC src/gfx/Instance.hpp src/gfx/Texture.hpp src/gfx/Buffer.hpp src/gfx/ComputePipelineState.hpp src/gfx/CommandQueue.hpp src/gfx/CommandQueue.cpp src/gfx/Texture.cpp src/gfx/Buffer.cpp src/gfx/Instance.cpp src/gfx/ComputePipelineState.cpp src/gfx/DescriptorSet.cpp src/gfx/DescriptorSet.hpp src/gfx/Swapchain.cpp src/gfx/Swapchain.hpp src/gfx/Device.cpp src/gfx/Device.hpp src/gfx/Drawable.cpp src/gfx/Drawable.hpp src/gfx/Sampler.cpp src/gfx/Sampler.hpp src/gfx/CommandBuffer.cpp src/gfx/CommandBuffer.hpp src/gfx/Library.cpp src/gfx/Library.hpp src/gfx/Function.hpp src/gfx/Function.cpp src/gfx/RenderPipelineState.cpp src/gfx/RenderPipelineState.hpp src/gfx/GFX.hpp src/gfx/Surface.hpp src/gfx/Surface.cpp src/gfx/BindGroupLayout.hpp src/gfx/BindGroupLayout.cpp src/gfx/ClearColor.hpp)
 set_target_properties(gfx PROPERTIES CXX_EXTENSIONS OFF CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(gfx
 PUBLIC

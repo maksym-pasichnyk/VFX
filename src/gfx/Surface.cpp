@@ -4,7 +4,7 @@ gfx::SurfaceShared::SurfaceShared(gfx::Instance instance, vk::SurfaceKHR raw)
     : instance(std::move(instance)), raw(raw) {}
 
 gfx::SurfaceShared::~SurfaceShared() {
-    instance.handle().destroySurfaceKHR(raw, nullptr, instance.dispatcher());
+    instance.shared->raii.raw.destroySurfaceKHR(raw, nullptr, instance.shared->raii.dispatcher);
 }
 
 gfx::Surface::Surface() : shared(nullptr) {}

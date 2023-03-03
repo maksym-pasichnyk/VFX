@@ -1,5 +1,4 @@
 #include "Assets.hpp"
-#include "filesystem.hpp"
 #include "Application.hpp"
 #include "ParticleSystem.hpp"
 #include "ParticleEmitter.hpp"
@@ -22,8 +21,8 @@ public:
 
 public:
     void update(float_t dt) override {
-        g_proj_matrix = getPerspectiveProjection(glm::radians(60.0F), getAspectRatio(), 0.03F, 1000.0F);
-        g_view_matrix = glm::lookAtLH(glm::vec3(25.0F, 10.0F, 0.0F), glm::vec3(0.0F, 10.0F, 0.0F), glm::vec3(0, 1, 0));
+        camera_projection_matrix = getPerspectiveProjection(glm::radians(60.0F), getAspectRatio(), 0.03F, 1000.0F);
+        world_to_camera_matrix = glm::lookAtLH(glm::vec3(25.0F, 10.0F, 0.0F), glm::vec3(0.0F, 10.0F, 0.0F), glm::vec3(0, 1, 0));
 
         rocketParticleEmitter->update(dt);
         rocketParticleSystem->update(dt, false);
@@ -54,8 +53,8 @@ public:
         rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
         ShaderData shader_data = {};
-        shader_data.g_proj_matrix = g_proj_matrix;
-        shader_data.g_view_matrix = g_view_matrix;
+        shader_data.g_proj_matrix = camera_projection_matrix;
+        shader_data.g_view_matrix = world_to_camera_matrix;
 
         commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
         commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
@@ -119,8 +118,8 @@ public:
     }
 
 private:
-    glm::mat4x4 g_proj_matrix = {};
-    glm::mat4x4 g_view_matrix = {};
+    glm::mat4x4 camera_projection_matrix = {};
+    glm::mat4x4 world_to_camera_matrix = {};
 
     sp<ParticleSystem> rocketParticleSystem = {};
     sp<ParticleSystem> sparkleParticleSystem = {};
@@ -131,9 +130,6 @@ private:
 };
 
 auto main(int argc, char** argv) -> int32_t {
-    cxx::filesystem::init(argv[0]);
-    cxx::filesystem::mount("assets", {}, true);
-
     setenv("GFX_ENABLE_API_VALIDATION", "1", 1);
 
     Game app{};
