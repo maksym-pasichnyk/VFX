@@ -308,6 +308,7 @@ private:
                 samplers.emplace_back(sampler.interpolation, std::move(inputs), std::move(outputs));
             }
 
+            channels.reserve(animation.channels.size());
             for (const auto& channel : animation.channels) {
                 channels.emplace_back(channel.target_path, channel.sampler, channel.target_node);
             }
@@ -352,10 +353,7 @@ public:
 
         commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
-        auto descriptorSet = commandBuffer->newDescriptorSet(renderPipelineState->bind_group_layouts.front(), {
-            vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
-            vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 1},
-        });
+        auto descriptorSet = commandBuffer->newDescriptorSet(renderPipelineState, 0);
 
         vk::DescriptorImageInfo sampler_info = {};
         sampler_info.setSampler(sampler->raw);

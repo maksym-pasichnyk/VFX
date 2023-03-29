@@ -60,8 +60,7 @@ public:
     void run() {
         auto previous = std::chrono::steady_clock::now();
 
-        running = true;
-        while (running) {
+        while (true) {
             using seconds = std::chrono::duration<float, std::chrono::seconds::period>;
 
             auto current = std::chrono::steady_clock::now();
@@ -75,7 +74,9 @@ public:
             accumulateCount = std::min(accumulateCount + 1, static_cast<int32_t>(std::size(accumulate)));
             average = accumulateTotal / static_cast<float>(accumulateCount);
 
-            _pollEvents();
+            if (_pollEvents()) {
+                break;
+            }
 
             uiRenderer->setCurrentContext();
             uiRenderer->setScreenSize(getUISize(getWindowSize()));
@@ -137,12 +138,13 @@ public:
     }
 
 protected:
-    void _pollEvents() {
+    auto _pollEvents() -> bool {
+        bool quit = false;
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
                 case SDL_QUIT: {
-                    running = false;
+                    quit = true;
                     break;
                 }
                 case SDL_WINDOWEVENT: {
@@ -191,6 +193,7 @@ protected:
                 }
             }
         }
+        return quit;
     }
 
     auto _drawView(const sp<View>& view) {
@@ -229,12 +232,11 @@ public:
     }
 
 //todo: make this private
-//protected:
-    bool running{};
-    SDL_Window* window;
+protected:
+    SDL_Window*                         window          = {};
 
-    float_t                             average = {};
-    float_t                             accumulate[60] = {};
+    float_t                             average         = {};
+    float_t                             accumulate[60]  = {};
     float_t                             accumulateTotal = {};
     int32_t                             accumulateCount = {};
     int32_t                             accumulateIndex = {};

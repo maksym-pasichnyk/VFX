@@ -37,9 +37,7 @@ public:
         commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-        auto descriptor_set = commandBuffer->newDescriptorSet(renderPipelineState->bind_group_layouts.front(), {
-            vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1}
-        });
+        auto descriptor_set = commandBuffer->newDescriptorSet(renderPipelineState, 0);
         vk::DescriptorBufferInfo buffer_info = {};
         buffer_info.setBuffer(vertexBuffer->raw);
         buffer_info.setOffset(0);

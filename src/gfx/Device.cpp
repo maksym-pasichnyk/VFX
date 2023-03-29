@@ -8,7 +8,6 @@
 #include "Instance.hpp"
 #include "Swapchain.hpp"
 #include "CommandQueue.hpp"
-#include "DescriptorSet.hpp"
 #include "RenderPipelineState.hpp"
 #include "ComputePipelineState.hpp"
 

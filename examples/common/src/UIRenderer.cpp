@@ -118,35 +118,31 @@ void UIRenderer::draw(const ManagedShared<gfx::CommandBuffer>& cmd) {
     GuiShaderData gui_shader_data = {};
     gui_shader_data.scale = 2.0F / simd::float2{mScreenSize.width, mScreenSize.height};
 
-    auto descriptor_set = cmd->newDescriptorSet(render_pipeline_state->bind_group_layouts.front(), {
-        vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
-        vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 1},
-    });
+    auto descriptor_set = cmd->newDescriptorSet(render_pipeline_state, 0);
 
     vk::DescriptorImageInfo sampler_info = {};
     sampler_info.setSampler(font_sampler->raw);
-
-    vk::WriteDescriptorSet sampler_write_info = {};
-    sampler_write_info.setDstSet(descriptor_set);
-    sampler_write_info.setDstBinding(0);
-    sampler_write_info.setDstArrayElement(0);
-    sampler_write_info.setDescriptorCount(1);
-    sampler_write_info.setDescriptorType(vk::DescriptorType::eSampler);
-    sampler_write_info.setPImageInfo(&sampler_info);
 
     vk::DescriptorImageInfo image_info = {};
     image_info.setImageView(font_texture->image_view);
     image_info.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 
-    vk::WriteDescriptorSet image_write_info = {};
-    image_write_info.setDstSet(descriptor_set);
-    image_write_info.setDstBinding(1);
-    image_write_info.setDstArrayElement(0);
-    image_write_info.setDescriptorCount(1);
-    image_write_info.setDescriptorType(vk::DescriptorType::eSampledImage);
-    image_write_info.setPImageInfo(&image_info);
+    vk::WriteDescriptorSet writes[2] = {};
+    writes[0].setDstSet(descriptor_set);
+    writes[0].setDstBinding(0);
+    writes[0].setDstArrayElement(0);
+    writes[0].setDescriptorCount(1);
+    writes[0].setDescriptorType(vk::DescriptorType::eSampler);
+    writes[0].setPImageInfo(&sampler_info);
 
-    device->raii.raw.updateDescriptorSets({sampler_write_info, image_write_info}, {}, device->raii.dispatcher);
+    writes[1].setDstSet(descriptor_set);
+    writes[1].setDstBinding(1);
+    writes[1].setDstArrayElement(0);
+    writes[1].setDescriptorCount(1);
+    writes[1].setDescriptorType(vk::DescriptorType::eSampledImage);
+    writes[1].setPImageInfo(&image_info);
+
+    device->raii.raw.updateDescriptorSets(writes, {}, device->raii.dispatcher);
 
     vk::DeviceSize vertex_buffer_offset = dynamic_buffer_offset;
     dynamic_buffer_offset += mDrawList.VtxBuffer.Size * sizeof(ImDrawVert);

@@ -16,10 +16,13 @@ gfx::CommandBuffer::CommandBuffer(ManagedShared<Device> device, ManagedShared<Co
     allocate_info.setCommandPool(queue->raw);
     allocate_info.setLevel(vk::CommandBufferLevel::ePrimary);
     allocate_info.setCommandBufferCount(1);
-    vk::resultCheck(device->raii.raw.allocateCommandBuffers(&allocate_info, &raw, device->raii.dispatcher), "allocateCommandBuffers");
+    vk::resultCheck(device->raii.raw.allocateCommandBuffers(&allocate_info, &raw, device->raii.dispatcher), "Failed to allocate command buffer");
 
-    fence       = device->raii.raw.createFence(vk::FenceCreateInfo(), nullptr, device->raii.dispatcher);
-    semaphore   = device->raii.raw.createSemaphore(vk::SemaphoreCreateInfo(), nullptr, device->raii.dispatcher);
+    vk::FenceCreateInfo fence_create_info = {};
+    vk::resultCheck(device->raii.raw.createFence(&fence_create_info, nullptr, &fence, device->raii.dispatcher), "Failed to create fence");
+
+    vk::SemaphoreCreateInfo semaphore_create_info = {};
+    vk::resultCheck(device->raii.raw.createSemaphore(&semaphore_create_info, nullptr, &semaphore, device->raii.dispatcher), "Failed to create semaphore");
 
 //    vk::DescriptorPoolCreateInfo pool_create_info = {};
 //    pool_create_info.setMaxSets(1024);
@@ -55,7 +58,7 @@ void gfx::CommandBuffer::submit() {
     submit_info.setSignalSemaphoreCount(1);
     submit_info.setPSignalSemaphores(&semaphore);
 
-    vk::resultCheck(device->raii.raw.resetFences(1, &fence, device->raii.dispatcher), "Submit");
+    vk::resultCheck(device->raii.raw.resetFences(1, &fence, device->raii.dispatcher), "Failed to reset fence");
 
     // todo: get valid device for submit
     device->queue.submit(submit_info, fence, device->raii.dispatcher);
@@ -96,8 +99,7 @@ void gfx::CommandBuffer::dispatch(uint32_t groupCountX, uint32_t groupCountY, ui
 }
 
 void gfx::CommandBuffer::waitUntilCompleted() {
-    vk::Result result = device->raii.raw.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max(), device->raii.dispatcher);
-    vk::resultCheck(result, "waitForFences");
+    vk::resultCheck(device->raii.raw.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max(), device->raii.dispatcher), "Failed to wait for fence");
 }
 
 void gfx::CommandBuffer::setImageLayout(const ManagedShared<Texture>& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask) {
@@ -179,7 +181,7 @@ void gfx::CommandBuffer::beginRendering(const RenderingInfo& info) {
 
     if (info.stencilAttachment.texture || info.stencilAttachment.resolveTexture) {
         vk::ClearDepthStencilValue depth_stencil = {};
-        depth_stencil.setDepth(info.stencilAttachment.clearStencil);
+        depth_stencil.setStencil(info.stencilAttachment.clearStencil);
 
         if (info.stencilAttachment.texture) {
             stencilAttachment.setImageView(info.stencilAttachment.texture->image_view);
@@ -198,7 +200,6 @@ void gfx::CommandBuffer::beginRendering(const RenderingInfo& info) {
     }
 
     raw.beginRendering(rendering_info, device->raii.dispatcher);
-
 }
 
 void gfx::CommandBuffer::endRendering() {
@@ -238,12 +239,12 @@ void gfx::CommandBuffer::drawIndexed(uint32_t indexCount, uint32_t instanceCount
 }
 
 // todo: get sizes from layout
-auto gfx::CommandBuffer::newDescriptorSet(vk::DescriptorSetLayout layout, const std::vector<vk::DescriptorPoolSize>& sizes) -> vk::DescriptorSet {
+auto gfx::CommandBuffer::newDescriptorSet(const ManagedShared<RenderPipelineState>& render_pipeline_state, uint32_t index) -> vk::DescriptorSet {
     for (auto pool : descriptor_pools) {
         vk::DescriptorSetAllocateInfo allocate_info = {};
         allocate_info.setDescriptorPool(pool);
         allocate_info.setDescriptorSetCount(1);
-        allocate_info.setPSetLayouts(&layout);
+        allocate_info.setPSetLayouts(&render_pipeline_state->bind_group_layouts[index]);
 
         vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
         vk::Result result = device->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, device->raii.dispatcher);
@@ -268,7 +269,7 @@ auto gfx::CommandBuffer::newDescriptorSet(vk::DescriptorSetLayout layout, const 
 
     vk::DescriptorPoolCreateInfo pool_create_info = {};
     pool_create_info.setMaxSets(1024);
-    pool_create_info.setPoolSizes(sizes);
+    pool_create_info.setPoolSizes(pool_sizes);
 
     auto pool = device->raii.raw.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, device->raii.dispatcher);
     descriptor_pools.push_back(pool);
@@ -276,7 +277,7 @@ auto gfx::CommandBuffer::newDescriptorSet(vk::DescriptorSetLayout layout, const 
     vk::DescriptorSetAllocateInfo allocate_info = {};
     allocate_info.setDescriptorPool(pool);
     allocate_info.setDescriptorSetCount(1);
-    allocate_info.setPSetLayouts(&layout);
+    allocate_info.setPSetLayouts(&render_pipeline_state->bind_group_layouts[index]);
 
     vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
     vk::Result result = device->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, device->raii.dispatcher);
