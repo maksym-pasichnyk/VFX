@@ -2,6 +2,7 @@
 
 #include "Device.hpp"
 #include "ClearColor.hpp"
+#include "CommandQueue.hpp"
 
 #include <optional>
 
@@ -10,7 +11,6 @@ namespace gfx {
     struct Buffer;
     struct Texture;
     struct Drawable;
-    struct CommandQueue;
     struct CommandBuffer;
     struct DescriptorSet;
     struct RenderPipelineState;
@@ -36,7 +36,7 @@ namespace gfx {
         vk::ImageLayout         resolveImageLayout = vk::ImageLayout::eUndefined;
         vk::AttachmentLoadOp    loadOp             = vk::AttachmentLoadOp::eLoad;
         vk::AttachmentStoreOp   storeOp            = vk::AttachmentStoreOp::eStore;
-        float_t                 clearDepth         = {};
+        float                 clearDepth         = {};
     };
 
     struct RenderingStencilAttachmentInfo {
@@ -71,18 +71,17 @@ namespace gfx {
     };
 
     struct CommandBufferShared {
-        Device device;
-        CommandQueue queue;
-        vk::CommandBuffer raw;
+        Device                          device;
+        CommandQueue                    queue;
+        vk::CommandBuffer               raw                 = {};
+        vk::Fence                       fence               = {};
+        vk::Semaphore                   semaphore           = {};
+        vk::Pipeline                    pipeline            = {};
+        vk::PipelineLayout              pipeline_layout     = {};
+        vk::PipelineBindPoint           pipeline_bind_point = {};
+        std::vector<vk::DescriptorPool> descriptor_pools    = {};
 
-        vk::Fence fence;
-        vk::Semaphore semaphore;
-
-        vk::Pipeline pipeline = {};
-        vk::PipelineLayout pipeline_layout = {};
-        vk::PipelineBindPoint pipeline_bind_point = {};
-
-        explicit CommandBufferShared(gfx::Device device, gfx::CommandQueue queue);
+        explicit CommandBufferShared(Device device, CommandQueue queue);
         ~CommandBufferShared();
     };
 
@@ -97,11 +96,11 @@ namespace gfx {
         void submit();
         void present(const Drawable& drawable);
         void setComputePipelineState(ComputePipelineState const& state);
-        void bindDescriptorSet(const DescriptorSet& descriptorSet, uint32_t slot);
+        void bindDescriptorSet(vk::DescriptorSet descriptorSet, uint32_t slot);
         void pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data);
         void dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
         void waitUntilCompleted();
-        void imageBarrier(Texture const& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask);
+        void setImageLayout(Texture const& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask);
 
         void beginRendering(const RenderingInfo& info);
         void endRendering();
@@ -112,5 +111,6 @@ namespace gfx {
         void bindVertexBuffer(int firstBinding, const Buffer& buffer, vk::DeviceSize offset);
         void draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
         void drawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
+        auto newDescriptorSet(vk::DescriptorSetLayout layout, const std::vector<vk::DescriptorPoolSize>& sizes) -> vk::DescriptorSet;
     };
 }

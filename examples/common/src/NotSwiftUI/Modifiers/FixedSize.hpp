@@ -16,7 +16,7 @@ public:
         content->_draw(context, size);
     }
 
-    auto _size(const ProposedSize &proposed) -> Size override {
+    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
         auto p = proposed;
         if (horizontal) {
             p.width = std::nullopt;
@@ -24,7 +24,7 @@ public:
         if (vertical) {
             p.height = std::nullopt;
         }
-        return content->_size(p);
+        return content->_size(context, p);
     }
 };
 

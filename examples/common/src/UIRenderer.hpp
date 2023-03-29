@@ -11,6 +11,7 @@ public:
 private:
     void buildFonts();
     void buildShaders();
+    void buildBuffers();
 
 public:
     void resetForNewFrame();
@@ -18,23 +19,22 @@ public:
 
     auto drawList() -> ImDrawList*;
     void draw(gfx::CommandBuffer cmd);
-    void setScale(float_t scale);
+    void setScale(float scale);
     void setScreenSize(const Size& size);
 
 private:
-    float_t mScale = 1.0F;
-    Size mScreenSize = Size::zero();
+    Size                        mScreenSize         = Size::zero();
 
-    ImDrawList mDrawList;
-    ImFontAtlas mFontAtlas = {};
-    ImGuiContext mGuiContext = {&mFontAtlas};
-    ImDrawListSharedData mDrawListSharedData = {};
+    ImDrawList                  mDrawList;
+    ImFontAtlas                 mFontAtlas          = {};
+    ImGuiContext                mGuiContext         = {&mFontAtlas};
+    ImDrawListSharedData        mDrawListSharedData = {};
 
-    gfx::Device mDevice;
-    gfx::Buffer mIndexBuffer;
-    gfx::Buffer mVertexBuffer;
-    gfx::Texture mFontTexture;
-    gfx::Sampler mFontSampler;
-    gfx::DescriptorSet mDescriptorSet;
-    gfx::RenderPipelineState mRenderPipelineState;
+    vk::DeviceSize              dynamic_buffer_offset      = {};
+
+    gfx::Device                 mDevice;
+    gfx::Buffer                 dynamic_buffer;
+    gfx::Texture                mFontTexture;
+    gfx::Sampler                mFontSampler;
+    gfx::RenderPipelineState    render_pipeline_state;
 };

@@ -23,7 +23,7 @@ public:
         color.b = std::uniform_real_distribution(0.0F, 1.0F)(random_engine);
         color.a = 1.0F;
 
-        float_t lifetime = std::uniform_real_distribution(1.0F, 2.0F)(random_engine);
+        float lifetime = std::uniform_real_distribution(1.0F, 2.0F)(random_engine);
 
         mParticleSystem->emit({}, color, velocity * 5.0F, lifetime);
     }

@@ -19,8 +19,8 @@ public:
         context->restoreState();
     }
 
-    auto _size(const ProposedSize &proposed) -> Size override {
-        return content->_size(proposed);
+    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
+        return content->_size(context, proposed);
     }
 };
 

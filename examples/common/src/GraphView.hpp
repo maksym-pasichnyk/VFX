@@ -182,12 +182,12 @@ public:
 
         auto _getSlotPosition(const sp<Port>& port) -> Point {
             if (port->mDirection == Port::Direction::eInput) {
-                float_t x = mPosition.x + 10.0F + 10.0F + 10.0F;
-                float_t y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * static_cast<float_t>(port->mIndex);
+                float x = mPosition.x + 10.0F + 10.0F + 10.0F;
+                float y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * static_cast<float>(port->mIndex);
                 return Point{x, y};
             } else {
-                float_t x = mPosition.x + 10.0F + mSize.width - 20.0F - 10.0F;
-                float_t y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * static_cast<float_t>(port->mIndex);
+                float x = mPosition.x + 10.0F + mSize.width - 20.0F - 10.0F;
+                float y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * static_cast<float_t>(port->mIndex);
                 return Point{x, y};
             }
         }
@@ -224,7 +224,7 @@ private:
     sp<Link> mSelectedLink = {};
 
 private:
-    auto _size(const ProposedSize &proposed) -> Size override {
+    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
         return proposed.orMax();
     }
 
@@ -239,11 +239,13 @@ private:
         float_t cellSize = 50.0F * invScale;
         float_t x = std::fmod(mGridOffset.x * invScale, cellSize);
         float_t y = std::fmod(mGridOffset.y * invScale, cellSize);
-        for (; x < size.width; x += cellSize) {
+        while (x < size.width) {
             context->drawLine(Point{x, 0.0F}, Point{x, size.height}, 1.0F);
+            x += cellSize;
         }
-        for (; y < size.height; y += cellSize) {
+        while (y < size.height) {
             context->drawLine(Point{0.0F, y}, Point{size.width, y}, 1.0F);
+            y += cellSize;
         }
         context->restoreState();
 

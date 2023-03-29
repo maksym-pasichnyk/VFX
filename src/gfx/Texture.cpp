@@ -29,9 +29,9 @@ void gfx::Texture::replaceRegion(const void* data, uint64_t size) {
     auto commandBuffer = commandQueue.commandBuffer();
 
     commandBuffer.begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-    commandBuffer.imageBarrier(*this, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits2::eHost, vk::PipelineStageFlagBits2::eTransfer, {}, vk::AccessFlagBits2::eTransferWrite);
+    commandBuffer.setImageLayout(*this, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits2::eHost, vk::PipelineStageFlagBits2::eTransfer, {}, vk::AccessFlagBits2::eTransferWrite);
     commandBuffer.shared->raw.copyBufferToImage(storageBuffer.shared->raw, shared->image, vk::ImageLayout::eTransferDstOptimal, 1, &buffer_image_copy, shared->device.shared->raii.dispatcher);
-    commandBuffer.imageBarrier(*this, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead);
+    commandBuffer.setImageLayout(*this, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead);
     commandBuffer.end();
     commandBuffer.submit();
     commandBuffer.waitUntilCompleted();

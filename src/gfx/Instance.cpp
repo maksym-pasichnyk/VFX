@@ -83,7 +83,7 @@ auto gfx::createInstance(const InstanceSettings& desc) -> Instance {
 auto gfx::Instance::createDevice(vk::PhysicalDevice adapter) -> Device {
     auto queue_family_properties = adapter.getQueueFamilyProperties(shared->raii.dispatcher);
 
-    float_t queue_priority = 1.0F;
+    float queue_priority = 1.0F;
     uint32_t queue_family_index = 0;
     for (uint32_t i = 0; i < queue_family_properties.size(); ++i) {
         if (queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
@@ -140,10 +140,13 @@ auto gfx::Instance::createDevice(vk::PhysicalDevice adapter) -> Device {
         .setPEnabledLayerNames(layers)
         .setPEnabledExtensionNames(extensions);
 
-    auto device = raii::Device(adapter.createDevice(create_info, nullptr, shared->raii.dispatcher), shared->raii.dispatcher.vkGetDeviceProcAddr);
+    auto device = raii::Device(
+        adapter.createDevice(create_info, nullptr, shared->raii.dispatcher),
+        shared->raii.dispatcher.vkGetDeviceProcAddr
+    );
 
     VmaVulkanFunctions functions = {};
-    functions.vkGetDeviceProcAddr = shared->raii.dispatcher.vkGetDeviceProcAddr;
+    functions.vkGetDeviceProcAddr   = shared->raii.dispatcher.vkGetDeviceProcAddr;
     functions.vkGetInstanceProcAddr = shared->raii.dispatcher.vkGetInstanceProcAddr;
 
     VmaAllocatorCreateInfo allocator_create_info = {};

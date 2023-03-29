@@ -5,17 +5,17 @@
 struct ParticleEmitter : Object {
 protected:
     sp<ParticleSystem> mParticleSystem;
-    float_t mEmitRate = {};
-    float_t mTime = {};
+    float mEmitRate = {};
+    float mTime = {};
 
 public:
-    ParticleEmitter(sp<ParticleSystem> particleSystem, float_t emitRate)
+    ParticleEmitter(sp<ParticleSystem> particleSystem, float emitRate)
         : mParticleSystem(std::move(particleSystem)), mEmitRate(std::max(emitRate, 0.01F)) {}
 
 public:
     virtual void emit() = 0;
 
-    void update(float_t dt) {
+    void update(float dt) {
         mTime += dt;
         while (mTime >= mEmitRate) {
             mTime -= mEmitRate;

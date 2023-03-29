@@ -4,13 +4,13 @@
 
 struct Button : View {
 private:
-    sp<struct Text> text;
+    sp<struct View> text;
 
 public:
-    explicit Button(sp<struct Text> text) : text(std::move(text)) {}
+    explicit Button(sp<struct View> text) : text(std::move(text)) {}
 
     void _draw(const sp<UIContext> &context, const Size &size) override {
-        auto textSize = text->_size(ProposedSize(size));
+        auto textSize = text->_size(context, ProposedSize(size));
         auto translate = translation(textSize, size, Alignment::center());
 
         context->drawRectFilled(size, 5.0F);
@@ -22,12 +22,12 @@ public:
         context->restoreState();
     }
 
-    auto _size(const ProposedSize &proposed) -> Size override {
-        auto textSize = text->_size(proposed);
+    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
+        auto textSize = text->_size(context, proposed);
         return proposed.orDefault(textSize.width, textSize.height);
     }
 };
 
-static auto Button(sp<struct Text> text) {
+static auto Button(sp<struct View> text) {
     return sp<struct Button>::of(std::move(text));
 }

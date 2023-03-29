@@ -62,7 +62,7 @@ public:
 
         running = true;
         while (running) {
-            using seconds = std::chrono::duration<float_t, std::chrono::seconds::period>;
+            using seconds = std::chrono::duration<float, std::chrono::seconds::period>;
 
             auto current = std::chrono::steady_clock::now();
             auto elapsed = seconds(current - previous).count();
@@ -73,7 +73,7 @@ public:
             accumulateTotal += accumulate[accumulateIndex];
             accumulateIndex = (accumulateIndex + 1) % static_cast<int32_t>(std::size(accumulate));
             accumulateCount = std::min(accumulateCount + 1, static_cast<int32_t>(std::size(accumulate)));
-            average = accumulateTotal / static_cast<float_t>(accumulateCount);
+            average = accumulateTotal / static_cast<float>(accumulateCount);
 
             _pollEvents();
 
@@ -85,12 +85,12 @@ public:
         }
     }
 
-    auto getAspectRatio() -> float_t {
+    auto getAspectRatio() -> float {
         int32_t width;
         int32_t height;
         SDL_GetWindowSize(window, &width, &height);
 
-        return static_cast<float_t>(width) / static_cast<float_t>(height);
+        return static_cast<float>(width) / static_cast<float>(height);
     }
 
     auto getWindowSize() -> vk::Extent2D {
@@ -116,7 +116,7 @@ public:
     }
 
 public:
-    virtual void update(float_t dt) {}
+    virtual void update(float dt) {}
     virtual void render() {}
     virtual void keyUp(SDL_KeyboardEvent* event) {}
     virtual void keyDown(SDL_KeyboardEvent* event) {}
@@ -195,7 +195,7 @@ protected:
 
     auto _drawView(const sp<View>& view) {
         auto uiSize = getUISize(getWindowSize());
-        auto childSize = view->_size(ProposedSize(uiSize));
+        auto childSize = view->_size(uiContext, ProposedSize(uiSize));
         auto translate = view->translation(childSize, uiSize, Alignment::center());
 
         uiContext->saveState();
@@ -205,14 +205,14 @@ protected:
     }
 
 public:
-    static auto getPerspectiveProjection(float_t fovy, float_t aspect, float_t zNear, float_t zFar) -> glm::mat4x4 {
-        float_t range = tan(fovy * 0.5F);
+    static auto getPerspectiveProjection(float fovy, float aspect, float zNear, float zFar) -> glm::mat4x4 {
+        float range = tan(fovy * 0.5F);
 
-        float_t x = +1.0F / (range * aspect);
-        float_t y = -1.0F / (range);
-        float_t z = zFar / (zFar - zNear);
-        float_t a = 1.0F;
-        float_t b = -(zFar * zNear) / (zFar - zNear);
+        float x = +1.0F / (range * aspect);
+        float y = -1.0F / (range);
+        float z = zFar / (zFar - zNear);
+        float a = 1.0F;
+        float b = -(zFar * zNear) / (zFar - zNear);
 
         return glm::mat4x4 {
             x, 0, 0, 0,
@@ -239,15 +239,15 @@ public:
     int32_t accumulateCount = {};
     int32_t accumulateIndex = {};
 
-    vk::PhysicalDevice adapter;
-    gfx::Device device;
-    gfx::Instance instance;
-    gfx::Surface surface;
+    vk::PhysicalDevice  adapter;
+    gfx::Device         device;
+    gfx::Instance       instance;
+    gfx::Surface        surface;
 
-    gfx::Swapchain swapchain;
-    gfx::CommandQueue commandQueue;
-    gfx::CommandBuffer commandBuffer;
+    gfx::Swapchain      swapchain;
+    gfx::CommandQueue   commandQueue;
+    gfx::CommandBuffer  commandBuffer;
 
-    sp<UIContext> uiContext;
-    sp<UIRenderer> uiRenderer;
+    sp<UIContext>       uiContext;
+    sp<UIRenderer>      uiRenderer;
 };

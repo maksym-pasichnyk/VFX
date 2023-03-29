@@ -4,8 +4,8 @@
 
 namespace gfx {
     struct CommandQueueShared {
-        Device device;
-        vk::CommandPool raw;
+        Device                      device;
+        vk::CommandPool             raw;
 
         explicit CommandQueueShared(Device device, vk::CommandPool raw);
         ~CommandQueueShared();

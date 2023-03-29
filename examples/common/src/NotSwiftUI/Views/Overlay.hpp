@@ -12,14 +12,14 @@ public:
     explicit Overlay(sp<View> content, sp<View> overlay, Alignment alignment)
         : content(std::move(content)), overlay(std::move(overlay)), alignment(alignment) {}
 
-    auto _size(const ProposedSize& proposed) -> Size override {
-        return content->_size(proposed);
+    auto _size(const sp<UIContext> &context, const ProposedSize& proposed) -> Size override {
+        return content->_size(context, proposed);
     }
 
     void _draw(const sp<UIContext>& context, const Size& size) override {
         content->_draw(context, size);
 
-        auto childSize = overlay->_size(ProposedSize(size));
+        auto childSize = overlay->_size(context, ProposedSize(size));
         auto translate = translation(childSize, size, alignment);
 
         context->saveState();

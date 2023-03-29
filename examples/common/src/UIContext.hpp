@@ -13,10 +13,10 @@
 struct UIContext : Object {
 private:
     struct State {
-        float_t x = 0.0F;
-        float_t y = 0.0F;
-        float_t scaleX = 1.0F;
-        float_t scaleY = 1.0F;
+        float x = 0.0F;
+        float y = 0.0F;
+        float scaleX = 1.0F;
+        float scaleY = 1.0F;
         Color fillColor = {1.0F, 1.0F, 1.0F, 1.0F};
     };
 
@@ -49,12 +49,12 @@ public:
         pDrawList->_Data->Scale.y = mCurrentState.scaleY;
     }
 
-    void translateBy(float_t x, float_t y) {
+    void translateBy(float x, float y) {
         mCurrentState.x += x;
         mCurrentState.y += y;
     }
 
-    void scaleBy(float_t x, float_t y) {
+    void scaleBy(float x, float y) {
         mCurrentState.scaleX *= x;
         mCurrentState.scaleY *= y;
 
@@ -62,13 +62,7 @@ public:
         pDrawList->_Data->Scale.y = mCurrentState.scaleY;
     }
 
-    struct UIPath {
-        virtual ~UIPath() = default;
-
-        virtual void stroke(ImDrawList* drawList) = 0;
-    };
-
-    void drawRect(const Size& size, float_t width, float_t rounding = 0.0F) {
+    void drawRect(const Size& size, float width, float rounding = 0.0F) {
         if (mCurrentState.fillColor.a == 0.0F) {
             return;
         }
@@ -78,49 +72,49 @@ public:
             mCurrentState.fillColor.b,
             mCurrentState.fillColor.a
         ));
-        float_t x0 = mCurrentState.x;
-        float_t y0 = mCurrentState.y;
-        float_t x1 = mCurrentState.x + size.width;
-        float_t y1 = mCurrentState.y + size.height;
+        float x0 = mCurrentState.x;
+        float y0 = mCurrentState.y;
+        float x1 = mCurrentState.x + size.width;
+        float y1 = mCurrentState.y + size.height;
 
         pDrawList->AddRect(ImVec2(x0, y0), ImVec2(x1, y1), imColor, rounding, ImDrawFlags_RoundCornersAll, width);
     }
 
-    void drawRectFilled(const Size& size, float_t rounding = 0.0F) {
+    void drawRectFilled(const Size& size, float rounding = 0.0F) {
         ImU32 imColor = static_cast<ImU32>(ImColor(
             mCurrentState.fillColor.r,
             mCurrentState.fillColor.g,
             mCurrentState.fillColor.b,
             mCurrentState.fillColor.a
         ));
-        float_t x0 = mCurrentState.x;
-        float_t y0 = mCurrentState.y;
-        float_t x1 = mCurrentState.x + size.width;
-        float_t y1 = mCurrentState.y + size.height;
+        float x0 = mCurrentState.x;
+        float y0 = mCurrentState.y;
+        float x1 = mCurrentState.x + size.width;
+        float y1 = mCurrentState.y + size.height;
         pDrawList->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1), imColor, rounding, 0);
     }
 
-    void drawCircle(float_t radius, float_t width) {
+    void drawCircle(float radius, float width) {
         ImU32 imColor = static_cast<ImU32>(ImColor(
             mCurrentState.fillColor.r,
             mCurrentState.fillColor.g,
             mCurrentState.fillColor.b,
             mCurrentState.fillColor.a
         ));
-        float_t x = mCurrentState.x + radius;
-        float_t y = mCurrentState.y + radius;
+        float x = mCurrentState.x + radius;
+        float y = mCurrentState.y + radius;
         pDrawList->AddCircle(ImVec2(x, y), radius, imColor, 0, width);
     }
 
-    void drawCircleFilled(float_t radius) {
+    void drawCircleFilled(float radius) {
         ImU32 imColor = static_cast<ImU32>(ImColor(
             mCurrentState.fillColor.r,
             mCurrentState.fillColor.g,
             mCurrentState.fillColor.b,
             mCurrentState.fillColor.a
         ));
-        float_t x = mCurrentState.x + radius;
-        float_t y = mCurrentState.y + radius;
+        float x = mCurrentState.x + radius;
+        float y = mCurrentState.y + radius;
         pDrawList->AddCircleFilled(ImVec2(x, y), radius, imColor, 100);
     }
 
@@ -131,10 +125,10 @@ public:
             mCurrentState.fillColor.b,
             mCurrentState.fillColor.a
         ));
-        float_t x0 = mCurrentState.x + p1.x;
-        float_t y0 = mCurrentState.y + p1.y;
-        float_t x1 = mCurrentState.x + p2.x;
-        float_t y1 = mCurrentState.y + p2.y;
+        float x0 = mCurrentState.x + p1.x;
+        float y0 = mCurrentState.y + p1.y;
+        float x1 = mCurrentState.x + p2.x;
+        float y1 = mCurrentState.y + p2.y;
         pDrawList->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), imColor, width);
     }
 

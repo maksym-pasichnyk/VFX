@@ -20,7 +20,7 @@ public:
     }
 
 public:
-    void update(float_t dt) override {
+    void update(float dt) override {
         camera_projection_matrix = getPerspectiveProjection(glm::radians(60.0F), getAspectRatio(), 0.03F, 1000.0F);
         world_to_camera_matrix = glm::lookAtLH(glm::vec3(25.0F, 10.0F, 0.0F), glm::vec3(0.0F, 10.0F, 0.0F), glm::vec3(0, 1, 0));
 
@@ -39,8 +39,8 @@ public:
         rendering_area.setExtent(drawableSize);
 
         vk::Viewport rendering_viewport = {};
-        rendering_viewport.setWidth(static_cast<float_t>(drawableSize.width));
-        rendering_viewport.setHeight(static_cast<float_t>(drawableSize.height));
+        rendering_viewport.setWidth(static_cast<float>(drawableSize.width));
+        rendering_viewport.setHeight(static_cast<float>(drawableSize.height));
         rendering_viewport.setMinDepth(0.0F);
         rendering_viewport.setMaxDepth(1.0F);
 
@@ -57,7 +57,7 @@ public:
         shader_data.g_view_matrix = world_to_camera_matrix;
 
         commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
         commandBuffer.setRenderPipelineState(rocketParticleSystem->renderPipelineState());
         commandBuffer.pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
@@ -72,7 +72,7 @@ public:
 
         commandBuffer.endRendering();
 
-        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer.end();
         commandBuffer.submit();
         commandBuffer.present(drawable);
@@ -80,7 +80,7 @@ public:
     }
 
 public:
-    void onRocketParticleUpdate(Particle& particle, float_t dt) {
+    void onRocketParticleUpdate(Particle& particle, float dt) {
         particle.color.a = std::clamp(particle.lifetime / particle.time, 0.0F, 1.0F);
 
         glm::vec3 velocity = {};
@@ -88,7 +88,7 @@ public:
         velocity.y = 0.0F;
         velocity.z = std::uniform_real_distribution(-1.0F, 1.0F)(random_engine) * 0.5F;
 
-        float_t lifetime = std::uniform_real_distribution(0.0F, 1.0F)(random_engine);
+        float lifetime = std::uniform_real_distribution(0.0F, 1.0F)(random_engine);
 
         sparkleParticleSystem->emit(particle.position, particle.color, velocity, lifetime);
     }
@@ -107,13 +107,13 @@ public:
         }
     }
 
-    void onSparkleParticleUpdate(Particle& particle, float_t dt) {
+    void onSparkleParticleUpdate(Particle& particle, float dt) {
         particle.color.a = std::clamp(particle.lifetime / particle.time, 0.0F, 1.0F);
         particle.velocity.y -= 9.8f * dt;
         particle.velocity.y = std::max(particle.velocity.y, -1.0F);
     }
 
-    void onExplosionParticleUpdate(Particle& particle, float_t dt) {
+    void onExplosionParticleUpdate(Particle& particle, float dt) {
         particle.color.a = std::clamp(particle.lifetime / particle.time, 0.0F, 1.0F);
     }
 

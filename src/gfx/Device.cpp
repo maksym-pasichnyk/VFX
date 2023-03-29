@@ -343,8 +343,8 @@ struct DescriptorSetLayoutCreateInfo {
     }
 };
 
-gfx::DeviceShared::DeviceShared(gfx::Instance instance, gfx::raii::Device raii, vk::PhysicalDevice adapter, uint32_t family_index, uint32_t queue_index, vk::Queue raw_queue, VmaAllocator allocator)
-    : instance(std::move(instance)), raii(raii), adapter(adapter), family_index(family_index), queue_index(queue_index), raw_queue(raw_queue), allocator(allocator) {}
+gfx::DeviceShared::DeviceShared(Instance instance, raii::Device raii, vk::PhysicalDevice adapter, uint32_t family_index, uint32_t queue_index, vk::Queue raw_queue, VmaAllocator allocator)
+    : instance(std::move(instance)), raii(raii), adapter(adapter), family_index(family_index), queue_index(queue_index), queue(raw_queue), allocator(allocator) {}
 
 gfx::DeviceShared::~DeviceShared() {
     vmaDestroyAllocator(allocator);
@@ -649,22 +649,6 @@ auto gfx::Device::newCommandQueue() -> CommandQueue {
     auto pool = shared->raii.raw.createCommandPool(command_pool_create_info, nullptr, shared->raii.dispatcher);
 
     return CommandQueue(std::make_shared<CommandQueueShared>(*this, pool));
-}
-
-// todo: get sizes from layout
-auto gfx::Device::newDescriptorSet(vk::DescriptorSetLayout layout, const std::vector<vk::DescriptorPoolSize>& sizes) -> DescriptorSet {
-    vk::DescriptorPoolCreateInfo pool_create_info = {};
-    pool_create_info.setMaxSets(1);
-    pool_create_info.setPoolSizes(sizes);
-    auto pool = shared->raii.raw.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, shared->raii.dispatcher);
-
-    vk::DescriptorSetAllocateInfo ds_allocate_info = {};
-    ds_allocate_info.setDescriptorPool(pool);
-    ds_allocate_info.setDescriptorSetCount(1);
-    ds_allocate_info.setPSetLayouts(&layout);
-    auto set = shared->raii.raw.allocateDescriptorSets(ds_allocate_info, shared->raii.dispatcher)[0];
-
-    return DescriptorSet(std::make_shared<DescriptorSetShared>(*this, set, pool));
 }
 
 auto gfx::Device::createSwapchain(Surface const& surface) -> Swapchain {

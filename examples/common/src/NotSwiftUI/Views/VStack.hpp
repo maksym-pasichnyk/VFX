@@ -4,11 +4,10 @@
 
 struct VStack : View {
 private:
-    std::vector<sp<View>> children;
-    HorizontalAlignment alignment;
-    float_t spacing;
-
-    std::vector<Size> sizes = {};
+    std::vector<sp<View>>   children;
+    HorizontalAlignment     alignment;
+    float_t                 spacing;
+    std::vector<Size>       sizes;
 
 public:
     explicit VStack(std::vector<sp<View>> children, HorizontalAlignment alignment = HorizontalAlignment::center(), std::optional<float_t> spacing = {})
@@ -32,12 +31,12 @@ private:
         }
     }
 
-    auto _size(const ProposedSize &proposed) -> Size override {
+    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
         if (children.empty()) {
             return Size::zero();
         }
 
-        layout(proposed);
+        layout(context, proposed);
 
         float_t width = ranges::accumulate(sizes, 0.0F, [](auto lhs, auto rhs) -> float_t {
             return std::max(lhs, rhs.width);
@@ -51,11 +50,11 @@ private:
         return Size{width, height};
     }
 
-    void layout(const ProposedSize &proposed) {
+    void layout(const sp<UIContext> &context, const ProposedSize &proposed) {
         auto flexibility = cxx::iter(children)
             .map([&](auto& child) {
-                auto lower = child->_size(ProposedSize(proposed.width, 0));
-                auto upper = child->_size(ProposedSize(proposed.width, std::numeric_limits<float_t>::max()));
+                auto lower = child->_size(context, ProposedSize(proposed.width, 0));
+                auto upper = child->_size(context, ProposedSize(proposed.width, std::numeric_limits<float_t>::max()));
                 return upper.height - lower.height;
             })
             .collect();
@@ -74,7 +73,7 @@ private:
             size_t idx = remainingIndices.front();
             remainingIndices.erase(remainingIndices.begin());
 
-            auto childSize = children[idx]->_size(ProposedSize(proposed.width, height));
+            auto childSize = children[idx]->_size(context, ProposedSize(proposed.width, height));
             sizes[idx] = childSize;
 
             remainingHeight -= childSize.height;

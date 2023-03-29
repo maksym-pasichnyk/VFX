@@ -4,22 +4,21 @@
 
 namespace gfx {
     struct TextureSettings {
-        uint32_t width = {};
-        uint32_t height = {};
-        vk::Format format = {};
-        vk::ImageUsageFlags usage = {};
-        vk::ComponentMapping mapping = {};
+        uint32_t                width   = {};
+        uint32_t                height  = {};
+        vk::Format              format  = {};
+        vk::ImageUsageFlags     usage   = {};
+        vk::ComponentMapping    mapping = {};
     };
 
     struct TextureShared {
-        Device device;
-        vk::Image image;
-        vk::Format format;
-        vk::Extent3D extent;
-        vk::ImageView image_view;
-        vk::ImageSubresourceRange subresource;
-
-        VmaAllocation allocation;
+        Device                      device;
+        vk::Image                   image;
+        vk::Format                  format;
+        vk::Extent3D                extent;
+        vk::ImageView               image_view;
+        vk::ImageSubresourceRange   subresource;
+        VmaAllocation               allocation;
 
         explicit TextureShared(Device device);
         explicit TextureShared(Device device, vk::Image image, vk::Format format, vk::Extent3D extent, vk::ImageView image_view, vk::ImageSubresourceRange subresource, VmaAllocation allocation);

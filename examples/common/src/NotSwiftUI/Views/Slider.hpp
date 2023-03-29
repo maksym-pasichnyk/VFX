@@ -36,7 +36,7 @@ public:
         ctx->restoreState();
     }
 
-    auto _size(const ProposedSize &proposed) -> Size override {
+    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
         return proposed.orDefault(200.0F, 20.0F);
     }
 };

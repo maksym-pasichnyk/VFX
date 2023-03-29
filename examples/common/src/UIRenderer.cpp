@@ -14,6 +14,7 @@ UIRenderer::UIRenderer(gfx::Device device)
 , mDrawList(&mDrawListSharedData) {
     buildFonts();
     buildShaders();
+    buildBuffers();
 
     mDrawListSharedData.CurveTessellationTol = 0.10F;
 }
@@ -56,13 +57,13 @@ void UIRenderer::buildFonts() {
 }
 
 void UIRenderer::buildShaders() {
-    auto vertexLibrary = mDevice.newLibrary(Assets::readFile("shaders/gui.vert.spv"));
-    auto fragmentLibrary = mDevice.newLibrary(Assets::readFile("shaders/gui.frag.spv"));
+    auto vertexLibrary      = mDevice.newLibrary(Assets::readFile("shaders/gui.vert.spv"));
+    auto fragmentLibrary    = mDevice.newLibrary(Assets::readFile("shaders/gui.frag.spv"));
 
     gfx::RenderPipelineStateDescription description;
-    description.vertexFunction = vertexLibrary.newFunction("main");
-    description.fragmentFunction = fragmentLibrary.newFunction("main");
-    description.vertexInputState = {
+    description.vertexFunction      = vertexLibrary.newFunction("main");
+    description.fragmentFunction    = fragmentLibrary.newFunction("main");
+    description.vertexInputState    = {
         .bindings = {
             vk::VertexInputBindingDescription{0, sizeof(ImDrawVert), vk::VertexInputRate::eVertex}
         },
@@ -82,17 +83,20 @@ void UIRenderer::buildShaders() {
     description.colorBlendAttachments[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
     description.colorBlendAttachments[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
 
-    mRenderPipelineState = mDevice.newRenderPipelineState(description);
-    mDescriptorSet = mDevice.newDescriptorSet(mRenderPipelineState.shared->bind_group_layouts.front(), {
-        vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
-        vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 1},
-    });
+    render_pipeline_state = mDevice.newRenderPipelineState(description);
+}
 
-    mDescriptorSet.setSampler(mFontSampler, 0);
-    mDescriptorSet.setTexture(mFontTexture, 1);
+void UIRenderer::buildBuffers() {
+    dynamic_buffer = mDevice.newBuffer(
+        vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer,
+        5ULL * 1024ULL * 1024ULL,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
+    );
 }
 
 void UIRenderer::resetForNewFrame() {
+    dynamic_buffer_offset = 0;
+
     mDrawList._ResetForNewFrame();
     mDrawList.PushClipRect(ImVec2(0, 0), ImVec2(mScreenSize.width, mScreenSize.height));
     mDrawList.PushTextureID(mFontAtlas.TexID);
@@ -111,34 +115,61 @@ void UIRenderer::draw(gfx::CommandBuffer cmd) {
         return;
     }
 
-    mIndexBuffer = mDevice.newBuffer(
-        vk::BufferUsageFlagBits::eIndexBuffer,
-        mDrawList.IdxBuffer.Data,
-        mDrawList.IdxBuffer.size_in_bytes(),
-        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-
-    mVertexBuffer = mDevice.newBuffer(
-        vk::BufferUsageFlagBits::eVertexBuffer,
-        mDrawList.VtxBuffer.Data,
-        mDrawList.VtxBuffer.size_in_bytes(),
-        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-
     GuiShaderData gui_shader_data = {};
-    gui_shader_data.scale = mScale * 2.0F / simd::float2{mScreenSize.width, mScreenSize.height};
+    gui_shader_data.scale = 2.0F / simd::float2{mScreenSize.width, mScreenSize.height};
 
-    cmd.setRenderPipelineState(mRenderPipelineState);
-    cmd.bindDescriptorSet(mDescriptorSet, 0);
+    auto descriptor_set = cmd.newDescriptorSet(render_pipeline_state.shared->bind_group_layouts.front(), {
+        vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
+        vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 1},
+    });
+
+    vk::DescriptorImageInfo sampler_info = {};
+    sampler_info.setSampler(mFontSampler.shared->raw);
+
+    vk::WriteDescriptorSet sampler_write_info = {};
+    sampler_write_info.setDstSet(descriptor_set);
+    sampler_write_info.setDstBinding(0);
+    sampler_write_info.setDstArrayElement(0);
+    sampler_write_info.setDescriptorCount(1);
+    sampler_write_info.setDescriptorType(vk::DescriptorType::eSampler);
+    sampler_write_info.setPImageInfo(&sampler_info);
+
+    vk::DescriptorImageInfo image_info = {};
+    image_info.setImageView(mFontTexture.shared->image_view);
+    image_info.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+
+    vk::WriteDescriptorSet image_write_info = {};
+    image_write_info.setDstSet(descriptor_set);
+    image_write_info.setDstBinding(1);
+    image_write_info.setDstArrayElement(0);
+    image_write_info.setDescriptorCount(1);
+    image_write_info.setDescriptorType(vk::DescriptorType::eSampledImage);
+    image_write_info.setPImageInfo(&image_info);
+
+    mDevice.shared->raii.raw.updateDescriptorSets({sampler_write_info, image_write_info}, {}, mDevice.shared->raii.dispatcher);
+
+    vk::DeviceSize vertex_buffer_offset = dynamic_buffer_offset;
+    dynamic_buffer_offset += mDrawList.VtxBuffer.Size * sizeof(ImDrawVert);
+
+    vk::DeviceSize index_buffer_offset  = dynamic_buffer_offset;
+    dynamic_buffer_offset += mDrawList.IdxBuffer.Size * sizeof(ImDrawIdx);
+
+    std::memcpy(static_cast<std::byte*>(dynamic_buffer.contents()) + vertex_buffer_offset, mDrawList.VtxBuffer.Data, mDrawList.VtxBuffer.Size * sizeof(ImDrawVert));
+    std::memcpy(static_cast<std::byte*>(dynamic_buffer.contents()) + index_buffer_offset, mDrawList.IdxBuffer.Data, mDrawList.IdxBuffer.Size * sizeof(ImDrawIdx));
+
+
+//    mDescriptorSet.setSampler(mFontSampler, 0);
+//    mDescriptorSet.setTexture(mFontTexture, 1);
+
+    cmd.setRenderPipelineState(render_pipeline_state);
+    cmd.bindDescriptorSet(descriptor_set, 0);
     cmd.pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(GuiShaderData), &gui_shader_data);
-    cmd.bindVertexBuffer(0, mVertexBuffer, 0);
-    cmd.bindIndexBuffer(mIndexBuffer, 0, vk::IndexType::eUint16);
+    cmd.bindVertexBuffer(0, dynamic_buffer, vertex_buffer_offset);
+    cmd.bindIndexBuffer(dynamic_buffer, index_buffer_offset, vk::IndexType::eUint16);
 
     for (auto& drawCmd : std::span(mDrawList.CmdBuffer.Data, mDrawList.CmdBuffer.Size)) {
         cmd.drawIndexed(drawCmd.ElemCount, 1, drawCmd.IdxOffset, static_cast<int32_t>(drawCmd.VtxOffset), 0);
     }
-}
-
-void UIRenderer::setScale(float_t scale) {
-    mScale = scale;
 }
 
 void UIRenderer::setScreenSize(const Size& size) {

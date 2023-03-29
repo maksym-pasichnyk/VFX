@@ -16,7 +16,7 @@ public:
     explicit ShapeView(sp<T> shape) : shape(std::move(shape)) {}
 
 public:
-    auto _size(const ProposedSize &proposed) -> Size override {
+    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
         return proposed.orDefault(10.0F, 10.0F);
     }
 

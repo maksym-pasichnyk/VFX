@@ -11,24 +11,38 @@
 
 #include "spdlog/spdlog.h"
 
-gfx::CommandBufferShared::CommandBufferShared(gfx::Device device, gfx::CommandQueue queue) : device(device), queue(queue) {
+gfx::CommandBufferShared::CommandBufferShared(Device device, CommandQueue queue) : device(device), queue(queue) {
     vk::CommandBufferAllocateInfo allocate_info = {};
     allocate_info.setCommandPool(queue.shared->raw);
     allocate_info.setLevel(vk::CommandBufferLevel::ePrimary);
     allocate_info.setCommandBufferCount(1);
     vk::resultCheck(device.shared->raii.raw.allocateCommandBuffers(&allocate_info, &raw, device.shared->raii.dispatcher), "allocateCommandBuffers");
 
-    fence = device.shared->raii.raw.createFence(vk::FenceCreateInfo(), nullptr, device.shared->raii.dispatcher);
-    semaphore = device.shared->raii.raw.createSemaphore(vk::SemaphoreCreateInfo(), nullptr, device.shared->raii.dispatcher);
+    fence       = device.shared->raii.raw.createFence(vk::FenceCreateInfo(), nullptr, device.shared->raii.dispatcher);
+    semaphore   = device.shared->raii.raw.createSemaphore(vk::SemaphoreCreateInfo(), nullptr, device.shared->raii.dispatcher);
+
+
+//    vk::DescriptorPoolCreateInfo pool_create_info = {};
+//    pool_create_info.setMaxSets(1024);
+//    pool_create_info.setPoolSizes(pool_sizes);
+//    auto pool = shared->raii.raw.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, shared->raii.dispatcher);
 }
 
 gfx::CommandBufferShared::~CommandBufferShared() {
     device.shared->raii.raw.destroySemaphore(semaphore, nullptr, device.shared->raii.dispatcher);
     device.shared->raii.raw.destroyFence(fence, nullptr, device.shared->raii.dispatcher);
+
+    for (auto& value : descriptor_pools) {
+        device.shared->raii.raw.destroyDescriptorPool(value, nullptr, device.shared->raii.dispatcher);
+    }
 }
 
 void gfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
     shared->raw.begin(info, shared->device.shared->raii.dispatcher);
+
+    for (auto& value : shared->descriptor_pools) {
+        shared->device.shared->raii.raw.resetDescriptorPool(value, {}, shared->device.shared->raii.dispatcher);
+    }
 }
 
 void gfx::CommandBuffer::end() {
@@ -45,7 +59,7 @@ void gfx::CommandBuffer::submit() {
     vk::resultCheck(shared->device.shared->raii.raw.resetFences(1, &shared->fence, shared->device.shared->raii.dispatcher), "Submit");
 
     // todo: get valid device for submit
-    shared->device.shared->raw_queue.submit(submit_info, shared->fence, shared->device.shared->raii.dispatcher);
+    shared->device.shared->queue.submit(submit_info, shared->fence, shared->device.shared->raii.dispatcher);
 }
 
 void gfx::CommandBuffer::present(const gfx::Drawable& drawable) {
@@ -56,7 +70,7 @@ void gfx::CommandBuffer::present(const gfx::Drawable& drawable) {
     present_info.setPImageIndices(&drawable.drawableIndex);
 
     // todo: get valid device for present
-    vk::Result result = shared->device.shared->raw_queue.presentKHR(present_info, shared->device.shared->raii.dispatcher);
+    vk::Result result = shared->device.shared->queue.presentKHR(present_info, shared->device.shared->raii.dispatcher);
     if (result != vk::Result::eErrorOutOfDateKHR && result != vk::Result::eSuboptimalKHR && result != vk::Result::eSuccess) {
         throw std::runtime_error(vk::to_string(result));
     }
@@ -70,8 +84,8 @@ void gfx::CommandBuffer::setComputePipelineState(ComputePipelineState const& sta
     shared->pipeline_bind_point = vk::PipelineBindPoint::eCompute;
 }
 
-void gfx::CommandBuffer::bindDescriptorSet(const DescriptorSet& descriptorSet, uint32_t slot) {
-    shared->raw.bindDescriptorSets(shared->pipeline_bind_point, shared->pipeline_layout, slot, 1, &descriptorSet.shared->raw, 0, nullptr, shared->device.shared->raii.dispatcher);
+void gfx::CommandBuffer::bindDescriptorSet(vk::DescriptorSet descriptorSet, uint32_t slot) {
+    shared->raw.bindDescriptorSets(shared->pipeline_bind_point, shared->pipeline_layout, slot, 1, &descriptorSet, 0, nullptr, shared->device.shared->raii.dispatcher);
 }
 
 void gfx::CommandBuffer::pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data) {
@@ -87,7 +101,7 @@ void gfx::CommandBuffer::waitUntilCompleted() {
     vk::resultCheck(result, "waitForFences");
 }
 
-void gfx::CommandBuffer::imageBarrier(Texture const& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask) {
+void gfx::CommandBuffer::setImageLayout(Texture const& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask) {
     vk::ImageMemoryBarrier2 barrier = {};
     barrier.setSrcStageMask(srcStageMask);
     barrier.setSrcAccessMask(srcAccessMask);
@@ -222,4 +236,53 @@ void gfx::CommandBuffer::draw(uint32_t vertexCount, uint32_t instanceCount, uint
 
 void gfx::CommandBuffer::drawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
     shared->raw.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, shared->device.shared->raii.dispatcher);
+}
+
+// todo: get sizes from layout
+auto gfx::CommandBuffer::newDescriptorSet(vk::DescriptorSetLayout layout, const std::vector<vk::DescriptorPoolSize>& sizes) -> vk::DescriptorSet {
+    for (auto pool : shared->descriptor_pools) {
+        vk::DescriptorSetAllocateInfo allocate_info = {};
+        allocate_info.setDescriptorPool(pool);
+        allocate_info.setDescriptorSetCount(1);
+        allocate_info.setPSetLayouts(&layout);
+
+        vk::DescriptorSet descriptor_set;
+        vk::Result result = shared->device.shared->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, shared->device.shared->raii.dispatcher);
+        if (result == vk::Result::eSuccess) {
+            return descriptor_set;
+        }
+    }
+
+    // todo: reduce pool sizes, check is there is enough space for the new descriptor set
+    auto pool_sizes = std::array{
+        vk::DescriptorPoolSize{vk::DescriptorType::eSampler                  , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage             , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler     , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage             , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eUniformTexelBuffer       , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eStorageTexelBuffer       , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer            , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer            , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBufferDynamic     , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eStorageBufferDynamic     , 1024}
+    };
+
+    vk::DescriptorPoolCreateInfo pool_create_info = {};
+    pool_create_info.setMaxSets(1024);
+    pool_create_info.setPoolSizes(sizes);
+
+    auto pool = shared->device.shared->raii.raw.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, shared->device.shared->raii.dispatcher);
+    shared->descriptor_pools.push_back(pool);
+
+    vk::DescriptorSetAllocateInfo allocate_info = {};
+    allocate_info.setDescriptorPool(pool);
+    allocate_info.setDescriptorSetCount(1);
+    allocate_info.setPSetLayouts(&layout);
+
+    vk::DescriptorSet descriptor_set;
+    vk::Result result = shared->device.shared->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, shared->device.shared->raii.dispatcher);
+    if (result == vk::Result::eSuccess) {
+        return descriptor_set;
+    }
+    return VK_NULL_HANDLE;
 }

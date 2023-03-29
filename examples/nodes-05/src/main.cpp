@@ -27,7 +27,7 @@ public:
     }
 
 public:
-    void update(float_t dt) override {
+    void update(float dt) override {
         ImGui::GetIO().DeltaTime = dt;
         graphView->update();
     }
@@ -43,8 +43,8 @@ public:
         rendering_area.setExtent(drawableSize);
 
         vk::Viewport rendering_viewport = {};
-        rendering_viewport.setWidth(static_cast<float_t>(drawableSize.width));
-        rendering_viewport.setHeight(static_cast<float_t>(drawableSize.height));
+        rendering_viewport.setWidth(static_cast<float>(drawableSize.width));
+        rendering_viewport.setHeight(static_cast<float>(drawableSize.height));
         rendering_viewport.setMinDepth(0.0f);
         rendering_viewport.setMaxDepth(1.0f);
 
@@ -57,7 +57,7 @@ public:
         rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
         commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
         commandBuffer.beginRendering(rendering_info);
         commandBuffer.setScissor(0, rendering_area);
@@ -75,7 +75,7 @@ public:
 
         commandBuffer.endRendering();
 
-        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer.end();
         commandBuffer.submit();
         commandBuffer.present(drawable);

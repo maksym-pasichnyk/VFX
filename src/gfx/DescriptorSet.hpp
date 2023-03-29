@@ -11,9 +11,9 @@ namespace gfx {
     struct Sampler;
 
     struct DescriptorSetShared {
-        Device device;
-        vk::DescriptorSet raw;
-        vk::DescriptorPool pool;
+        Device              device;
+        vk::DescriptorSet   raw;
+        vk::DescriptorPool  pool;
 
         explicit DescriptorSetShared(Device device, vk::DescriptorSet raw, vk::DescriptorPool pool);
         ~DescriptorSetShared();

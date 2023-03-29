@@ -21,8 +21,8 @@ struct View : Object {
         throw std::runtime_error("FatalError");
     }
 
-    virtual auto _size(const ProposedSize& proposed) -> Size {
-        return body()->_size(proposed);
+    virtual auto _size(const sp<UIContext> &context, const ProposedSize& proposed) -> Size {
+        return body()->_size(context, proposed);
     }
 
     virtual void _draw(const sp<UIContext>& context, const Size& size) {
@@ -30,8 +30,8 @@ struct View : Object {
     }
 
     static auto translation(const Size& childSize, const Size& parentSize, const Alignment& alignment) -> Point {
-        Point childPoint = alignment.point(childSize);
-        Point parentPoint = alignment.point(parentSize);
+        auto childPoint = alignment.point(childSize);
+        auto parentPoint = alignment.point(parentSize);
         return parentPoint - childPoint;
     }
 };

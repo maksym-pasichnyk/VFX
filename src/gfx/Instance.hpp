@@ -7,22 +7,22 @@
 
 namespace gfx::raii {
     struct Context {
-        vk::DynamicLoader loader;
+        vk::DynamicLoader           loader;
         vk::raii::ContextDispatcher dispatcher;
 
         explicit Context() : dispatcher(loader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr")) {}
     };
 
     struct Instance {
-        vk::Instance raw;
-        vk::raii::InstanceDispatcher dispatcher;
+        vk::Instance                    raw;
+        vk::raii::InstanceDispatcher    dispatcher;
 
         explicit Instance(vk::Instance raw, PFN_vkGetInstanceProcAddr getProcAddr) : raw(raw), dispatcher(getProcAddr, raw) {}
     };
 
     struct Device {
-        vk::Device raw;
-        vk::raii::DeviceDispatcher dispatcher;
+        vk::Device                  raw;
+        vk::raii::DeviceDispatcher  dispatcher;
 
         explicit Device(vk::Device raw, PFN_vkGetDeviceProcAddr getProcAddr) : raw(raw), dispatcher(getProcAddr, raw) {}
     };
@@ -33,8 +33,8 @@ namespace gfx {
     struct Surface;
 
     struct InstanceSettings {
-        std::string name = {};
-        uint32_t version = 0;
+        std::string name    = {};
+        uint32_t    version = 0;
     };
 
     struct InstanceShared {

@@ -9,7 +9,7 @@ public:
     }
 
 public:
-    void update(float_t dt) override {
+    void update(float dt) override {
     }
 
     void render() override {
@@ -21,8 +21,8 @@ public:
         rendering_area.setExtent(drawableSize);
 
         vk::Viewport rendering_viewport = {};
-        rendering_viewport.setWidth(static_cast<float_t>(drawableSize.width));
-        rendering_viewport.setHeight(static_cast<float_t>(drawableSize.height));
+        rendering_viewport.setWidth(static_cast<float>(drawableSize.width));
+        rendering_viewport.setHeight(static_cast<float>(drawableSize.height));
         rendering_viewport.setMinDepth(0.0f);
         rendering_viewport.setMaxDepth(1.0f);
 
@@ -35,10 +35,28 @@ public:
         rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
         commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+
+        auto descriptor_set = commandBuffer.newDescriptorSet(renderPipelineState.shared->bind_group_layouts.front(), {
+            vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1}
+        });
+        vk::DescriptorBufferInfo buffer_info = {};
+        buffer_info.setBuffer(vertexBuffer.shared->raw);
+        buffer_info.setOffset(0);
+        buffer_info.setRange(VK_WHOLE_SIZE);
+
+        vk::WriteDescriptorSet buffer_write_info = {};
+        buffer_write_info.setDstSet(descriptor_set);
+        buffer_write_info.setDstBinding(0);
+        buffer_write_info.setDstArrayElement(0);
+        buffer_write_info.setDescriptorType(vk::DescriptorType::eStorageBuffer);
+        buffer_write_info.setDescriptorCount(1);
+        buffer_write_info.setPBufferInfo(&buffer_info);
+
+        device.shared->raii.raw.updateDescriptorSets({buffer_write_info}, {}, device.shared->raii.dispatcher);
 
         commandBuffer.setRenderPipelineState(renderPipelineState);
-        commandBuffer.bindDescriptorSet(descriptorSet, 0);
+        commandBuffer.bindDescriptorSet(descriptor_set, 0);
 
         commandBuffer.beginRendering(rendering_info);
         commandBuffer.setScissor(0, rendering_area);
@@ -47,7 +65,7 @@ public:
         commandBuffer.draw(3, 1, 0, 0);
         commandBuffer.endRendering();
 
-        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer.end();
         commandBuffer.submit();
         commandBuffer.present(drawable);
@@ -67,9 +85,6 @@ private:
         description.colorBlendAttachments[0].setBlendEnable(false);
 
         renderPipelineState = device.newRenderPipelineState(description);
-        descriptorSet = device.newDescriptorSet(renderPipelineState.shared->bind_group_layouts[0], {
-            vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1}
-        });
     }
 
     void buildBuffers() {
@@ -87,13 +102,11 @@ private:
         vertexBuffer = device.newBuffer(vk::BufferUsageFlagBits::eStorageBuffer, sizeof(vertices), VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
         std::memcpy(vertexBuffer.contents(), vertices, sizeof(vertices));
         vertexBuffer.didModifyRange(0, vertexBuffer.length());
-        descriptorSet.setStorageBuffer(vertexBuffer, 0, 0);
     }
 
 private:
     sp<View> content;
     gfx::Buffer vertexBuffer;
-    gfx::DescriptorSet descriptorSet;
     gfx::RenderPipelineState renderPipelineState;
 };
 

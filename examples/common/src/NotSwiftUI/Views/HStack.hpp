@@ -33,12 +33,12 @@ public:
         }
     }
 
-    auto _size(const ProposedSize &proposed) -> Size override {
+    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
         if (children.empty()) {
             return Size::zero();
         }
 
-        layout(proposed);
+        layout(context, proposed);
 
         float_t width = ranges::accumulate(sizes, 0.0F, [](auto lhs, auto rhs) -> float_t {
             return lhs + rhs.width;
@@ -52,11 +52,11 @@ public:
         return Size{width, height};
     }
 
-    void layout(const ProposedSize &proposed) {
+    void layout(const sp<UIContext> &context, const ProposedSize &proposed) {
         auto flexibility = cxx::iter(children)
             .map([&](auto& child) {
-                auto lower = child->_size(ProposedSize(0, proposed.height));
-                auto upper = child->_size(ProposedSize(std::numeric_limits<float_t>::max(), proposed.height));
+                auto lower = child->_size(context, ProposedSize(0, proposed.height));
+                auto upper = child->_size(context, ProposedSize(std::numeric_limits<float_t>::max(), proposed.height));
                 return upper.width - lower.width;
             })
             .collect();
@@ -75,7 +75,7 @@ public:
             size_t idx = remainingIndices.front();
             remainingIndices.erase(remainingIndices.begin());
 
-            auto childSize = children[idx]->_size(ProposedSize(width, proposed.height));
+            auto childSize = children[idx]->_size(context, ProposedSize(width, proposed.height));
             sizes[idx] = childSize;
 
             remainingWidth -= childSize.width;

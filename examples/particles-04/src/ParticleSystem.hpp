@@ -25,7 +25,7 @@ private:
     std::vector<Instance> mInstances = {};
 
     Signal<void(Particle&)> mParticleDeathEvent = {};
-    Signal<void(Particle&, float_t)> mParticleUpdateEvent = {};
+    Signal<void(Particle&, float)> mParticleUpdateEvent = {};
 
 public:
     explicit ParticleSystem(gfx::Device device, size_t capacity) : mDevice(std::move(device)) {
@@ -87,7 +87,7 @@ private:
     }
 
 public:
-    void update(float_t dt, bool flag) {
+    void update(float dt, bool flag) {
         mInstanceCount = 0;
         for (auto& particle : mParticles) {
             if (particle.lifetime <= 0.0F) {
@@ -129,7 +129,7 @@ public:
         cmd.drawIndexed(6, mInstanceCount, 0, 0, 0);
     }
 
-    void emit(const glm::vec3 &position, const glm::vec4 &color, const glm::vec3 &velocity, float_t lifetime) {
+    void emit(const glm::vec3 &position, const glm::vec4 &color, const glm::vec3 &velocity, float lifetime) {
         int32_t index = -1;
         for (int32_t i = 0; i < mParticles.size(); ++i) {
             if (mParticles[i].lifetime <= 0.0F) {
@@ -152,7 +152,7 @@ public:
         return mParticleDeathEvent;
     }
 
-    auto updateEvent() -> Signal<void(Particle&, float_t)>& {
+    auto updateEvent() -> Signal<void(Particle&, float)>& {
         return mParticleUpdateEvent;
     }
 };

@@ -214,24 +214,24 @@ private:
 
             if (!node.translation.empty()) {
                 assert(node.translation.size() == 3);
-                auto x = static_cast<float_t>(node.translation[0]);
-                auto y = static_cast<float_t>(node.translation[1]);
-                auto z = static_cast<float_t>(node.translation[2]);
+                auto x = static_cast<float>(node.translation[0]);
+                auto y = static_cast<float>(node.translation[1]);
+                auto z = static_cast<float>(node.translation[2]);
                 position = glm::vec3(x, y, z);
             }
             if (!node.rotation.empty()) {
                 assert(node.rotation.size() == 4);
-                auto x = static_cast<float_t>(node.rotation[0]);
-                auto y = static_cast<float_t>(node.rotation[1]);
-                auto z = static_cast<float_t>(node.rotation[2]);
-                auto w = static_cast<float_t>(node.rotation[3]);
+                auto x = static_cast<float>(node.rotation[0]);
+                auto y = static_cast<float>(node.rotation[1]);
+                auto z = static_cast<float>(node.rotation[2]);
+                auto w = static_cast<float>(node.rotation[3]);
                 rotation = glm::quat(w, x, y, z);
             }
             if (!node.scale.empty()) {
                 assert(node.scale.size() == 3);
-                auto x = static_cast<float_t>(node.scale[0]);
-                auto y = static_cast<float_t>(node.scale[1]);
-                auto z = static_cast<float_t>(node.scale[2]);
+                auto x = static_cast<float>(node.scale[0]);
+                auto y = static_cast<float>(node.scale[1]);
+                auto z = static_cast<float>(node.scale[2]);
                 scale = glm::vec3(x, y, z);
             }
             sp<Skin> skin = {};
@@ -256,8 +256,8 @@ private:
         }
 
         for (auto& animation : model.animations) {
-            float_t start = std::numeric_limits<float_t>::max();
-            float_t end = std::numeric_limits<float_t>::min();
+            float start = std::numeric_limits<float>::max();
+            float end = std::numeric_limits<float_t>::min();
 
             std::vector<AnimationSampler> samplers = {};
             std::vector<AnimationChannel> channels = {};
@@ -359,7 +359,7 @@ public:
         shader_data.g_view_matrix = world_to_camera_matrix;
 
         commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
         commandBuffer.setRenderPipelineState(renderPipelineState);
         commandBuffer.bindDescriptorSet(descriptorSet, 0);
@@ -371,7 +371,7 @@ public:
         gltf_bundle.meshes.front()->draw(commandBuffer);
         commandBuffer.endRendering();
 
-        commandBuffer.imageBarrier(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer.end();
         commandBuffer.submit();
         commandBuffer.present(drawable);

@@ -21,7 +21,7 @@ public:
 struct AnimationSampler {
 private:
     std::string interpolation = {};
-    std::vector<float_t> inputs = {};
+    std::vector<float> inputs = {};
     std::vector<glm::f32vec4> outputs = {};
 
 public:
