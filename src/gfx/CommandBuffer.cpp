@@ -5,13 +5,12 @@
 #include "Swapchain.hpp"
 #include "CommandQueue.hpp"
 #include "CommandBuffer.hpp"
-#include "DescriptorSet.hpp"
 #include "RenderPipelineState.hpp"
 #include "ComputePipelineState.hpp"
 
 #include "spdlog/spdlog.h"
 
-gfx::CommandBuffer::CommandBuffer(ManagedShared<Device> device, ManagedShared<CommandQueue> queue) : device(device), queue(queue) {
+gfx::CommandBuffer::CommandBuffer(const ManagedShared<Device>& device, const ManagedShared<CommandQueue>& queue) : device(device), queue(queue) {
     vk::CommandBufferAllocateInfo allocate_info = {};
     allocate_info.setCommandPool(queue->raw);
     allocate_info.setLevel(vk::CommandBufferLevel::ePrimary);
@@ -78,26 +77,6 @@ void gfx::CommandBuffer::present(const gfx::Drawable& drawable) {
     }
 }
 
-void gfx::CommandBuffer::setComputePipelineState(const ManagedShared<ComputePipelineState>& state) {
-    raw.bindPipeline(vk::PipelineBindPoint::eCompute, state->pipeline, device->raii.dispatcher);
-
-    pipeline = state->pipeline;
-    pipeline_layout = state->pipeline_layout;
-    pipeline_bind_point = vk::PipelineBindPoint::eCompute;
-}
-
-void gfx::CommandBuffer::bindDescriptorSet(vk::DescriptorSet descriptorSet, uint32_t slot) {
-    raw.bindDescriptorSets(pipeline_bind_point, pipeline_layout, slot, 1, &descriptorSet, 0, nullptr, device->raii.dispatcher);
-}
-
-void gfx::CommandBuffer::pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data) {
-    raw.pushConstants(pipeline_layout, stageFlags, offset, size, data, device->raii.dispatcher);
-}
-
-void gfx::CommandBuffer::dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
-    raw.dispatch(groupCountX, groupCountY, groupCountZ, device->raii.dispatcher);
-}
-
 void gfx::CommandBuffer::waitUntilCompleted() {
     vk::resultCheck(device->raii.raw.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max(), device->raii.dispatcher), "Failed to wait for fence");
 }
@@ -122,7 +101,68 @@ void gfx::CommandBuffer::setImageLayout(const ManagedShared<Texture>& texture, v
     raw.pipelineBarrier2(dependency_info, device->raii.dispatcher);
 }
 
-void gfx::CommandBuffer::beginRendering(const RenderingInfo& info) {
+auto gfx::CommandBuffer::newDescriptorSet(const ManagedShared<RenderPipelineState>& render_pipeline_state, uint32_t index) -> vk::DescriptorSet {
+    for (auto pool : descriptor_pools) {
+        vk::DescriptorSetAllocateInfo allocate_info = {};
+        allocate_info.setDescriptorPool(pool);
+        allocate_info.setDescriptorSetCount(1);
+        allocate_info.setPSetLayouts(&render_pipeline_state->bind_group_layouts[index]);
+
+        vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
+        vk::Result result = device->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, device->raii.dispatcher);
+        if (result == vk::Result::eSuccess) {
+            return descriptor_set;
+        }
+    }
+
+    // todo: reduce pool sizes, check is there is enough space for the new descriptor set
+    auto pool_sizes = std::array{
+        vk::DescriptorPoolSize{vk::DescriptorType::eSampler                  , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage             , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler     , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage             , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eUniformTexelBuffer       , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eStorageTexelBuffer       , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer            , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer            , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBufferDynamic     , 1024},
+        vk::DescriptorPoolSize{vk::DescriptorType::eStorageBufferDynamic     , 1024}
+    };
+
+    vk::DescriptorPoolCreateInfo pool_create_info = {};
+    pool_create_info.setMaxSets(1024);
+    pool_create_info.setPoolSizes(pool_sizes);
+
+    auto pool = device->raii.raw.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, device->raii.dispatcher);
+    descriptor_pools.push_back(pool);
+
+    vk::DescriptorSetAllocateInfo allocate_info = {};
+    allocate_info.setDescriptorPool(pool);
+    allocate_info.setDescriptorSetCount(1);
+    allocate_info.setPSetLayouts(&render_pipeline_state->bind_group_layouts[index]);
+
+    vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
+    vk::Result result = device->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, device->raii.dispatcher);
+    if (result == vk::Result::eSuccess) {
+        return descriptor_set;
+    }
+    return VK_NULL_HANDLE;
+}
+
+auto gfx::CommandBuffer::newRenderCommandEncoder(const RenderingInfo& info) -> ManagedShared<RenderCommandEncoder> {
+    auto encoder = MakeShared(new RenderCommandEncoder(shared_from_this()));
+    encoder->_beginRendering(info);
+    return encoder;
+}
+
+auto gfx::CommandBuffer::newComputeCommandEncoder() -> ManagedShared<ComputeCommandEncoder> {
+    // todo: create compute command encoder
+    return {};
+}
+
+gfx::RenderCommandEncoder::RenderCommandEncoder(const ManagedShared<CommandBuffer>& commandBuffer) : commandBuffer(commandBuffer) {}
+
+void gfx::RenderCommandEncoder::_beginRendering(const RenderingInfo& info) {
     vk::RenderingAttachmentInfo depthAttachment = {};
     vk::RenderingAttachmentInfo stencilAttachment = {};
     std::vector<vk::RenderingAttachmentInfo> colorAttachments = {};
@@ -199,90 +239,70 @@ void gfx::CommandBuffer::beginRendering(const RenderingInfo& info) {
         rendering_info.setPStencilAttachment(&stencilAttachment);
     }
 
-    raw.beginRendering(rendering_info, device->raii.dispatcher);
+    commandBuffer->raw.beginRendering(rendering_info, commandBuffer->device->raii.dispatcher);
 }
 
-void gfx::CommandBuffer::endRendering() {
-    raw.endRendering(device->raii.dispatcher);
+void gfx::RenderCommandEncoder::_endRendering() {
+    commandBuffer->raw.endRendering(commandBuffer->device->raii.dispatcher);
 }
 
-void gfx::CommandBuffer::setRenderPipelineState(const ManagedShared<RenderPipelineState>& state) {
-    raw.bindPipeline(vk::PipelineBindPoint::eGraphics, state->pipeline, device->raii.dispatcher);
-
-    pipeline = state->pipeline;
-    pipeline_layout = state->pipeline_layout;
-    pipeline_bind_point = vk::PipelineBindPoint::eGraphics;
+auto gfx::RenderCommandEncoder::getCommandBuffer() -> ManagedShared<CommandBuffer> {
+    return commandBuffer;
 }
 
-void gfx::CommandBuffer::setScissor(uint32_t firstScissor, const vk::Rect2D& rect) {
-    raw.setScissor(firstScissor, 1, &rect, device->raii.dispatcher);
+void gfx::RenderCommandEncoder::endEncoding() {
+    _endRendering();
 }
 
-void gfx::CommandBuffer::setViewport(uint32_t firstViewport, const vk::Viewport& viewport) {
-    raw.setViewport(firstViewport, 1, &viewport, device->raii.dispatcher);
+void gfx::RenderCommandEncoder::setRenderPipelineState(const ManagedShared<RenderPipelineState>& pipelineState) {
+    currentPipelineState = pipelineState;
+    commandBuffer->raw.bindPipeline(vk::PipelineBindPoint::eGraphics, currentPipelineState->pipeline, commandBuffer->device->raii.dispatcher);
 }
 
-void gfx::CommandBuffer::bindIndexBuffer(const ManagedShared<Buffer>& buffer, vk::DeviceSize offset, vk::IndexType indexType) {
-    raw.bindIndexBuffer(buffer->raw, offset, indexType, device->raii.dispatcher);
+void gfx::RenderCommandEncoder::setScissor(uint32_t firstScissor, const vk::Rect2D& rect) {
+    commandBuffer->raw.setScissor(firstScissor, 1, &rect, commandBuffer->device->raii.dispatcher);
 }
 
-void gfx::CommandBuffer::bindVertexBuffer(int firstBinding, const ManagedShared<Buffer>& buffer, vk::DeviceSize offset) {
-    raw.bindVertexBuffers(firstBinding, 1, &buffer->raw, &offset, device->raii.dispatcher);
+void gfx::RenderCommandEncoder::setViewport(uint32_t firstViewport, const vk::Viewport& viewport) {
+    commandBuffer->raw.setViewport(firstViewport, 1, &viewport, commandBuffer->device->raii.dispatcher);
 }
 
-void gfx::CommandBuffer::draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
-    raw.draw(vertexCount, instanceCount, firstVertex, firstInstance, device->raii.dispatcher);
+void gfx::RenderCommandEncoder::bindIndexBuffer(const ManagedShared<Buffer>& buffer, vk::DeviceSize offset, vk::IndexType indexType) {
+    commandBuffer->raw.bindIndexBuffer(buffer->raw, offset, indexType, commandBuffer->device->raii.dispatcher);
 }
 
-void gfx::CommandBuffer::drawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
-    raw.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, device->raii.dispatcher);
+void gfx::RenderCommandEncoder::bindVertexBuffer(int firstBinding, const ManagedShared<Buffer>& buffer, vk::DeviceSize offset) {
+    commandBuffer->raw.bindVertexBuffers(firstBinding, 1, &buffer->raw, &offset, commandBuffer->device->raii.dispatcher);
 }
 
-// todo: get sizes from layout
-auto gfx::CommandBuffer::newDescriptorSet(const ManagedShared<RenderPipelineState>& render_pipeline_state, uint32_t index) -> vk::DescriptorSet {
-    for (auto pool : descriptor_pools) {
-        vk::DescriptorSetAllocateInfo allocate_info = {};
-        allocate_info.setDescriptorPool(pool);
-        allocate_info.setDescriptorSetCount(1);
-        allocate_info.setPSetLayouts(&render_pipeline_state->bind_group_layouts[index]);
+void gfx::RenderCommandEncoder::draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
+    commandBuffer->raw.draw(vertexCount, instanceCount, firstVertex, firstInstance, commandBuffer->device->raii.dispatcher);
+}
 
-        vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
-        vk::Result result = device->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, device->raii.dispatcher);
-        if (result == vk::Result::eSuccess) {
-            return descriptor_set;
-        }
-    }
+void gfx::RenderCommandEncoder::drawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
+    commandBuffer->raw.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, commandBuffer->device->raii.dispatcher);
+}
 
-    // todo: reduce pool sizes, check is there is enough space for the new descriptor set
-    auto pool_sizes = std::array{
-        vk::DescriptorPoolSize{vk::DescriptorType::eSampler                  , 1024},
-        vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage             , 1024},
-        vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler     , 1024},
-        vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage             , 1024},
-        vk::DescriptorPoolSize{vk::DescriptorType::eUniformTexelBuffer       , 1024},
-        vk::DescriptorPoolSize{vk::DescriptorType::eStorageTexelBuffer       , 1024},
-        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer            , 1024},
-        vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer            , 1024},
-        vk::DescriptorPoolSize{vk::DescriptorType::eUniformBufferDynamic     , 1024},
-        vk::DescriptorPoolSize{vk::DescriptorType::eStorageBufferDynamic     , 1024}
-    };
+void gfx::RenderCommandEncoder::bindDescriptorSet(vk::DescriptorSet descriptorSet, uint32_t slot) {
+    commandBuffer->raw.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, currentPipelineState->pipeline_layout, slot, 1, &descriptorSet, 0, nullptr, commandBuffer->device->raii.dispatcher);
+}
 
-    vk::DescriptorPoolCreateInfo pool_create_info = {};
-    pool_create_info.setMaxSets(1024);
-    pool_create_info.setPoolSizes(pool_sizes);
+void gfx::RenderCommandEncoder::pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data) {
+    commandBuffer->raw.pushConstants(currentPipelineState->pipeline_layout, stageFlags, offset, size, data, commandBuffer->device->raii.dispatcher);
+}
 
-    auto pool = device->raii.raw.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, device->raii.dispatcher);
-    descriptor_pools.push_back(pool);
+void gfx::ComputeCommandEncoder::setComputePipelineState(const ManagedShared<ComputePipelineState>& state) {
+    commandBuffer->raw.bindPipeline(vk::PipelineBindPoint::eCompute, state->pipeline, commandBuffer->device->raii.dispatcher);
+}
 
-    vk::DescriptorSetAllocateInfo allocate_info = {};
-    allocate_info.setDescriptorPool(pool);
-    allocate_info.setDescriptorSetCount(1);
-    allocate_info.setPSetLayouts(&render_pipeline_state->bind_group_layouts[index]);
+void gfx::ComputeCommandEncoder::bindDescriptorSet(vk::DescriptorSet descriptorSet, uint32_t slot) {
+    commandBuffer->raw.bindDescriptorSets(vk::PipelineBindPoint::eCompute, currentPipelineState->pipeline_layout, slot, 1, &descriptorSet, 0, nullptr, commandBuffer->device->raii.dispatcher);
+}
 
-    vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
-    vk::Result result = device->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, device->raii.dispatcher);
-    if (result == vk::Result::eSuccess) {
-        return descriptor_set;
-    }
-    return VK_NULL_HANDLE;
+void gfx::ComputeCommandEncoder::pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data) {
+    commandBuffer->raw.pushConstants(currentPipelineState->pipeline_layout, stageFlags, offset, size, data, commandBuffer->device->raii.dispatcher);
+}
+
+void gfx::ComputeCommandEncoder::dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
+    commandBuffer->raw.dispatch(groupCountX, groupCountY, groupCountZ, commandBuffer->device->raii.dispatcher);
 }

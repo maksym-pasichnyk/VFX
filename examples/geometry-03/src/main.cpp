@@ -380,15 +380,15 @@ public:
         device->raii.raw.updateDescriptorSets(2, writes, 0, nullptr, device->raii.dispatcher);
 
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
-        commandBuffer->setRenderPipelineState(renderPipelineState);
-        commandBuffer->bindDescriptorSet(descriptorSet, 0);
-        commandBuffer->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
 
-        commandBuffer->beginRendering(rendering_info);
-        commandBuffer->setScissor(0, rendering_area);
-        commandBuffer->setViewport(0, rendering_viewport);
-        gltf_bundle.meshes.front()->draw(commandBuffer);
-        commandBuffer->endRendering();
+        auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
+        encoder->setRenderPipelineState(renderPipelineState);
+        encoder->bindDescriptorSet(descriptorSet, 0);
+        encoder->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
+        encoder->setScissor(0, rendering_area);
+        encoder->setViewport(0, rendering_viewport);
+        gltf_bundle.meshes.front()->draw(encoder);
+        encoder->endEncoding();
 
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer->end();

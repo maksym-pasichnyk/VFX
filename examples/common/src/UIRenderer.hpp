@@ -18,7 +18,7 @@ public:
     void setCurrentContext();
 
     auto drawList() -> ImDrawList*;
-    void draw(const ManagedShared<gfx::CommandBuffer>& cmd);
+    void draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder);
     void setScale(float scale);
     void setScreenSize(const Size& size);
 

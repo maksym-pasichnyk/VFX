@@ -44,19 +44,19 @@ public:
         }
     }
 
-    void draw(const ManagedShared<gfx::CommandBuffer>& cmd) {
+    void draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder) {
         if (mIndexBuffer) {
-            cmd->bindIndexBuffer(mIndexBuffer, 0, vk::IndexType::eUint32);
+            encoder->bindIndexBuffer(mIndexBuffer, 0, vk::IndexType::eUint32);
         }
         if (mVertexBuffer) {
-            cmd->bindVertexBuffer(0, mVertexBuffer, 0);
+            encoder->bindVertexBuffer(0, mVertexBuffer, 0);
         }
 
         for (auto& primitive : mPrimitives) {
             if (primitive.numIndices > 0) {
-                cmd->drawIndexed(primitive.numIndices, 1, primitive.baseIndex, static_cast<int32_t>(primitive.baseVertex), 0);
+                encoder->drawIndexed(primitive.numIndices, 1, primitive.baseIndex, static_cast<int32_t>(primitive.baseVertex), 0);
             } else {
-                cmd->draw(primitive.numVertices, 1, primitive.baseVertex, 0);
+                encoder->draw(primitive.numVertices, 1, primitive.baseVertex, 0);
             }
         }
     }

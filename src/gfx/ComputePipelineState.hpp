@@ -8,7 +8,7 @@ namespace gfx {
         ManagedShared<Device>                   device;
         vk::Pipeline                            pipeline;
         vk::PipelineLayout                      pipeline_layout;
-        std::vector<vk::DescriptorSetLayout>    bind_group_layouts;
+        std::vector<vk::DescriptorSetLayout>    descriptor_set_layouts;
 
         explicit ComputePipelineState(ManagedShared<Device> device);
         ~ComputePipelineState() override;

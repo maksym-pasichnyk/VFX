@@ -59,18 +59,17 @@ public:
         commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-        commandBuffer->setRenderPipelineState(rocketParticleSystem->renderPipelineState());
-        commandBuffer->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
+        auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
+        encoder->setRenderPipelineState(rocketParticleSystem->renderPipelineState());
+        encoder->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
+        encoder->setScissor(0, rendering_area);
+        encoder->setViewport(0, rendering_viewport);
 
-        commandBuffer->beginRendering(rendering_info);
-        commandBuffer->setScissor(0, rendering_area);
-        commandBuffer->setViewport(0, rendering_viewport);
+        rocketParticleSystem->draw(encoder);
+        sparkleParticleSystem->draw(encoder);
+        explosionParticleSystem->draw(encoder);
 
-        rocketParticleSystem->draw(commandBuffer);
-        sparkleParticleSystem->draw(commandBuffer);
-        explosionParticleSystem->draw(commandBuffer);
-
-        commandBuffer->endRendering();
+        encoder->endEncoding();
 
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer->end();

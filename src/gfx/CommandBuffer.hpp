@@ -13,7 +13,6 @@ namespace gfx {
     struct Texture;
     struct Drawable;
     struct CommandBuffer;
-    struct DescriptorSet;
     struct RenderPipelineState;
     struct RenderCommandEncoder;
     struct ComputePipelineState;
@@ -71,40 +70,71 @@ namespace gfx {
         RenderingColorAttachmentInfoArray colorAttachments  = {};
     };
 
-    struct CommandBuffer : ManagedObject<CommandBuffer> {
-        ManagedShared<Device>           device;
-        ManagedShared<CommandQueue>     queue               = {};
-        vk::CommandBuffer               raw                 = {};
-        vk::Fence                       fence               = {};
-        vk::Semaphore                   semaphore           = {};
-        vk::Pipeline                    pipeline            = {};
-        vk::PipelineLayout              pipeline_layout     = {};
-        vk::PipelineBindPoint           pipeline_bind_point = {};
-        std::vector<vk::DescriptorPool> descriptor_pools    = {};
+    struct RenderCommandEncoder : ManagedObject<RenderCommandEncoder> {
+    private:
+        friend CommandBuffer;
 
-        explicit CommandBuffer(ManagedShared<Device> device, ManagedShared<CommandQueue> queue);
-        ~CommandBuffer() override;
+        ManagedShared<CommandBuffer> commandBuffer;
+        ManagedShared<RenderPipelineState> currentPipelineState;
 
-        void begin(const vk::CommandBufferBeginInfo& info);
-        void end();
-        void submit();
-        void present(const Drawable& drawable);
-        void setComputePipelineState(const ManagedShared<ComputePipelineState>& state);
-        void bindDescriptorSet(vk::DescriptorSet descriptorSet, uint32_t slot);
-        void pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data);
-        void dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
-        void waitUntilCompleted();
-        void setImageLayout(const ManagedShared<Texture>& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask);
+    public:
+        RenderCommandEncoder(const ManagedShared<CommandBuffer>& commandBuffer);
 
-        void beginRendering(const RenderingInfo& info);
-        void endRendering();
-        void setRenderPipelineState(const ManagedShared<RenderPipelineState>& state);
+    private:
+        void _beginRendering(const RenderingInfo& info);
+        void _endRendering();
+
+    public:
+        auto getCommandBuffer() -> ManagedShared<CommandBuffer>;
+        void endEncoding();
+        void setRenderPipelineState(const ManagedShared<RenderPipelineState>& pipelineState);
         void setScissor(uint32_t firstScissor, const vk::Rect2D& rect);
         void setViewport(uint32_t firstViewport, const vk::Viewport& viewport);
         void bindIndexBuffer(const ManagedShared<Buffer>& buffer, vk::DeviceSize offset, vk::IndexType indexType);
         void bindVertexBuffer(int firstBinding, const ManagedShared<Buffer>& buffer, vk::DeviceSize offset);
         void draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
         void drawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
+        void bindDescriptorSet(vk::DescriptorSet descriptorSet, uint32_t slot);
+        void pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data);
+    };
+
+    struct ComputeCommandEncoder : ManagedObject<ComputeCommandEncoder> {
+    private:
+        friend CommandBuffer;
+
+        ManagedShared<CommandBuffer> commandBuffer;
+        ManagedShared<ComputePipelineState> currentPipelineState;
+
+    public:
+        ComputeCommandEncoder(const ManagedShared<CommandBuffer>& commandBuffer);
+
+    public:
+        void setComputePipelineState(const ManagedShared<ComputePipelineState>& pipelineState);
+        void bindDescriptorSet(vk::DescriptorSet descriptorSet, uint32_t slot);
+        void pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data);
+        void dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+    };
+
+    struct CommandBuffer : ManagedObject<CommandBuffer> {
+        ManagedShared<Device>           device              = {};
+        ManagedShared<CommandQueue>     queue               = {};
+        vk::CommandBuffer               raw                 = {};
+        vk::Fence                       fence               = {};
+        vk::Semaphore                   semaphore           = {};
+        std::vector<vk::DescriptorPool> descriptor_pools    = {};
+
+        explicit CommandBuffer(const ManagedShared<Device>& device, const ManagedShared<CommandQueue>& queue);
+        ~CommandBuffer() override;
+
+        void begin(const vk::CommandBufferBeginInfo& info);
+        void end();
+        void submit();
+        void present(const Drawable& drawable);
+        void waitUntilCompleted();
+        void setImageLayout(const ManagedShared<Texture>& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask);
+
         auto newDescriptorSet(const ManagedShared<RenderPipelineState>& render_pipeline_state, uint32_t index) -> vk::DescriptorSet;
+        auto newRenderCommandEncoder(const RenderingInfo& info) -> ManagedShared<RenderCommandEncoder>;
+        auto newComputeCommandEncoder() -> ManagedShared<ComputeCommandEncoder>;
     };
 }

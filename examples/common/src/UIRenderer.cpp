@@ -110,7 +110,7 @@ auto UIRenderer::drawList() -> ImDrawList* {
     return &mDrawList;
 }
 
-void UIRenderer::draw(const ManagedShared<gfx::CommandBuffer>& cmd) {
+void UIRenderer::draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder) {
     if (mDrawList.IdxBuffer.Size == 0) {
         return;
     }
@@ -118,7 +118,7 @@ void UIRenderer::draw(const ManagedShared<gfx::CommandBuffer>& cmd) {
     GuiShaderData gui_shader_data = {};
     gui_shader_data.scale = 2.0F / simd::float2{mScreenSize.width, mScreenSize.height};
 
-    auto descriptor_set = cmd->newDescriptorSet(render_pipeline_state, 0);
+    auto descriptor_set = encoder->getCommandBuffer()->newDescriptorSet(render_pipeline_state, 0);
 
     vk::DescriptorImageInfo sampler_info = {};
     sampler_info.setSampler(font_sampler->raw);
@@ -157,14 +157,14 @@ void UIRenderer::draw(const ManagedShared<gfx::CommandBuffer>& cmd) {
 //    mDescriptorSet.setSampler(font_sampler, 0);
 //    mDescriptorSet.setTexture(font_texture, 1);
 
-    cmd->setRenderPipelineState(render_pipeline_state);
-    cmd->bindDescriptorSet(descriptor_set, 0);
-    cmd->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(GuiShaderData), &gui_shader_data);
-    cmd->bindVertexBuffer(0, dynamic_buffer, vertex_buffer_offset);
-    cmd->bindIndexBuffer(dynamic_buffer, index_buffer_offset, vk::IndexType::eUint16);
+    encoder->setRenderPipelineState(render_pipeline_state);
+    encoder->bindDescriptorSet(descriptor_set, 0);
+    encoder->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(GuiShaderData), &gui_shader_data);
+    encoder->bindVertexBuffer(0, dynamic_buffer, vertex_buffer_offset);
+    encoder->bindIndexBuffer(dynamic_buffer, index_buffer_offset, vk::IndexType::eUint16);
 
     for (auto& drawCmd : std::span(mDrawList.CmdBuffer.Data, mDrawList.CmdBuffer.Size)) {
-        cmd->drawIndexed(drawCmd.ElemCount, 1, drawCmd.IdxOffset, static_cast<int32_t>(drawCmd.VtxOffset), 0);
+        encoder->drawIndexed(drawCmd.ElemCount, 1, drawCmd.IdxOffset, static_cast<int32_t>(drawCmd.VtxOffset), 0);
     }
 }
 

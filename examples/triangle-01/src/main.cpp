@@ -53,15 +53,13 @@ public:
 
         device->raii.raw.updateDescriptorSets({buffer_write_info}, {}, device->raii.dispatcher);
 
-        commandBuffer->setRenderPipelineState(renderPipelineState);
-        commandBuffer->bindDescriptorSet(descriptor_set, 0);
-
-        commandBuffer->beginRendering(rendering_info);
-        commandBuffer->setScissor(0, rendering_area);
-        commandBuffer->setViewport(0, rendering_viewport);
-
-        commandBuffer->draw(3, 1, 0, 0);
-        commandBuffer->endRendering();
+        auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
+        encoder->setRenderPipelineState(renderPipelineState);
+        encoder->bindDescriptorSet(descriptor_set, 0);
+        encoder->setScissor(0, rendering_area);
+        encoder->setViewport(0, rendering_viewport);
+        encoder->draw(3, 1, 0, 0);
+        encoder->endEncoding();
 
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer->end();

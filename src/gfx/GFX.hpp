@@ -14,6 +14,5 @@
 #include "Swapchain.hpp"
 #include "CommandQueue.hpp"
 #include "CommandBuffer.hpp"
-#include "DescriptorSet.hpp"
 #include "RenderPipelineState.hpp"
 #include "ComputePipelineState.hpp"

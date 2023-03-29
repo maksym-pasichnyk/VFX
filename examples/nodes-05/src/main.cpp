@@ -59,10 +59,6 @@ public:
         commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-        commandBuffer->beginRendering(rendering_info);
-        commandBuffer->setScissor(0, rendering_area);
-        commandBuffer->setViewport(0, rendering_viewport);
-
         auto view = graphView->overlay(
             Text(fmt::format("FPS {:.0F}", 1.0F / average), 24.0F)->fixedSize(true, true),
             Alignment::topLeading()
@@ -70,9 +66,12 @@ public:
 
         uiRenderer->resetForNewFrame();
         _drawView(view);
-        uiRenderer->draw(commandBuffer);
 
-        commandBuffer->endRendering();
+        auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
+        encoder->setScissor(0, rendering_area);
+        encoder->setViewport(0, rendering_viewport);
+        uiRenderer->draw(encoder);
+        encoder->endEncoding();
 
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer->end();

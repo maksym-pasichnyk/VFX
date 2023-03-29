@@ -2,8 +2,6 @@
 
 #include "Device.hpp"
 #include "Function.hpp"
-#include "DescriptorSet.hpp"
-#include "BindGroupLayout.hpp"
 
 #include <optional>
 

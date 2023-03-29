@@ -573,7 +573,7 @@ auto gfx::Device::newRenderPipelineState(const gfx::RenderPipelineStateDescripti
     pipeline_create_info.setBasePipelineHandle(nullptr);
     pipeline_create_info.setBasePipelineIndex(0);
 
-    std::ignore = raii.raw.createGraphicsPipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, raii.dispatcher);
+    vk::resultCheck(raii.raw.createGraphicsPipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, raii.dispatcher), "Failed to create graphics pipeline");
     
     return state;
 }
@@ -608,20 +608,20 @@ auto gfx::Device::newComputePipelineState(const ManagedShared<Function>& functio
     }
 
     auto state = MakeShared(new ComputePipelineState(MakeShared(this->retain())));
-    state->bind_group_layouts.resize(descriptor_sets.size());
+    state->descriptor_set_layouts.resize(descriptor_sets.size());
     for (uint32_t i = 0; i < descriptor_sets.size(); ++i) {
         vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {};
         descriptor_set_layout_create_info.setBindings(descriptor_sets[i].bindings);
 
-        state->bind_group_layouts[i] = raii.raw.createDescriptorSetLayout(descriptor_set_layout_create_info, nullptr, raii.dispatcher);
+        state->descriptor_set_layouts[i] = raii.raw.createDescriptorSetLayout(descriptor_set_layout_create_info, nullptr, raii.dispatcher);
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_create_info = {};
-    pipeline_layout_create_info.setSetLayouts(state->bind_group_layouts);
+    pipeline_layout_create_info.setSetLayouts(state->descriptor_set_layouts);
     pipeline_layout_create_info.setPushConstantRanges(push_constant_ranges);
     state->pipeline_layout = raii.raw.createPipelineLayout(pipeline_layout_create_info, nullptr, raii.dispatcher);
 
-    vk::PipelineShaderStageCreateInfo shader_stage_create_info{};
+    vk::PipelineShaderStageCreateInfo shader_stage_create_info = {};
     shader_stage_create_info.setStage(vk::ShaderStageFlagBits::eCompute);
     shader_stage_create_info.setModule(function->library->raw);
     shader_stage_create_info.setPName(function->name.c_str());
@@ -632,7 +632,7 @@ auto gfx::Device::newComputePipelineState(const ManagedShared<Function>& functio
     pipeline_create_info.setBasePipelineHandle(nullptr);
     pipeline_create_info.setBasePipelineIndex(0);
 
-    std::ignore = raii.raw.createComputePipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, raii.dispatcher);
+    vk::resultCheck(raii.raw.createComputePipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, raii.dispatcher), "Failed to create compute pipeline");
     return state;
 }
 

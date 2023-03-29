@@ -7,6 +7,12 @@
 #include <atomic>
 #include <typeinfo>
 
+template<typename T>
+class ManagedShared;
+
+template<typename T>
+auto MakeShared(T* stored) -> ManagedShared<T>;
+
 // TODO: remove template when Deducing this will be supported
 template<typename T>
 class ManagedObject {
@@ -29,6 +35,10 @@ public:
         if (counter == 0) {
             delete this;
         }
+    }
+
+    auto shared_from_this() -> ManagedShared<T> {
+        return MakeShared(retain());
     }
 
 private:

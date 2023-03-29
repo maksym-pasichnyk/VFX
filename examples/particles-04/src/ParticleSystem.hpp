@@ -118,15 +118,15 @@ public:
         return mRenderPipelineState;
     }
 
-    void draw(const ManagedShared<gfx::CommandBuffer>& cmd) {
+    void draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder) {
         if (mInstanceCount == 0) {
             return;
         }
 
-        cmd->bindIndexBuffer(mQuadIndexBuffer, 0, vk::IndexType::eUint32);
-        cmd->bindVertexBuffer(0, mQuadVertexBuffer, 0);
-        cmd->bindVertexBuffer(1, mInstanceVertexBuffer, 0);
-        cmd->drawIndexed(6, mInstanceCount, 0, 0, 0);
+        encoder->bindIndexBuffer(mQuadIndexBuffer, 0, vk::IndexType::eUint32);
+        encoder->bindVertexBuffer(0, mQuadVertexBuffer, 0);
+        encoder->bindVertexBuffer(1, mInstanceVertexBuffer, 0);
+        encoder->drawIndexed(6, mInstanceCount, 0, 0, 0);
     }
 
     void emit(const glm::vec3 &position, const glm::vec4 &color, const glm::vec3 &velocity, float lifetime) {
