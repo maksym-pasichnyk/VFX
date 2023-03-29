@@ -1,22 +1,17 @@
 #pragma once
 
 #include "Device.hpp"
+#include "ManagedObject.hpp"
 
 namespace gfx {
-    struct CommandQueueShared {
-        Device                      device;
-        vk::CommandPool             raw;
+    struct CommandBuffer;
+    struct CommandQueue : ManagedObject<CommandQueue> {
+        ManagedShared<Device>   device;
+        vk::CommandPool         raw;
 
-        explicit CommandQueueShared(Device device, vk::CommandPool raw);
-        ~CommandQueueShared();
-    };
+        explicit CommandQueue(ManagedShared<Device> device, vk::CommandPool raw);
+        ~CommandQueue() override;
 
-    struct CommandQueue final {
-        std::shared_ptr<CommandQueueShared> shared;
-
-        explicit CommandQueue();
-        explicit CommandQueue(std::shared_ptr<CommandQueueShared> shared);
-
-        auto commandBuffer() -> CommandBuffer;
+        auto commandBuffer() -> ManagedShared<CommandBuffer>;
     };
 }

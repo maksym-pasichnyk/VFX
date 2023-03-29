@@ -9,8 +9,8 @@ struct GuiShaderData {
     simd::float2 scale;
 };
 
-UIRenderer::UIRenderer(gfx::Device device)
-: mDevice(std::move(device))
+UIRenderer::UIRenderer(const ManagedShared<gfx::Device>& device)
+: device(device)
 , mDrawList(&mDrawListSharedData) {
     buildFonts();
     buildShaders();
@@ -37,8 +37,8 @@ void UIRenderer::buildFonts() {
     font_texture_description.height = static_cast<uint32_t>(mFontAtlas.TexHeight);
     font_texture_description.format = vk::Format::eR8G8B8A8Unorm;
     font_texture_description.usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
-    mFontTexture = mDevice.newTexture(font_texture_description);
-    mFontTexture.replaceRegion(pixels.data(), pixels.size() * sizeof(uint32_t));
+    font_texture = device->newTexture(font_texture_description);
+    font_texture->replaceRegion(pixels.data(), pixels.size() * sizeof(uint32_t));
 
     vk::SamplerCreateInfo font_sampler_description = {};
     font_sampler_description.setMagFilter(vk::Filter::eLinear);
@@ -47,9 +47,9 @@ void UIRenderer::buildFonts() {
     font_sampler_description.setAddressModeU(vk::SamplerAddressMode::eRepeat);
     font_sampler_description.setAddressModeV(vk::SamplerAddressMode::eRepeat);
     font_sampler_description.setAddressModeW(vk::SamplerAddressMode::eRepeat);
-    mFontSampler = mDevice.newSampler(font_sampler_description);
+    font_sampler = device->newSampler(font_sampler_description);
 
-    mFontAtlas.SetTexID(mFontTexture.shared->image);
+    mFontAtlas.SetTexID(font_texture->image);
 
     mDrawListSharedData.Font = mFontAtlas.Fonts.front();
     mDrawListSharedData.FontSize = mDrawListSharedData.Font->FontSize;
@@ -57,12 +57,12 @@ void UIRenderer::buildFonts() {
 }
 
 void UIRenderer::buildShaders() {
-    auto vertexLibrary      = mDevice.newLibrary(Assets::readFile("shaders/gui.vert.spv"));
-    auto fragmentLibrary    = mDevice.newLibrary(Assets::readFile("shaders/gui.frag.spv"));
+    auto vertexLibrary      = device->newLibrary(Assets::readFile("shaders/gui.vert.spv"));
+    auto fragmentLibrary    = device->newLibrary(Assets::readFile("shaders/gui.frag.spv"));
 
     gfx::RenderPipelineStateDescription description;
-    description.vertexFunction      = vertexLibrary.newFunction("main");
-    description.fragmentFunction    = fragmentLibrary.newFunction("main");
+    description.vertexFunction      = vertexLibrary->newFunction("main");
+    description.fragmentFunction    = fragmentLibrary->newFunction("main");
     description.vertexInputState    = {
         .bindings = {
             vk::VertexInputBindingDescription{0, sizeof(ImDrawVert), vk::VertexInputRate::eVertex}
@@ -83,11 +83,11 @@ void UIRenderer::buildShaders() {
     description.colorBlendAttachments[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
     description.colorBlendAttachments[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
 
-    render_pipeline_state = mDevice.newRenderPipelineState(description);
+    render_pipeline_state = device->newRenderPipelineState(description);
 }
 
 void UIRenderer::buildBuffers() {
-    dynamic_buffer = mDevice.newBuffer(
+    dynamic_buffer = device->newBuffer(
         vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer,
         5ULL * 1024ULL * 1024ULL,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
@@ -110,7 +110,7 @@ auto UIRenderer::drawList() -> ImDrawList* {
     return &mDrawList;
 }
 
-void UIRenderer::draw(gfx::CommandBuffer cmd) {
+void UIRenderer::draw(const ManagedShared<gfx::CommandBuffer>& cmd) {
     if (mDrawList.IdxBuffer.Size == 0) {
         return;
     }
@@ -118,13 +118,13 @@ void UIRenderer::draw(gfx::CommandBuffer cmd) {
     GuiShaderData gui_shader_data = {};
     gui_shader_data.scale = 2.0F / simd::float2{mScreenSize.width, mScreenSize.height};
 
-    auto descriptor_set = cmd.newDescriptorSet(render_pipeline_state.shared->bind_group_layouts.front(), {
+    auto descriptor_set = cmd->newDescriptorSet(render_pipeline_state->bind_group_layouts.front(), {
         vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
         vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 1},
     });
 
     vk::DescriptorImageInfo sampler_info = {};
-    sampler_info.setSampler(mFontSampler.shared->raw);
+    sampler_info.setSampler(font_sampler->raw);
 
     vk::WriteDescriptorSet sampler_write_info = {};
     sampler_write_info.setDstSet(descriptor_set);
@@ -135,7 +135,7 @@ void UIRenderer::draw(gfx::CommandBuffer cmd) {
     sampler_write_info.setPImageInfo(&sampler_info);
 
     vk::DescriptorImageInfo image_info = {};
-    image_info.setImageView(mFontTexture.shared->image_view);
+    image_info.setImageView(font_texture->image_view);
     image_info.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 
     vk::WriteDescriptorSet image_write_info = {};
@@ -146,7 +146,7 @@ void UIRenderer::draw(gfx::CommandBuffer cmd) {
     image_write_info.setDescriptorType(vk::DescriptorType::eSampledImage);
     image_write_info.setPImageInfo(&image_info);
 
-    mDevice.shared->raii.raw.updateDescriptorSets({sampler_write_info, image_write_info}, {}, mDevice.shared->raii.dispatcher);
+    device->raii.raw.updateDescriptorSets({sampler_write_info, image_write_info}, {}, device->raii.dispatcher);
 
     vk::DeviceSize vertex_buffer_offset = dynamic_buffer_offset;
     dynamic_buffer_offset += mDrawList.VtxBuffer.Size * sizeof(ImDrawVert);
@@ -154,21 +154,21 @@ void UIRenderer::draw(gfx::CommandBuffer cmd) {
     vk::DeviceSize index_buffer_offset  = dynamic_buffer_offset;
     dynamic_buffer_offset += mDrawList.IdxBuffer.Size * sizeof(ImDrawIdx);
 
-    std::memcpy(static_cast<std::byte*>(dynamic_buffer.contents()) + vertex_buffer_offset, mDrawList.VtxBuffer.Data, mDrawList.VtxBuffer.Size * sizeof(ImDrawVert));
-    std::memcpy(static_cast<std::byte*>(dynamic_buffer.contents()) + index_buffer_offset, mDrawList.IdxBuffer.Data, mDrawList.IdxBuffer.Size * sizeof(ImDrawIdx));
+    std::memcpy(static_cast<std::byte*>(dynamic_buffer->contents()) + vertex_buffer_offset, mDrawList.VtxBuffer.Data, mDrawList.VtxBuffer.Size * sizeof(ImDrawVert));
+    std::memcpy(static_cast<std::byte*>(dynamic_buffer->contents()) + index_buffer_offset, mDrawList.IdxBuffer.Data, mDrawList.IdxBuffer.Size * sizeof(ImDrawIdx));
 
 
-//    mDescriptorSet.setSampler(mFontSampler, 0);
-//    mDescriptorSet.setTexture(mFontTexture, 1);
+//    mDescriptorSet.setSampler(font_sampler, 0);
+//    mDescriptorSet.setTexture(font_texture, 1);
 
-    cmd.setRenderPipelineState(render_pipeline_state);
-    cmd.bindDescriptorSet(descriptor_set, 0);
-    cmd.pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(GuiShaderData), &gui_shader_data);
-    cmd.bindVertexBuffer(0, dynamic_buffer, vertex_buffer_offset);
-    cmd.bindIndexBuffer(dynamic_buffer, index_buffer_offset, vk::IndexType::eUint16);
+    cmd->setRenderPipelineState(render_pipeline_state);
+    cmd->bindDescriptorSet(descriptor_set, 0);
+    cmd->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(GuiShaderData), &gui_shader_data);
+    cmd->bindVertexBuffer(0, dynamic_buffer, vertex_buffer_offset);
+    cmd->bindIndexBuffer(dynamic_buffer, index_buffer_offset, vk::IndexType::eUint16);
 
     for (auto& drawCmd : std::span(mDrawList.CmdBuffer.Data, mDrawList.CmdBuffer.Size)) {
-        cmd.drawIndexed(drawCmd.ElemCount, 1, drawCmd.IdxOffset, static_cast<int32_t>(drawCmd.VtxOffset), 0);
+        cmd->drawIndexed(drawCmd.ElemCount, 1, drawCmd.IdxOffset, static_cast<int32_t>(drawCmd.VtxOffset), 0);
     }
 }
 

@@ -1,14 +1,11 @@
 #include "ComputePipelineState.hpp"
 
-gfx::ComputePipelineStateShared::ComputePipelineStateShared(gfx::Device device) : device(std::move(device)) {}
-gfx::ComputePipelineStateShared::~ComputePipelineStateShared() {
+gfx::ComputePipelineState::ComputePipelineState(ManagedShared<Device> device) : device(std::move(device)) {}
+gfx::ComputePipelineState::~ComputePipelineState() {
     for (auto& layout : bind_group_layouts) {
-        device.shared->raii.raw.destroyDescriptorSetLayout(layout, nullptr, device.shared->raii.dispatcher);
+        device->raii.raw.destroyDescriptorSetLayout(layout, nullptr, device->raii.dispatcher);
     }
 
-    device.shared->raii.raw.destroyPipelineLayout(pipeline_layout, nullptr, device.shared->raii.dispatcher);
-    device.shared->raii.raw.destroyPipeline(pipeline, nullptr, device.shared->raii.dispatcher);
+    device->raii.raw.destroyPipelineLayout(pipeline_layout, nullptr, device->raii.dispatcher);
+    device->raii.raw.destroyPipeline(pipeline, nullptr, device->raii.dispatcher);
 }
-
-gfx::ComputePipelineState::ComputePipelineState() : shared(nullptr) {}
-gfx::ComputePipelineState::ComputePipelineState(std::shared_ptr<ComputePipelineStateShared> shared) : shared(std::move(shared)) {}

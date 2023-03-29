@@ -20,12 +20,12 @@ auto gfx::RenderPipelineColorAttachmentFormatArray::operator[](size_t i) -> vk::
     return elements[i];
 }
 
-gfx::RenderPipelineStateShared::RenderPipelineStateShared(gfx::Device device) : device(std::move(device)) {}
+gfx::RenderPipelineState::RenderPipelineState(ManagedShared<Device> device) : device(std::move(device)) {}
 
-gfx::RenderPipelineStateShared::~RenderPipelineStateShared() {
+gfx::RenderPipelineState::~RenderPipelineState() {
     for (auto& layout : bind_group_layouts) {
-        device.shared->raii.raw.destroyDescriptorSetLayout(layout, nullptr, device.shared->raii.dispatcher);
+        device->raii.raw.destroyDescriptorSetLayout(layout, nullptr, device->raii.dispatcher);
     }
-    device.shared->raii.raw.destroyPipelineLayout(pipeline_layout, nullptr, device.shared->raii.dispatcher);
-    device.shared->raii.raw.destroyPipeline(pipeline, nullptr, device.shared->raii.dispatcher);
+    device->raii.raw.destroyPipelineLayout(pipeline_layout, nullptr, device->raii.dispatcher);
+    device->raii.raw.destroyPipeline(pipeline, nullptr, device->raii.dispatcher);
 }

@@ -68,14 +68,14 @@ namespace gfx {
     };
 
     struct RenderPipelineStateDescription {
-        Function                                        vertexFunction;
-        Function                                        fragmentFunction;
-        InputAssemblyState                              inputAssemblyState;
-        TessellationState                               tessellationState;
-        RasterizationState                              rasterizationState;
-        MultisampleState                                multisampleState;
-        DepthStencilState                               depthStencilState;
-        VertexInputState                                vertexInputState;
+        ManagedShared<Function>                         vertexFunction          = {};
+        ManagedShared<Function>                         fragmentFunction        = {};
+        InputAssemblyState                              inputAssemblyState      = {};
+        TessellationState                               tessellationState       = {};
+        RasterizationState                              rasterizationState      = {};
+        MultisampleState                                multisampleState        = {};
+        DepthStencilState                               depthStencilState       = {};
+        VertexInputState                                vertexInputState        = {};
         uint32_t                                        viewMask                = {};
         vk::Format                                      depthAttachmentFormat   = vk::Format::eUndefined;
         vk::Format                                      stencilAttachmentFormat = vk::Format::eUndefined;
@@ -83,20 +83,13 @@ namespace gfx {
         RenderPipelineColorBlendAttachmentStateArray    colorBlendAttachments   = {};
     };
 
-    struct RenderPipelineStateShared {
-        Device device;
-        vk::Pipeline pipeline;
-        vk::PipelineLayout pipeline_layout;
-        std::vector<vk::DescriptorSetLayout> bind_group_layouts;
+    struct RenderPipelineState : ManagedObject<RenderPipelineState> {
+        ManagedShared<Device>                   device              = {};
+        vk::Pipeline                            pipeline            = {};
+        vk::PipelineLayout                      pipeline_layout     = {};
+        std::vector<vk::DescriptorSetLayout>    bind_group_layouts  = {};
 
-        explicit RenderPipelineStateShared(Device device);
-        ~RenderPipelineStateShared();
-    };
-
-    struct RenderPipelineState final {
-        std::shared_ptr<RenderPipelineStateShared> shared;
-
-        explicit RenderPipelineState() : shared(nullptr) {}
-        explicit RenderPipelineState(std::shared_ptr<RenderPipelineStateShared> shared) : shared(std::move(shared)) {}
+        explicit RenderPipelineState(ManagedShared<Device> device);
+        ~RenderPipelineState() override;
     };
 }

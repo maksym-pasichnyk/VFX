@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Instance.hpp"
+#include "ManagedObject.hpp"
 
 #if defined(__clang__)
 #pragma clang diagnostic push
@@ -28,35 +29,27 @@ namespace gfx {
     struct ComputePipelineState;
     struct RenderPipelineStateDescription;
 
-    struct DeviceShared {
-        Instance            instance;
-        raii::Device        raii;
-        vk::PhysicalDevice  adapter;
-        uint32_t            family_index;
-        uint32_t            queue_index;
-        vk::Queue           queue;
-        VmaAllocator        allocator;
+    struct Device : ManagedObject<Device> {
+        ManagedShared<Instance> instance;
+        raii::Device            raii;
+        vk::PhysicalDevice      adapter;
+        uint32_t                family_index;
+        uint32_t                queue_index;
+        vk::Queue               queue;
+        VmaAllocator            allocator;
 
-        explicit DeviceShared(Instance instance, raii::Device raii, vk::PhysicalDevice adapter, uint32_t family_index, uint32_t queue_index, vk::Queue raw_queue, VmaAllocator allocator);
-
-        ~DeviceShared();
-    };
-
-    struct Device final {
-        std::shared_ptr<DeviceShared> shared;
-
-        explicit Device();
-        explicit Device(std::shared_ptr<DeviceShared> shared);
+        explicit Device(ManagedShared<Instance> instance, raii::Device raii, vk::PhysicalDevice adapter, uint32_t family_index, uint32_t queue_index, vk::Queue raw_queue, VmaAllocator allocator);
+        ~Device() override;
 
         void waitIdle();
-        auto newTexture(const TextureSettings& description) -> Texture;
-        auto newSampler(const vk::SamplerCreateInfo& info) -> Sampler;
-        auto newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAllocationCreateFlags options = 0) -> Buffer;
-        auto newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, VmaAllocationCreateFlags options = 0) -> Buffer;
-        auto newLibrary(const std::vector<char>& bytes) -> Library;
-        auto newRenderPipelineState(const RenderPipelineStateDescription& description) -> RenderPipelineState;
-        auto newComputePipelineState(const Function& function) -> ComputePipelineState;
-        auto newCommandQueue() -> CommandQueue;
-        auto createSwapchain(const Surface& surface) -> Swapchain;
+        auto newTexture(const TextureSettings& description) -> ManagedShared<Texture>;
+        auto newSampler(const vk::SamplerCreateInfo& info) -> ManagedShared<Sampler>;
+        auto newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAllocationCreateFlags options = 0) -> ManagedShared<Buffer>;
+        auto newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, VmaAllocationCreateFlags options = 0) -> ManagedShared<Buffer>;
+        auto newLibrary(const std::vector<char>& bytes) -> ManagedShared<Library>;
+        auto newRenderPipelineState(const RenderPipelineStateDescription& description) -> ManagedShared<RenderPipelineState>;
+        auto newComputePipelineState(const ManagedShared<Function>& function) -> ManagedShared<ComputePipelineState>;
+        auto newCommandQueue() -> ManagedShared<CommandQueue>;
+        auto createSwapchain(const ManagedShared<Surface>& surface) -> ManagedShared<Swapchain>;
     };
 }

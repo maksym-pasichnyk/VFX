@@ -14,11 +14,11 @@ private:
     };
 
 private:
-    gfx::Device mDevice;
-    gfx::Buffer mQuadIndexBuffer;
-    gfx::Buffer mQuadVertexBuffer;
-    gfx::Buffer mInstanceVertexBuffer;
-    gfx::RenderPipelineState mRenderPipelineState;
+    ManagedShared<gfx::Device> mDevice;
+    ManagedShared<gfx::Buffer> mQuadIndexBuffer;
+    ManagedShared<gfx::Buffer> mQuadVertexBuffer;
+    ManagedShared<gfx::Buffer> mInstanceVertexBuffer;
+    ManagedShared<gfx::RenderPipelineState> mRenderPipelineState;
 
     size_t mInstanceCount = {};
     std::vector<Particle> mParticles = {};
@@ -28,7 +28,7 @@ private:
     Signal<void(Particle&, float)> mParticleUpdateEvent = {};
 
 public:
-    explicit ParticleSystem(gfx::Device device, size_t capacity) : mDevice(std::move(device)) {
+    explicit ParticleSystem(ManagedShared<gfx::Device> device, size_t capacity) : mDevice(std::move(device)) {
         mParticles.resize(capacity);
         mInstances.resize(capacity);
 
@@ -38,12 +38,12 @@ public:
 
 private:
     void buildShaders() {
-        auto vertexLibrary = mDevice.newLibrary(Assets::readFile("shaders/particles.vert.spv"));
-        auto fragmentLibrary = mDevice.newLibrary(Assets::readFile("shaders/particles.frag.spv"));
+        auto vertexLibrary = mDevice->newLibrary(Assets::readFile("shaders/particles.vert.spv"));
+        auto fragmentLibrary = mDevice->newLibrary(Assets::readFile("shaders/particles.frag.spv"));
 
         gfx::RenderPipelineStateDescription description;
-        description.vertexFunction = vertexLibrary.newFunction("main");
-        description.fragmentFunction = fragmentLibrary.newFunction("main");
+        description.vertexFunction = vertexLibrary->newFunction("main");
+        description.fragmentFunction = fragmentLibrary->newFunction("main");
         description.vertexInputState = {
             .bindings = {
                 vk::VertexInputBindingDescription{0, sizeof(glm::vec3), vk::VertexInputRate::eVertex},
@@ -65,7 +65,7 @@ private:
         description.colorBlendAttachments[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
         description.colorBlendAttachments[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
 
-        mRenderPipelineState = mDevice.newRenderPipelineState(description);
+        mRenderPipelineState = mDevice->newRenderPipelineState(description);
     }
 
     void buildBuffers() {
@@ -81,9 +81,9 @@ private:
             0, 2, 3
         };
 
-        mQuadIndexBuffer = mDevice.newBuffer(vk::BufferUsageFlagBits::eIndexBuffer, quadIndices.data(), quadIndices.size() * sizeof(uint32_t), VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT);
-        mQuadVertexBuffer = mDevice.newBuffer(vk::BufferUsageFlagBits::eVertexBuffer, quadVertices.data(), quadVertices.size() * sizeof(glm::vec3), VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT);
-        mInstanceVertexBuffer = mDevice.newBuffer(vk::BufferUsageFlagBits::eVertexBuffer, mInstances.size() * sizeof(Instance), VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT);
+        mQuadIndexBuffer = mDevice->newBuffer(vk::BufferUsageFlagBits::eIndexBuffer, quadIndices.data(), quadIndices.size() * sizeof(uint32_t), VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT);
+        mQuadVertexBuffer = mDevice->newBuffer(vk::BufferUsageFlagBits::eVertexBuffer, quadVertices.data(), quadVertices.size() * sizeof(glm::vec3), VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT);
+        mInstanceVertexBuffer = mDevice->newBuffer(vk::BufferUsageFlagBits::eVertexBuffer, mInstances.size() * sizeof(Instance), VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT);
     }
 
 public:
@@ -109,24 +109,24 @@ public:
         }
 
         if (mInstanceCount > 0) {
-            std::memcpy(mInstanceVertexBuffer.contents(), mInstances.data(), mInstanceCount * sizeof(Instance));
-            mInstanceVertexBuffer.didModifyRange(0, mInstanceCount * sizeof(Instance));
+            std::memcpy(mInstanceVertexBuffer->contents(), mInstances.data(), mInstanceCount * sizeof(Instance));
+            mInstanceVertexBuffer->didModifyRange(0, mInstanceCount * sizeof(Instance));
         }
     }
 
-    auto renderPipelineState() -> gfx::RenderPipelineState {
+    auto renderPipelineState() -> ManagedShared<gfx::RenderPipelineState> {
         return mRenderPipelineState;
     }
 
-    void draw(gfx::CommandBuffer cmd) {
+    void draw(const ManagedShared<gfx::CommandBuffer>& cmd) {
         if (mInstanceCount == 0) {
             return;
         }
 
-        cmd.bindIndexBuffer(mQuadIndexBuffer, 0, vk::IndexType::eUint32);
-        cmd.bindVertexBuffer(0, mQuadVertexBuffer, 0);
-        cmd.bindVertexBuffer(1, mInstanceVertexBuffer, 0);
-        cmd.drawIndexed(6, mInstanceCount, 0, 0, 0);
+        cmd->bindIndexBuffer(mQuadIndexBuffer, 0, vk::IndexType::eUint32);
+        cmd->bindVertexBuffer(0, mQuadVertexBuffer, 0);
+        cmd->bindVertexBuffer(1, mInstanceVertexBuffer, 0);
+        cmd->drawIndexed(6, mInstanceCount, 0, 0, 0);
     }
 
     void emit(const glm::vec3 &position, const glm::vec4 &color, const glm::vec3 &velocity, float lifetime) {

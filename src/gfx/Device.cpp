@@ -13,6 +13,7 @@
 #include "ComputePipelineState.hpp"
 
 #include "spdlog/spdlog.h"
+#include "ManagedObject.hpp"
 
 #include <unordered_map>
 #include <spirv_reflect.h>
@@ -343,24 +344,21 @@ struct DescriptorSetLayoutCreateInfo {
     }
 };
 
-gfx::DeviceShared::DeviceShared(Instance instance, raii::Device raii, vk::PhysicalDevice adapter, uint32_t family_index, uint32_t queue_index, vk::Queue raw_queue, VmaAllocator allocator)
+gfx::Device::Device(ManagedShared<Instance> instance, raii::Device raii, vk::PhysicalDevice adapter, uint32_t family_index, uint32_t queue_index, vk::Queue raw_queue, VmaAllocator allocator)
     : instance(std::move(instance)), raii(raii), adapter(adapter), family_index(family_index), queue_index(queue_index), queue(raw_queue), allocator(allocator) {}
 
-gfx::DeviceShared::~DeviceShared() {
+gfx::Device::~Device() {
     vmaDestroyAllocator(allocator);
     raii.raw.destroy(nullptr, raii.dispatcher);
 }
 
-gfx::Device::Device() : shared(nullptr) {}
-gfx::Device::Device(std::shared_ptr<DeviceShared> shared) : shared(std::move(shared)) {}
-
 void gfx::Device::waitIdle() {
-    shared->raii.raw.waitIdle(shared->raii.dispatcher);
+    raii.raw.waitIdle(raii.dispatcher);
 }
 
-auto gfx::Device::newTexture(const TextureSettings& description) -> Texture {
+auto gfx::Device::newTexture(const TextureSettings& description) -> ManagedShared<Texture> {
     auto aspect = image_aspect_flags_table.at(description.format);
-    auto texture = std::make_shared<TextureShared>(*this);
+    auto texture = MakeShared(new Texture(MakeShared(this->retain())));
 
     texture->format = description.format;
     texture->extent.setWidth(description.width);
@@ -382,7 +380,7 @@ auto gfx::Device::newTexture(const TextureSettings& description) -> Texture {
 
     VmaAllocationCreateInfo allocation_create_info = {};
     allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
-    vmaCreateImage(shared->allocator, reinterpret_cast<const VkImageCreateInfo*>(&image_create_info), &allocation_create_info, reinterpret_cast<VkImage*>(&texture->image), &texture->allocation, nullptr);
+    vmaCreateImage(allocator, reinterpret_cast<const VkImageCreateInfo*>(&image_create_info), &allocation_create_info, reinterpret_cast<VkImage*>(&texture->image), &texture->allocation, nullptr);
 
     vk::ImageViewCreateInfo view_create_info = {};
     view_create_info.setImage(texture->image);
@@ -391,16 +389,16 @@ auto gfx::Device::newTexture(const TextureSettings& description) -> Texture {
     view_create_info.setComponents(description.mapping),
     view_create_info.setSubresourceRange(texture->subresource);
 
-    texture->image_view = shared->raii.raw.createImageView(view_create_info, VK_NULL_HANDLE, shared->raii.dispatcher);
+    texture->image_view = raii.raw.createImageView(view_create_info, VK_NULL_HANDLE, raii.dispatcher);
 
-    return Texture(std::move(texture));
+    return texture;
 }
 
-auto gfx::Device::newSampler(const vk::SamplerCreateInfo& info) -> Sampler {
-    return Sampler(std::make_shared<SamplerShared>(*this, shared->raii.raw.createSampler(info, VK_NULL_HANDLE, shared->raii.dispatcher)));
+auto gfx::Device::newSampler(const vk::SamplerCreateInfo& info) -> ManagedShared<Sampler> {
+    return MakeShared(new Sampler(MakeShared(this->retain()), raii.raw.createSampler(info, VK_NULL_HANDLE, raii.dispatcher)));
 }
 
-auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAllocationCreateFlags options) -> Buffer {
+auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAllocationCreateFlags options) -> ManagedShared<Buffer> {
     vk::BufferCreateInfo buffer_create_info = {};
     buffer_create_info.setSize(static_cast<vk::DeviceSize>(size));
     buffer_create_info.setUsage(usage);
@@ -409,49 +407,47 @@ auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAlloca
     allocation_create_info.flags = options;
     allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
 
-    auto buffer = std::make_shared<BufferShared>(*this);
-
-    vmaCreateBuffer(shared->allocator, reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info), &allocation_create_info, reinterpret_cast<VkBuffer*>(&buffer->raw), &buffer->allocation, nullptr);
-
-    return Buffer(buffer);
+    auto buffer = MakeShared(new Buffer(MakeShared(this->retain())));
+    vmaCreateBuffer(allocator, reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info), &allocation_create_info, reinterpret_cast<VkBuffer*>(&buffer->raw), &buffer->allocation, nullptr);
+    return buffer;
 }
 
-auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, VmaAllocationCreateFlags options) -> Buffer {
+auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, VmaAllocationCreateFlags options) -> ManagedShared<Buffer> {
     // todo: use transfer operation if buffer is not mappable
-    auto id = newBuffer(usage, size, options);
-    std::memcpy(id.contents(), pointer, size);
-    id.didModifyRange(0, size);
-    return id;
+    auto buffer = newBuffer(usage, size, options);
+    std::memcpy(buffer->contents(), pointer, size);
+    buffer->didModifyRange(0, size);
+    return buffer;
 }
 
-auto gfx::Device::newLibrary(const std::vector<char>& bytes) -> Library {
+auto gfx::Device::newLibrary(const std::vector<char>& bytes) -> ManagedShared<Library> {
     vk::ShaderModuleCreateInfo module_create_info = {};
     module_create_info.setCodeSize(bytes.size());
     module_create_info.setPCode(reinterpret_cast<const uint32_t *>(bytes.data()));
 
-    auto library = std::make_shared<LibraryShared>(*this);
-    library->raw = shared->raii.raw.createShaderModule(module_create_info, VK_NULL_HANDLE, shared->raii.dispatcher);
+    auto library = MakeShared(new Library(MakeShared(this->retain())));
+    library->raw = raii.raw.createShaderModule(module_create_info, VK_NULL_HANDLE, raii.dispatcher);
 
     spvReflectCreateShaderModule(module_create_info.codeSize, module_create_info.pCode, &library->spvReflectShaderModule);
 
-    return Library(library);
+    return library;
 }
 
-auto gfx::Device::newRenderPipelineState(const gfx::RenderPipelineStateDescription& description) -> RenderPipelineState {
+auto gfx::Device::newRenderPipelineState(const gfx::RenderPipelineStateDescription& description) -> ManagedShared<RenderPipelineState> {
     std::vector<vk::PushConstantRange> push_constant_ranges = {};
     std::vector<DescriptorSetLayoutCreateInfo> descriptor_sets = {};
 
     for (auto& function : {description.vertexFunction, description.fragmentFunction}) {
         // todo: merge if overlaps
-        for (auto& pcb : std::span(function.library.shared->spvReflectShaderModule.push_constant_blocks, function.library.shared->spvReflectShaderModule.push_constant_block_count)) {
+        for (auto& pcb : std::span(function->library->spvReflectShaderModule.push_constant_blocks, function->library->spvReflectShaderModule.push_constant_block_count)) {
             vk::PushConstantRange push_constant_range = {};
             push_constant_range.setSize(pcb.size);
             push_constant_range.setOffset(pcb.offset);
-            push_constant_range.setStageFlags(vk::ShaderStageFlags(function.entry_point->shader_stage));
+            push_constant_range.setStageFlags(vk::ShaderStageFlags(function->entry_point->shader_stage));
             push_constant_ranges.emplace_back(push_constant_range);
         }
 
-        for (auto& sds : std::span(function.library.shared->spvReflectShaderModule.descriptor_sets, function.library.shared->spvReflectShaderModule.descriptor_set_count)) {
+        for (auto& sds : std::span(function->library->spvReflectShaderModule.descriptor_sets, function->library->spvReflectShaderModule.descriptor_set_count)) {
             if (sds.set >= descriptor_sets.size()) {
                 descriptor_sets.resize(sds.set + 1);
             }
@@ -461,7 +457,7 @@ auto gfx::Device::newRenderPipelineState(const gfx::RenderPipelineStateDescripti
                 binding.setBinding(sb->binding);
                 binding.setDescriptorType(vk::DescriptorType(sb->descriptor_type));
                 binding.setDescriptorCount(sb->count);
-                binding.setStageFlags(vk::ShaderStageFlags(function.entry_point->shader_stage));
+                binding.setStageFlags(vk::ShaderStageFlags(function->entry_point->shader_stage));
                 binding.setPImmutableSamplers(nullptr);
 
                 descriptor_sets[sds.set].emplace(binding);
@@ -469,19 +465,19 @@ auto gfx::Device::newRenderPipelineState(const gfx::RenderPipelineStateDescripti
         }
     }
     
-    auto state = std::make_shared<RenderPipelineStateShared>(*this);
+    auto state = MakeShared(new RenderPipelineState(MakeShared(this->retain())));
 
     state->bind_group_layouts.resize(descriptor_sets.size());
     for (uint32_t i = 0; i < state->bind_group_layouts.size(); ++i) {
         vk::DescriptorSetLayoutCreateInfo layout_create_info = {};
         layout_create_info.setBindings(descriptor_sets[i].bindings);
-        state->bind_group_layouts[i] = shared->raii.raw.createDescriptorSetLayout(layout_create_info, nullptr, shared->raii.dispatcher);
+        state->bind_group_layouts[i] = raii.raw.createDescriptorSetLayout(layout_create_info, nullptr, raii.dispatcher);
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_create_info = {};
     pipeline_layout_create_info.setSetLayouts(state->bind_group_layouts);
     pipeline_layout_create_info.setPushConstantRanges(push_constant_ranges);
-    state->pipeline_layout = shared->raii.raw.createPipelineLayout(pipeline_layout_create_info, nullptr, shared->raii.dispatcher);
+    state->pipeline_layout = raii.raw.createPipelineLayout(pipeline_layout_create_info, nullptr, raii.dispatcher);
 
     vk::PipelineViewportStateCreateInfo viewport_state = {};
     viewport_state.setViewportCount(1);
@@ -537,14 +533,14 @@ auto gfx::Device::newRenderPipelineState(const gfx::RenderPipelineStateDescripti
 
     vk::PipelineShaderStageCreateInfo vertex_stage = {};
     vertex_stage.setStage(vk::ShaderStageFlagBits::eVertex);
-    vertex_stage.setModule(description.vertexFunction.library.shared->raw);
-    vertex_stage.setPName(description.vertexFunction.name.c_str());
+    vertex_stage.setModule(description.vertexFunction->library->raw);
+    vertex_stage.setPName(description.vertexFunction->name.c_str());
     stages.emplace_back(vertex_stage);
 
     vk::PipelineShaderStageCreateInfo fragment_stage = {};
     fragment_stage.setStage(vk::ShaderStageFlagBits::eFragment);
-    fragment_stage.setModule(description.fragmentFunction.library.shared->raw);
-    fragment_stage.setPName(description.fragmentFunction.name.c_str());
+    fragment_stage.setModule(description.fragmentFunction->library->raw);
+    fragment_stage.setPName(description.fragmentFunction->name.c_str());
     stages.emplace_back(fragment_stage);
 
     vk::PipelineVertexInputStateCreateInfo vertex_input_state = {};
@@ -578,24 +574,24 @@ auto gfx::Device::newRenderPipelineState(const gfx::RenderPipelineStateDescripti
     pipeline_create_info.setBasePipelineHandle(nullptr);
     pipeline_create_info.setBasePipelineIndex(0);
 
-    std::ignore = shared->raii.raw.createGraphicsPipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, shared->raii.dispatcher);
+    std::ignore = raii.raw.createGraphicsPipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, raii.dispatcher);
     
-    return RenderPipelineState(state);
+    return state;
 }
 
-auto gfx::Device::newComputePipelineState(const Function& function) -> ComputePipelineState {
+auto gfx::Device::newComputePipelineState(const ManagedShared<Function>& function) -> ManagedShared<ComputePipelineState> {
     std::vector<vk::PushConstantRange> push_constant_ranges = {};
     std::vector<DescriptorSetLayoutCreateInfo> descriptor_sets = {};
 
-    for (auto& pcb : std::span(function.library.shared->spvReflectShaderModule.push_constant_blocks, function.library.shared->spvReflectShaderModule.push_constant_block_count)) {
+    for (auto& pcb : std::span(function->library->spvReflectShaderModule.push_constant_blocks, function->library->spvReflectShaderModule.push_constant_block_count)) {
         vk::PushConstantRange push_constant_range = {};
         push_constant_range.setSize(pcb.size);
         push_constant_range.setOffset(pcb.offset);
-        push_constant_range.setStageFlags(vk::ShaderStageFlags(function.entry_point->shader_stage));
+        push_constant_range.setStageFlags(vk::ShaderStageFlags(function->entry_point->shader_stage));
         push_constant_ranges.emplace_back(push_constant_range);
     }
 
-    for (auto& sds : std::span(function.library.shared->spvReflectShaderModule.descriptor_sets, function.library.shared->spvReflectShaderModule.descriptor_set_count)) {
+    for (auto& sds : std::span(function->library->spvReflectShaderModule.descriptor_sets, function->library->spvReflectShaderModule.descriptor_set_count)) {
         if (sds.set >= descriptor_sets.size()) {
             descriptor_sets.resize(sds.set + 1);
         }
@@ -605,31 +601,31 @@ auto gfx::Device::newComputePipelineState(const Function& function) -> ComputePi
             binding.setBinding(sb->binding);
             binding.setDescriptorType(vk::DescriptorType(sb->descriptor_type));
             binding.setDescriptorCount(sb->count);
-            binding.setStageFlags(vk::ShaderStageFlags(function.entry_point->shader_stage));
+            binding.setStageFlags(vk::ShaderStageFlags(function->entry_point->shader_stage));
             binding.setPImmutableSamplers(nullptr);
 
             descriptor_sets[sds.set].emplace(binding);
         }
     }
 
-    auto state = std::make_shared<ComputePipelineStateShared>(*this);
+    auto state = MakeShared(new ComputePipelineState(MakeShared(this->retain())));
     state->bind_group_layouts.resize(descriptor_sets.size());
     for (uint32_t i = 0; i < descriptor_sets.size(); ++i) {
         vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {};
         descriptor_set_layout_create_info.setBindings(descriptor_sets[i].bindings);
 
-        state->bind_group_layouts[i] = shared->raii.raw.createDescriptorSetLayout(descriptor_set_layout_create_info, nullptr, shared->raii.dispatcher);
+        state->bind_group_layouts[i] = raii.raw.createDescriptorSetLayout(descriptor_set_layout_create_info, nullptr, raii.dispatcher);
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_create_info = {};
     pipeline_layout_create_info.setSetLayouts(state->bind_group_layouts);
     pipeline_layout_create_info.setPushConstantRanges(push_constant_ranges);
-    state->pipeline_layout = shared->raii.raw.createPipelineLayout(pipeline_layout_create_info, nullptr, shared->raii.dispatcher);
+    state->pipeline_layout = raii.raw.createPipelineLayout(pipeline_layout_create_info, nullptr, raii.dispatcher);
 
     vk::PipelineShaderStageCreateInfo shader_stage_create_info{};
     shader_stage_create_info.setStage(vk::ShaderStageFlagBits::eCompute);
-    shader_stage_create_info.setModule(function.library.shared->raw);
-    shader_stage_create_info.setPName(function.name.c_str());
+    shader_stage_create_info.setModule(function->library->raw);
+    shader_stage_create_info.setPName(function->name.c_str());
 
     vk::ComputePipelineCreateInfo pipeline_create_info = {};
     pipeline_create_info.setStage(shader_stage_create_info);
@@ -637,20 +633,20 @@ auto gfx::Device::newComputePipelineState(const Function& function) -> ComputePi
     pipeline_create_info.setBasePipelineHandle(nullptr);
     pipeline_create_info.setBasePipelineIndex(0);
 
-    std::ignore = shared->raii.raw.createComputePipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, shared->raii.dispatcher);
-    return ComputePipelineState(state);
+    std::ignore = raii.raw.createComputePipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, raii.dispatcher);
+    return state;
 }
 
-auto gfx::Device::newCommandQueue() -> CommandQueue {
+auto gfx::Device::newCommandQueue() -> ManagedShared<CommandQueue> {
     vk::CommandPoolCreateInfo command_pool_create_info = {};
     command_pool_create_info.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
-    command_pool_create_info.setQueueFamilyIndex(shared->family_index);
+    command_pool_create_info.setQueueFamilyIndex(family_index);
 
-    auto pool = shared->raii.raw.createCommandPool(command_pool_create_info, nullptr, shared->raii.dispatcher);
+    auto pool = raii.raw.createCommandPool(command_pool_create_info, nullptr, raii.dispatcher);
 
-    return CommandQueue(std::make_shared<CommandQueueShared>(*this, pool));
+    return MakeShared(new CommandQueue(MakeShared(this->retain()), pool));
 }
 
-auto gfx::Device::createSwapchain(Surface const& surface) -> Swapchain {
-    return Swapchain(std::make_shared<SwapchainShared>(*this, surface));
+auto gfx::Device::createSwapchain(const ManagedShared<Surface>& surface) -> ManagedShared<Swapchain> {
+    return MakeShared(new Swapchain(MakeShared(this->retain()), surface));
 }

@@ -13,8 +13,8 @@ public:
     }
 
     void render() override {
-        auto drawable = swapchain.nextDrawable();
-        auto drawableSize = swapchain.drawableSize();
+        auto drawable = swapchain->nextDrawable();
+        auto drawableSize = swapchain->drawableSize();
 
         vk::Rect2D rendering_area = {};
         rendering_area.setOffset(vk::Offset2D{0, 0});
@@ -34,14 +34,14 @@ public:
         rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
         rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
-        commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-        auto descriptor_set = commandBuffer.newDescriptorSet(renderPipelineState.shared->bind_group_layouts.front(), {
+        auto descriptor_set = commandBuffer->newDescriptorSet(renderPipelineState->bind_group_layouts.front(), {
             vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1}
         });
         vk::DescriptorBufferInfo buffer_info = {};
-        buffer_info.setBuffer(vertexBuffer.shared->raw);
+        buffer_info.setBuffer(vertexBuffer->raw);
         buffer_info.setOffset(0);
         buffer_info.setRange(VK_WHOLE_SIZE);
 
@@ -53,38 +53,38 @@ public:
         buffer_write_info.setDescriptorCount(1);
         buffer_write_info.setPBufferInfo(&buffer_info);
 
-        device.shared->raii.raw.updateDescriptorSets({buffer_write_info}, {}, device.shared->raii.dispatcher);
+        device->raii.raw.updateDescriptorSets({buffer_write_info}, {}, device->raii.dispatcher);
 
-        commandBuffer.setRenderPipelineState(renderPipelineState);
-        commandBuffer.bindDescriptorSet(descriptor_set, 0);
+        commandBuffer->setRenderPipelineState(renderPipelineState);
+        commandBuffer->bindDescriptorSet(descriptor_set, 0);
 
-        commandBuffer.beginRendering(rendering_info);
-        commandBuffer.setScissor(0, rendering_area);
-        commandBuffer.setViewport(0, rendering_viewport);
+        commandBuffer->beginRendering(rendering_info);
+        commandBuffer->setScissor(0, rendering_area);
+        commandBuffer->setViewport(0, rendering_viewport);
 
-        commandBuffer.draw(3, 1, 0, 0);
-        commandBuffer.endRendering();
+        commandBuffer->draw(3, 1, 0, 0);
+        commandBuffer->endRendering();
 
-        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
-        commandBuffer.end();
-        commandBuffer.submit();
-        commandBuffer.present(drawable);
-        commandBuffer.waitUntilCompleted();
+        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer->end();
+        commandBuffer->submit();
+        commandBuffer->present(drawable);
+        commandBuffer->waitUntilCompleted();
     }
 
 private:
     void buildShaders() {
-        auto vertexLibrary = device.newLibrary(Assets::readFile("shaders/default.vert.spv"));
-        auto fragmentLibrary = device.newLibrary(Assets::readFile("shaders/default.frag.spv"));
+        auto vertexLibrary = device->newLibrary(Assets::readFile("shaders/default.vert.spv"));
+        auto fragmentLibrary = device->newLibrary(Assets::readFile("shaders/default.frag.spv"));
 
         gfx::RenderPipelineStateDescription description;
-        description.vertexFunction = vertexLibrary.newFunction("main");
-        description.fragmentFunction = fragmentLibrary.newFunction("main");
+        description.vertexFunction = vertexLibrary->newFunction("main");
+        description.fragmentFunction = fragmentLibrary->newFunction("main");
 
         description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
         description.colorBlendAttachments[0].setBlendEnable(false);
 
-        renderPipelineState = device.newRenderPipelineState(description);
+        renderPipelineState = device->newRenderPipelineState(description);
     }
 
     void buildBuffers() {
@@ -99,15 +99,15 @@ private:
             {{+0.8F, +0.8F, +0.0F}, {0.0F, 0.0F, 1.0F}}
         };
 
-        vertexBuffer = device.newBuffer(vk::BufferUsageFlagBits::eStorageBuffer, sizeof(vertices), VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-        std::memcpy(vertexBuffer.contents(), vertices, sizeof(vertices));
-        vertexBuffer.didModifyRange(0, vertexBuffer.length());
+        vertexBuffer = device->newBuffer(vk::BufferUsageFlagBits::eStorageBuffer, sizeof(vertices), VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+        std::memcpy(vertexBuffer->contents(), vertices, sizeof(vertices));
+        vertexBuffer->didModifyRange(0, vertexBuffer->length());
     }
 
 private:
     sp<View> content;
-    gfx::Buffer vertexBuffer;
-    gfx::RenderPipelineState renderPipelineState;
+    ManagedShared<gfx::Buffer> vertexBuffer;
+    ManagedShared<gfx::RenderPipelineState> renderPipelineState;
 };
 
 auto main(int argc, char** argv) -> int32_t {

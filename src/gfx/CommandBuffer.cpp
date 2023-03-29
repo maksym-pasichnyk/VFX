@@ -1,8 +1,8 @@
 #include "Device.hpp"
-#include "Swapchain.hpp"
 #include "Buffer.hpp"
 #include "Texture.hpp"
 #include "Drawable.hpp"
+#include "Swapchain.hpp"
 #include "CommandQueue.hpp"
 #include "CommandBuffer.hpp"
 #include "DescriptorSet.hpp"
@@ -11,97 +11,96 @@
 
 #include "spdlog/spdlog.h"
 
-gfx::CommandBufferShared::CommandBufferShared(Device device, CommandQueue queue) : device(device), queue(queue) {
+gfx::CommandBuffer::CommandBuffer(ManagedShared<Device> device, ManagedShared<CommandQueue> queue) : device(device), queue(queue) {
     vk::CommandBufferAllocateInfo allocate_info = {};
-    allocate_info.setCommandPool(queue.shared->raw);
+    allocate_info.setCommandPool(queue->raw);
     allocate_info.setLevel(vk::CommandBufferLevel::ePrimary);
     allocate_info.setCommandBufferCount(1);
-    vk::resultCheck(device.shared->raii.raw.allocateCommandBuffers(&allocate_info, &raw, device.shared->raii.dispatcher), "allocateCommandBuffers");
+    vk::resultCheck(device->raii.raw.allocateCommandBuffers(&allocate_info, &raw, device->raii.dispatcher), "allocateCommandBuffers");
 
-    fence       = device.shared->raii.raw.createFence(vk::FenceCreateInfo(), nullptr, device.shared->raii.dispatcher);
-    semaphore   = device.shared->raii.raw.createSemaphore(vk::SemaphoreCreateInfo(), nullptr, device.shared->raii.dispatcher);
-
+    fence       = device->raii.raw.createFence(vk::FenceCreateInfo(), nullptr, device->raii.dispatcher);
+    semaphore   = device->raii.raw.createSemaphore(vk::SemaphoreCreateInfo(), nullptr, device->raii.dispatcher);
 
 //    vk::DescriptorPoolCreateInfo pool_create_info = {};
 //    pool_create_info.setMaxSets(1024);
 //    pool_create_info.setPoolSizes(pool_sizes);
-//    auto pool = shared->raii.raw.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, shared->raii.dispatcher);
+//    auto pool = raii.raw.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, raii.dispatcher);
 }
 
-gfx::CommandBufferShared::~CommandBufferShared() {
-    device.shared->raii.raw.destroySemaphore(semaphore, nullptr, device.shared->raii.dispatcher);
-    device.shared->raii.raw.destroyFence(fence, nullptr, device.shared->raii.dispatcher);
+gfx::CommandBuffer::~CommandBuffer() {
+    device->raii.raw.destroySemaphore(semaphore, nullptr, device->raii.dispatcher);
+    device->raii.raw.destroyFence(fence, nullptr, device->raii.dispatcher);
 
     for (auto& value : descriptor_pools) {
-        device.shared->raii.raw.destroyDescriptorPool(value, nullptr, device.shared->raii.dispatcher);
+        device->raii.raw.destroyDescriptorPool(value, nullptr, device->raii.dispatcher);
     }
 }
 
 void gfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
-    shared->raw.begin(info, shared->device.shared->raii.dispatcher);
+    raw.begin(info, device->raii.dispatcher);
 
-    for (auto& value : shared->descriptor_pools) {
-        shared->device.shared->raii.raw.resetDescriptorPool(value, {}, shared->device.shared->raii.dispatcher);
+    for (auto& value : descriptor_pools) {
+        device->raii.raw.resetDescriptorPool(value, {}, device->raii.dispatcher);
     }
 }
 
 void gfx::CommandBuffer::end() {
-    shared->raw.end(shared->device.shared->raii.dispatcher);
+    raw.end(device->raii.dispatcher);
 }
 
 void gfx::CommandBuffer::submit() {
     vk::SubmitInfo submit_info = {};
     submit_info.setCommandBufferCount(1);
-    submit_info.setPCommandBuffers(&shared->raw);
+    submit_info.setPCommandBuffers(&raw);
     submit_info.setSignalSemaphoreCount(1);
-    submit_info.setPSignalSemaphores(&shared->semaphore);
+    submit_info.setPSignalSemaphores(&semaphore);
 
-    vk::resultCheck(shared->device.shared->raii.raw.resetFences(1, &shared->fence, shared->device.shared->raii.dispatcher), "Submit");
+    vk::resultCheck(device->raii.raw.resetFences(1, &fence, device->raii.dispatcher), "Submit");
 
     // todo: get valid device for submit
-    shared->device.shared->queue.submit(submit_info, shared->fence, shared->device.shared->raii.dispatcher);
+    device->queue.submit(submit_info, fence, device->raii.dispatcher);
 }
 
 void gfx::CommandBuffer::present(const gfx::Drawable& drawable) {
     vk::PresentInfoKHR present_info = {};
-    present_info.setWaitSemaphores(shared->semaphore);
+    present_info.setWaitSemaphores(semaphore);
     present_info.setSwapchainCount(1);
     present_info.setPSwapchains(&drawable.swapchain);
     present_info.setPImageIndices(&drawable.drawableIndex);
 
     // todo: get valid device for present
-    vk::Result result = shared->device.shared->queue.presentKHR(present_info, shared->device.shared->raii.dispatcher);
+    vk::Result result = device->queue.presentKHR(present_info, device->raii.dispatcher);
     if (result != vk::Result::eErrorOutOfDateKHR && result != vk::Result::eSuboptimalKHR && result != vk::Result::eSuccess) {
         throw std::runtime_error(vk::to_string(result));
     }
 }
 
-void gfx::CommandBuffer::setComputePipelineState(ComputePipelineState const& state) {
-    shared->raw.bindPipeline(vk::PipelineBindPoint::eCompute, state.shared->pipeline, shared->device.shared->raii.dispatcher);
+void gfx::CommandBuffer::setComputePipelineState(const ManagedShared<ComputePipelineState>& state) {
+    raw.bindPipeline(vk::PipelineBindPoint::eCompute, state->pipeline, device->raii.dispatcher);
 
-    shared->pipeline = state.shared->pipeline;
-    shared->pipeline_layout = state.shared->pipeline_layout;
-    shared->pipeline_bind_point = vk::PipelineBindPoint::eCompute;
+    pipeline = state->pipeline;
+    pipeline_layout = state->pipeline_layout;
+    pipeline_bind_point = vk::PipelineBindPoint::eCompute;
 }
 
 void gfx::CommandBuffer::bindDescriptorSet(vk::DescriptorSet descriptorSet, uint32_t slot) {
-    shared->raw.bindDescriptorSets(shared->pipeline_bind_point, shared->pipeline_layout, slot, 1, &descriptorSet, 0, nullptr, shared->device.shared->raii.dispatcher);
+    raw.bindDescriptorSets(pipeline_bind_point, pipeline_layout, slot, 1, &descriptorSet, 0, nullptr, device->raii.dispatcher);
 }
 
 void gfx::CommandBuffer::pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data) {
-    shared->raw.pushConstants(shared->pipeline_layout, stageFlags, offset, size, data, shared->device.shared->raii.dispatcher);
+    raw.pushConstants(pipeline_layout, stageFlags, offset, size, data, device->raii.dispatcher);
 }
 
 void gfx::CommandBuffer::dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
-    shared->raw.dispatch(groupCountX, groupCountY, groupCountZ, shared->device.shared->raii.dispatcher);
+    raw.dispatch(groupCountX, groupCountY, groupCountZ, device->raii.dispatcher);
 }
 
 void gfx::CommandBuffer::waitUntilCompleted() {
-    vk::Result result = shared->device.shared->raii.raw.waitForFences(shared->fence, VK_TRUE, std::numeric_limits<uint64_t>::max(), shared->device.shared->raii.dispatcher);
+    vk::Result result = device->raii.raw.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max(), device->raii.dispatcher);
     vk::resultCheck(result, "waitForFences");
 }
 
-void gfx::CommandBuffer::setImageLayout(Texture const& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask) {
+void gfx::CommandBuffer::setImageLayout(const ManagedShared<Texture>& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask) {
     vk::ImageMemoryBarrier2 barrier = {};
     barrier.setSrcStageMask(srcStageMask);
     barrier.setSrcAccessMask(srcAccessMask);
@@ -111,14 +110,14 @@ void gfx::CommandBuffer::setImageLayout(Texture const& texture, vk::ImageLayout 
     barrier.setNewLayout(newLayout);
     barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
     barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-    barrier.setImage(texture.shared->image);
-    barrier.setSubresourceRange(texture.shared->subresource);
+    barrier.setImage(texture->image);
+    barrier.setSubresourceRange(texture->subresource);
 
     vk::DependencyInfo dependency_info = {};
     dependency_info.setImageMemoryBarrierCount(1);
     dependency_info.setPImageMemoryBarriers(&barrier);
 
-    shared->raw.pipelineBarrier2(dependency_info, shared->device.shared->raii.dispatcher);
+    raw.pipelineBarrier2(dependency_info, device->raii.dispatcher);
 }
 
 void gfx::CommandBuffer::beginRendering(const RenderingInfo& info) {
@@ -139,12 +138,12 @@ void gfx::CommandBuffer::beginRendering(const RenderingInfo& info) {
         color.setFloat32(rgba);
 
         if (info.colorAttachments.elements[i].texture) {
-            colorAttachments[i].setImageView(info.colorAttachments.elements[i].texture->shared->image_view);
+            colorAttachments[i].setImageView(info.colorAttachments.elements[i].texture->image_view);
             colorAttachments[i].setImageLayout(info.colorAttachments.elements[i].imageLayout);
         }
         if (info.colorAttachments.elements[i].resolveTexture) {
             colorAttachments[i].setResolveMode(info.colorAttachments.elements[i].resolveMode);
-            colorAttachments[i].setResolveImageView(info.colorAttachments.elements[i].resolveTexture->shared->image_view);
+            colorAttachments[i].setResolveImageView(info.colorAttachments.elements[i].resolveTexture->image_view);
             colorAttachments[i].setResolveImageLayout(info.colorAttachments.elements[i].resolveImageLayout);
         }
         colorAttachments[i].setLoadOp(info.colorAttachments.elements[i].loadOp);
@@ -163,12 +162,12 @@ void gfx::CommandBuffer::beginRendering(const RenderingInfo& info) {
         depth_stencil.setDepth(info.depthAttachment.clearDepth);
 
         if (info.depthAttachment.texture) {
-            depthAttachment.setImageView(info.depthAttachment.texture->shared->image_view);
+            depthAttachment.setImageView(info.depthAttachment.texture->image_view);
             depthAttachment.setImageLayout(info.depthAttachment.imageLayout);
         }
         if (info.depthAttachment.resolveTexture) {
             depthAttachment.setResolveMode(info.depthAttachment.resolveMode);
-            depthAttachment.setResolveImageView(info.depthAttachment.resolveTexture->shared->image_view);
+            depthAttachment.setResolveImageView(info.depthAttachment.resolveTexture->image_view);
             depthAttachment.setResolveImageLayout(info.depthAttachment.resolveImageLayout);
         }
         depthAttachment.setLoadOp(info.depthAttachment.loadOp);
@@ -183,12 +182,12 @@ void gfx::CommandBuffer::beginRendering(const RenderingInfo& info) {
         depth_stencil.setDepth(info.stencilAttachment.clearStencil);
 
         if (info.stencilAttachment.texture) {
-            stencilAttachment.setImageView(info.stencilAttachment.texture->shared->image_view);
+            stencilAttachment.setImageView(info.stencilAttachment.texture->image_view);
             stencilAttachment.setImageLayout(info.stencilAttachment.imageLayout);
         }
         if (info.stencilAttachment.resolveTexture) {
             stencilAttachment.setResolveMode(info.stencilAttachment.resolveMode);
-            stencilAttachment.setResolveImageView(info.stencilAttachment.resolveTexture->shared->image_view);
+            stencilAttachment.setResolveImageView(info.stencilAttachment.resolveTexture->image_view);
             stencilAttachment.setResolveImageLayout(info.stencilAttachment.resolveImageLayout);
         }
         stencilAttachment.setLoadOp(info.stencilAttachment.loadOp);
@@ -198,56 +197,56 @@ void gfx::CommandBuffer::beginRendering(const RenderingInfo& info) {
         rendering_info.setPStencilAttachment(&stencilAttachment);
     }
 
-    shared->raw.beginRendering(rendering_info, shared->device.shared->raii.dispatcher);
+    raw.beginRendering(rendering_info, device->raii.dispatcher);
 
 }
 
 void gfx::CommandBuffer::endRendering() {
-    shared->raw.endRendering(shared->device.shared->raii.dispatcher);
+    raw.endRendering(device->raii.dispatcher);
 }
 
-void gfx::CommandBuffer::setRenderPipelineState(const RenderPipelineState& state) {
-    shared->raw.bindPipeline(vk::PipelineBindPoint::eGraphics, state.shared->pipeline, shared->device.shared->raii.dispatcher);
+void gfx::CommandBuffer::setRenderPipelineState(const ManagedShared<RenderPipelineState>& state) {
+    raw.bindPipeline(vk::PipelineBindPoint::eGraphics, state->pipeline, device->raii.dispatcher);
 
-    shared->pipeline = state.shared->pipeline;
-    shared->pipeline_layout = state.shared->pipeline_layout;
-    shared->pipeline_bind_point = vk::PipelineBindPoint::eGraphics;
+    pipeline = state->pipeline;
+    pipeline_layout = state->pipeline_layout;
+    pipeline_bind_point = vk::PipelineBindPoint::eGraphics;
 }
 
 void gfx::CommandBuffer::setScissor(uint32_t firstScissor, const vk::Rect2D& rect) {
-    shared->raw.setScissor(firstScissor, 1, &rect, shared->device.shared->raii.dispatcher);
+    raw.setScissor(firstScissor, 1, &rect, device->raii.dispatcher);
 }
 
 void gfx::CommandBuffer::setViewport(uint32_t firstViewport, const vk::Viewport& viewport) {
-    shared->raw.setViewport(firstViewport, 1, &viewport, shared->device.shared->raii.dispatcher);
+    raw.setViewport(firstViewport, 1, &viewport, device->raii.dispatcher);
 }
 
-void gfx::CommandBuffer::bindIndexBuffer(const Buffer& buffer, vk::DeviceSize offset, vk::IndexType indexType) {
-    shared->raw.bindIndexBuffer(buffer.shared->raw, offset, indexType, shared->device.shared->raii.dispatcher);
+void gfx::CommandBuffer::bindIndexBuffer(const ManagedShared<Buffer>& buffer, vk::DeviceSize offset, vk::IndexType indexType) {
+    raw.bindIndexBuffer(buffer->raw, offset, indexType, device->raii.dispatcher);
 }
 
-void gfx::CommandBuffer::bindVertexBuffer(int firstBinding, const Buffer& buffer, vk::DeviceSize offset) {
-    shared->raw.bindVertexBuffers(firstBinding, 1, &buffer.shared->raw, &offset, shared->device.shared->raii.dispatcher);
+void gfx::CommandBuffer::bindVertexBuffer(int firstBinding, const ManagedShared<Buffer>& buffer, vk::DeviceSize offset) {
+    raw.bindVertexBuffers(firstBinding, 1, &buffer->raw, &offset, device->raii.dispatcher);
 }
 
 void gfx::CommandBuffer::draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
-    shared->raw.draw(vertexCount, instanceCount, firstVertex, firstInstance, shared->device.shared->raii.dispatcher);
+    raw.draw(vertexCount, instanceCount, firstVertex, firstInstance, device->raii.dispatcher);
 }
 
 void gfx::CommandBuffer::drawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
-    shared->raw.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, shared->device.shared->raii.dispatcher);
+    raw.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, device->raii.dispatcher);
 }
 
 // todo: get sizes from layout
 auto gfx::CommandBuffer::newDescriptorSet(vk::DescriptorSetLayout layout, const std::vector<vk::DescriptorPoolSize>& sizes) -> vk::DescriptorSet {
-    for (auto pool : shared->descriptor_pools) {
+    for (auto pool : descriptor_pools) {
         vk::DescriptorSetAllocateInfo allocate_info = {};
         allocate_info.setDescriptorPool(pool);
         allocate_info.setDescriptorSetCount(1);
         allocate_info.setPSetLayouts(&layout);
 
-        vk::DescriptorSet descriptor_set;
-        vk::Result result = shared->device.shared->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, shared->device.shared->raii.dispatcher);
+        vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
+        vk::Result result = device->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, device->raii.dispatcher);
         if (result == vk::Result::eSuccess) {
             return descriptor_set;
         }
@@ -271,16 +270,16 @@ auto gfx::CommandBuffer::newDescriptorSet(vk::DescriptorSetLayout layout, const 
     pool_create_info.setMaxSets(1024);
     pool_create_info.setPoolSizes(sizes);
 
-    auto pool = shared->device.shared->raii.raw.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, shared->device.shared->raii.dispatcher);
-    shared->descriptor_pools.push_back(pool);
+    auto pool = device->raii.raw.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, device->raii.dispatcher);
+    descriptor_pools.push_back(pool);
 
     vk::DescriptorSetAllocateInfo allocate_info = {};
     allocate_info.setDescriptorPool(pool);
     allocate_info.setDescriptorSetCount(1);
     allocate_info.setPSetLayouts(&layout);
 
-    vk::DescriptorSet descriptor_set;
-    vk::Result result = shared->device.shared->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, shared->device.shared->raii.dispatcher);
+    vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
+    vk::Result result = device->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, device->raii.dispatcher);
     if (result == vk::Result::eSuccess) {
         return descriptor_set;
     }

@@ -5,6 +5,8 @@
 #include <vulkan/vulkan_beta.h>
 #include <vulkan/vulkan_raii.hpp>
 
+#include "ManagedObject.hpp"
+
 namespace gfx::raii {
     struct Context {
         vk::DynamicLoader           loader;
@@ -37,27 +39,20 @@ namespace gfx {
         uint32_t    version = 0;
     };
 
-    struct InstanceShared {
+    struct Instance : ManagedObject<Instance> {
         raii::Context context;
         raii::Instance raii;
         vk::DebugUtilsMessengerEXT messenger;
 
-        explicit InstanceShared(raii::Context context, raii::Instance raii, vk::DebugUtilsMessengerEXT messenger);
-        ~InstanceShared();
-    };
-
-    struct Instance {
-        std::shared_ptr<InstanceShared> shared;
-
-        explicit Instance() : shared(nullptr) {}
-        explicit Instance(std::shared_ptr<InstanceShared> shared) : shared(std::move(shared)) {}
+        explicit Instance(raii::Context context, raii::Instance raii, vk::DebugUtilsMessengerEXT messenger);
+        ~Instance() override;
 
         auto enumerateAdapters() -> std::vector<vk::PhysicalDevice>;
-        auto createDevice(vk::PhysicalDevice adapter) -> Device;
-        auto wrapSurface(vk::SurfaceKHR surface) -> Surface;
+        auto createDevice(vk::PhysicalDevice adapter) -> ManagedShared<Device>;
+        auto wrapSurface(vk::SurfaceKHR surface) -> ManagedShared<Surface>;
 
         auto getSurfaceCapabilitiesKHR(vk::PhysicalDevice adapter, vk::SurfaceKHR surface) -> vk::SurfaceCapabilitiesKHR;
     };
 
-    extern auto createInstance(const InstanceSettings& desc) -> Instance;
+    extern auto createInstance(const InstanceSettings& desc) -> ManagedShared<Instance>;
 }

@@ -3,18 +3,11 @@
 #include "Instance.hpp"
 
 namespace gfx {
-    struct SurfaceShared {
-        Instance instance;
-        vk::SurfaceKHR raw;
+    struct Surface : ManagedObject<Surface> {
+        ManagedShared<Instance> instance;
+        vk::SurfaceKHR          raw;
 
-        explicit SurfaceShared(Instance instance, vk::SurfaceKHR raw);
-        ~SurfaceShared();
-    };
-
-    struct Surface {
-        std::shared_ptr<SurfaceShared> shared;
-
-        explicit Surface();
-        explicit Surface(std::shared_ptr<SurfaceShared> shared);
+        explicit Surface(ManagedShared<Instance> instance, vk::SurfaceKHR raw);
+        ~Surface() override;
     };
 }

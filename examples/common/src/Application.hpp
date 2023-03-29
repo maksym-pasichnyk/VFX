@@ -27,15 +27,15 @@ public:
         desc.version = 1;
 
         instance = gfx::createInstance(desc);
-        adapter = instance.enumerateAdapters().front();
-        device = instance.createDevice(adapter);
+        adapter = instance->enumerateAdapters().front();
+        device = instance->createDevice(adapter);
 
         VkSurfaceKHR raw_surface;
-        SDL_Vulkan_CreateSurface(window, instance.shared->raii.raw, &raw_surface);
+        SDL_Vulkan_CreateSurface(window, instance->raii.raw, &raw_surface);
 
         // todo: merge surface with swapchain?
-        surface = instance.wrapSurface(raw_surface);
-        swapchain = device.createSwapchain(surface);
+        surface = instance->wrapSurface(raw_surface);
+        swapchain = device->createSwapchain(surface);
 
         gfx::SurfaceConfiguration config;
         config.format = vk::Format::eB8G8R8A8Unorm;
@@ -43,10 +43,10 @@ public:
         config.image_count = 3;
         config.present_mode = vk::PresentModeKHR::eFifo;
         config.clipped = true;
-        swapchain.configure(config);
+        swapchain->configure(config);
 
-        commandQueue = device.newCommandQueue();
-        commandBuffer = commandQueue.commandBuffer();
+        commandQueue = device->newCommandQueue();
+        commandBuffer = commandQueue->commandBuffer();
 
         uiRenderer = sp<UIRenderer>::of(device);
         uiContext = sp<UIContext>::of(uiRenderer->drawList());
@@ -133,7 +133,7 @@ public:
         config.present_mode = vk::PresentModeKHR::eFifo;
         config.clipped = true;
 
-        swapchain.configure(config);
+        swapchain->configure(config);
     }
 
 protected:
@@ -233,21 +233,21 @@ public:
     bool running{};
     SDL_Window* window;
 
-    float_t average = {};
-    float_t accumulate[60] = {};
-    float_t accumulateTotal = {};
-    int32_t accumulateCount = {};
-    int32_t accumulateIndex = {};
+    float_t                             average = {};
+    float_t                             accumulate[60] = {};
+    float_t                             accumulateTotal = {};
+    int32_t                             accumulateCount = {};
+    int32_t                             accumulateIndex = {};
 
-    vk::PhysicalDevice  adapter;
-    gfx::Device         device;
-    gfx::Instance       instance;
-    gfx::Surface        surface;
+    vk::PhysicalDevice                  adapter         = {};
+    ManagedShared<gfx::Device>          device          = {};
+    ManagedShared<gfx::Instance>        instance        = {};
+    ManagedShared<gfx::Surface>         surface         = {};
 
-    gfx::Swapchain      swapchain;
-    gfx::CommandQueue   commandQueue;
-    gfx::CommandBuffer  commandBuffer;
+    ManagedShared<gfx::Swapchain>       swapchain       = {};
+    ManagedShared<gfx::CommandQueue>    commandQueue    = {};
+    ManagedShared<gfx::CommandBuffer>   commandBuffer   = {};
 
-    sp<UIContext>       uiContext;
-    sp<UIRenderer>      uiRenderer;
+    sp<UIContext>                       uiContext;
+    sp<UIRenderer>                      uiRenderer;
 };

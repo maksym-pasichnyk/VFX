@@ -17,8 +17,8 @@ public:
     }
 
     void render() override {
-        auto drawable = swapchain.nextDrawable();
-        auto drawableSize = swapchain.drawableSize();
+        auto drawable = swapchain->nextDrawable();
+        auto drawableSize = swapchain->drawableSize();
 
         vk::Rect2D rendering_area = {};
         rendering_area.setOffset(vk::Offset2D{0, 0});
@@ -38,24 +38,24 @@ public:
         rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
         rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
-        commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-        commandBuffer.beginRendering(rendering_info);
-        commandBuffer.setScissor(0, rendering_area);
-        commandBuffer.setViewport(0, rendering_viewport);
+        commandBuffer->beginRendering(rendering_info);
+        commandBuffer->setScissor(0, rendering_area);
+        commandBuffer->setViewport(0, rendering_viewport);
 
         uiRenderer->resetForNewFrame();
         _drawView(content);
         uiRenderer->draw(commandBuffer);
 
-        commandBuffer.endRendering();
+        commandBuffer->endRendering();
 
-        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
-        commandBuffer.end();
-        commandBuffer.submit();
-        commandBuffer.present(drawable);
-        commandBuffer.waitUntilCompleted();
+        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer->end();
+        commandBuffer->submit();
+        commandBuffer->present(drawable);
+        commandBuffer->waitUntilCompleted();
     }
 
 private:

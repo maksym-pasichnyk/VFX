@@ -6,12 +6,12 @@
 #include <string>
 
 namespace gfx {
-    struct Function final {
-        Library library;
-        std::string name;
-        SpvReflectEntryPoint* entry_point;
+    struct Function final : ManagedObject<Function> {
+        ManagedShared<Library>  library     = {};
+        std::string             name        = {};
+        SpvReflectEntryPoint*   entry_point = {};
 
         explicit Function() = default;
-        explicit Function(const Library& library, std::string name, SpvReflectEntryPoint* entry_point);
+        explicit Function(ManagedShared<Library> library, std::string name, SpvReflectEntryPoint* entry_point);
     };
 }

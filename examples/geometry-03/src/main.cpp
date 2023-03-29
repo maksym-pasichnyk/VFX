@@ -11,10 +11,10 @@
 #include "fmt/format.h"
 
 struct GltfBundle {
-    std::vector<sp<Skin>> skins = {};
-    std::vector<sp<Mesh>> meshes = {};
-    std::vector<sp<Scene>> scenes = {};
-    std::vector<sp<Animation>> animations = {};
+    std::vector<sp<Skin>>       skins = {};
+    std::vector<sp<Mesh>>       meshes = {};
+    std::vector<sp<Scene>>      scenes = {};
+    std::vector<sp<Animation>>  animations = {};
 };
 
 struct Game : Application {
@@ -26,12 +26,12 @@ public:
 
 private:
     void buildShaders() {
-        auto vertexLibrary = device.newLibrary(Assets::readFile("shaders/geometry.vert.spv"));
-        auto fragmentLibrary = device.newLibrary(Assets::readFile("shaders/geometry.frag.spv"));
+        auto vertexLibrary = device->newLibrary(Assets::readFile("shaders/geometry.vert.spv"));
+        auto fragmentLibrary = device->newLibrary(Assets::readFile("shaders/geometry.frag.spv"));
 
         gfx::RenderPipelineStateDescription description;
-        description.vertexFunction = vertexLibrary.newFunction("main");
-        description.fragmentFunction = fragmentLibrary.newFunction("main");
+        description.vertexFunction = vertexLibrary->newFunction("main");
+        description.fragmentFunction = fragmentLibrary->newFunction("main");
         description.vertexInputState = {
             .bindings = {
                 vk::VertexInputBindingDescription{0, sizeof(Vertex), vk::VertexInputRate::eVertex}
@@ -46,13 +46,8 @@ private:
         description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
         description.colorBlendAttachments[0].setBlendEnable(false);
 
-        renderPipelineState = device.newRenderPipelineState(description);
-        descriptorSet = device.newDescriptorSet(renderPipelineState.shared->bind_group_layouts[0], {
-            vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
-            vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 1},
-        });
-
-        sampler = device.newSampler(vk::SamplerCreateInfo{
+        renderPipelineState = device->newRenderPipelineState(description);
+        sampler = device->newSampler(vk::SamplerCreateInfo{
             .magFilter = vk::Filter::eNearest,
             .minFilter = vk::Filter::eNearest,
             .mipmapMode = vk::SamplerMipmapMode::eLinear,
@@ -61,7 +56,7 @@ private:
             .addressModeW = vk::SamplerAddressMode::eRepeat,
         });
 
-        texture = device.newTexture(gfx::TextureSettings{
+        texture = device->newTexture(gfx::TextureSettings{
             .width = 1,
             .height = 1,
             .format = vk::Format::eR8G8B8A8Unorm,
@@ -69,10 +64,7 @@ private:
         });
 
         std::array<uint8_t, 4> orange = {255, 127, 0, 255};
-        texture.replaceRegion(orange.data(), sizeof(orange));
-
-        descriptorSet.setSampler(sampler, 0);
-        descriptorSet.setTexture(texture, 1);
+        texture->replaceRegion(orange.data(), sizeof(orange));
     }
 
     void buildBuffers() {
@@ -333,8 +325,8 @@ public:
     }
 
     void render() override {
-        auto drawable = swapchain.nextDrawable();
-        auto drawableSize = swapchain.drawableSize();
+        auto drawable = swapchain->nextDrawable();
+        auto drawableSize = swapchain->drawableSize();
 
         vk::Rect2D rendering_area = {};
         rendering_area.setOffset(vk::Offset2D{0, 0});
@@ -358,24 +350,53 @@ public:
         shader_data.g_proj_matrix = camera_projection_matrix;
         shader_data.g_view_matrix = world_to_camera_matrix;
 
-        commandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
-        commandBuffer.setRenderPipelineState(renderPipelineState);
-        commandBuffer.bindDescriptorSet(descriptorSet, 0);
-        commandBuffer.pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
+        auto descriptorSet = commandBuffer->newDescriptorSet(renderPipelineState->bind_group_layouts.front(), {
+            vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1},
+            vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 1},
+        });
 
-        commandBuffer.beginRendering(rendering_info);
-        commandBuffer.setScissor(0, rendering_area);
-        commandBuffer.setViewport(0, rendering_viewport);
+        vk::DescriptorImageInfo sampler_info = {};
+        sampler_info.setSampler(sampler->raw);
+
+        vk::DescriptorImageInfo texture_info = {};
+        texture_info.setImageView(texture->image_view);
+        texture_info.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+
+        vk::WriteDescriptorSet writes[2] = {};
+        writes[0].setDstSet(descriptorSet);
+        writes[0].setDstBinding(0);
+        writes[0].setDstArrayElement(0);
+        writes[0].setDescriptorType(vk::DescriptorType::eSampler);
+        writes[0].setDescriptorCount(1);
+        writes[0].setPImageInfo(&sampler_info);
+
+        writes[1].setDstSet(descriptorSet);
+        writes[1].setDstBinding(1);
+        writes[1].setDstArrayElement(0);
+        writes[1].setDescriptorType(vk::DescriptorType::eSampledImage);
+        writes[1].setDescriptorCount(1);
+        writes[1].setPImageInfo(&texture_info);
+
+        device->raii.raw.updateDescriptorSets(2, writes, 0, nullptr, device->raii.dispatcher);
+
+        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer->setRenderPipelineState(renderPipelineState);
+        commandBuffer->bindDescriptorSet(descriptorSet, 0);
+        commandBuffer->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
+
+        commandBuffer->beginRendering(rendering_info);
+        commandBuffer->setScissor(0, rendering_area);
+        commandBuffer->setViewport(0, rendering_viewport);
         gltf_bundle.meshes.front()->draw(commandBuffer);
-        commandBuffer.endRendering();
+        commandBuffer->endRendering();
 
-        commandBuffer.setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
-        commandBuffer.end();
-        commandBuffer.submit();
-        commandBuffer.present(drawable);
-        commandBuffer.waitUntilCompleted();
+        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer->end();
+        commandBuffer->submit();
+        commandBuffer->present(drawable);
+        commandBuffer->waitUntilCompleted();
     }
 
 private:
@@ -383,12 +404,11 @@ private:
     glm::mat4x4 camera_projection_matrix = {};
     glm::mat4x4 world_to_camera_matrix = {};
 
-    GltfBundle gltf_bundle;
+    GltfBundle  gltf_bundle;
 
-    gfx::Sampler sampler;
-    gfx::Texture texture;
-    gfx::DescriptorSet descriptorSet;
-    gfx::RenderPipelineState renderPipelineState;
+    ManagedShared<gfx::Sampler>             sampler;
+    ManagedShared<gfx::Texture>             texture;
+    ManagedShared<gfx::RenderPipelineState> renderPipelineState;
 };
 
 auto main(int argc, char** argv) -> int32_t {

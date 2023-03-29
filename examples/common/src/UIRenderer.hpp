@@ -6,7 +6,7 @@
 
 struct UIRenderer : Object {
 public:
-    explicit UIRenderer(gfx::Device device);
+    explicit UIRenderer(const ManagedShared<gfx::Device>& device);
 
 private:
     void buildFonts();
@@ -18,23 +18,22 @@ public:
     void setCurrentContext();
 
     auto drawList() -> ImDrawList*;
-    void draw(gfx::CommandBuffer cmd);
+    void draw(const ManagedShared<gfx::CommandBuffer>& cmd);
     void setScale(float scale);
     void setScreenSize(const Size& size);
 
 private:
-    Size                        mScreenSize         = Size::zero();
+    Size                                    mScreenSize             = Size::zero();
 
-    ImDrawList                  mDrawList;
-    ImFontAtlas                 mFontAtlas          = {};
-    ImGuiContext                mGuiContext         = {&mFontAtlas};
-    ImDrawListSharedData        mDrawListSharedData = {};
+    ImDrawList                              mDrawList;
+    ImFontAtlas                             mFontAtlas              = {};
+    ImGuiContext                            mGuiContext             = {&mFontAtlas};
+    ImDrawListSharedData                    mDrawListSharedData     = {};
 
-    vk::DeviceSize              dynamic_buffer_offset      = {};
-
-    gfx::Device                 mDevice;
-    gfx::Buffer                 dynamic_buffer;
-    gfx::Texture                mFontTexture;
-    gfx::Sampler                mFontSampler;
-    gfx::RenderPipelineState    render_pipeline_state;
+    ManagedShared<gfx::Device>              device                  = {};
+    ManagedShared<gfx::Texture>             font_texture            = {};
+    ManagedShared<gfx::Sampler>             font_sampler            = {};
+    ManagedShared<gfx::Buffer>              dynamic_buffer          = {};
+    vk::DeviceSize                          dynamic_buffer_offset   = {};
+    ManagedShared<gfx::RenderPipelineState> render_pipeline_state   = {};
 };

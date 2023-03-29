@@ -4,25 +4,14 @@
 
 namespace gfx {
     struct Device;
-    struct Texture;
-    struct CommandBuffer;
-    struct DescriptorSet;
+    struct Buffer : ManagedObject<Buffer> {
+        ManagedShared<Device>   device;
+        vk::Buffer              raw;
+        VmaAllocation           allocation;
 
-    struct BufferShared {
-        Device device;
-        vk::Buffer raw;
-        VmaAllocation allocation;
-
-        explicit BufferShared(Device device);
-        explicit BufferShared(Device device, vk::Buffer raw, VmaAllocation allocation);
-        ~BufferShared();
-    };
-
-    struct Buffer final {
-        std::shared_ptr<BufferShared> shared;
-
-        explicit Buffer();
-        explicit Buffer(std::shared_ptr<BufferShared> shared);
+        explicit Buffer(ManagedShared<Device> device);
+        explicit Buffer(ManagedShared<Device> device, vk::Buffer raw, VmaAllocation allocation);
+        ~Buffer() override;
 
         auto contents() -> void*;
         auto length() -> vk::DeviceSize;

@@ -8,21 +8,14 @@ namespace gfx {
     struct Device;
     struct Function;
 
-    struct LibraryShared {
-        Device device;
+    struct Library : ManagedObject<Library> {
+        ManagedShared<Device> device;
         vk::ShaderModule raw;
         SpvReflectShaderModule spvReflectShaderModule;
 
-        explicit LibraryShared(Device device);
-        ~LibraryShared();
-    };
+        explicit Library(ManagedShared<Device> device);
+        ~Library() override;
 
-    struct Library final {
-        std::shared_ptr<LibraryShared> shared;
-
-        explicit Library();
-        explicit Library(std::shared_ptr<LibraryShared> shared);
-
-        auto newFunction(std::string name) -> Function;
+        auto newFunction(std::string name) -> ManagedShared<Function>;
     };
 }

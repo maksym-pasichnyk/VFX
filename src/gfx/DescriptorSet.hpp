@@ -10,22 +10,14 @@ namespace gfx {
     struct Texture;
     struct Sampler;
 
-    struct DescriptorSetShared {
-        Device              device;
-        vk::DescriptorSet   raw;
-        vk::DescriptorPool  pool;
+    struct DescriptorSet : ManagedObject<DescriptorSet> {
+        ManagedShared<Device>   device;
+        vk::DescriptorSet       raw;
+        vk::DescriptorPool      pool;
 
-        explicit DescriptorSetShared(Device device, vk::DescriptorSet raw, vk::DescriptorPool pool);
-        ~DescriptorSetShared();
-    };
+        explicit DescriptorSet(ManagedShared<Device> device, vk::DescriptorSet raw, vk::DescriptorPool pool);
+        ~DescriptorSet() override;
 
-    struct DescriptorSet final {
-        std::shared_ptr<DescriptorSetShared> shared;
-
-        explicit DescriptorSet();
-        explicit DescriptorSet(std::shared_ptr<DescriptorSetShared> shared);
-
-    public:
         void setBuffer(const Buffer& buffer, uint64_t offset, uint32_t binding);
         void setStorageBuffer(const Buffer& buffer, uint64_t offset, uint32_t binding);
         void setTexture(const Texture& texture, uint32_t binding);
