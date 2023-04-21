@@ -28,7 +28,7 @@ gfx::Instance::~Instance() {
     raii.raw.destroy(nullptr, raii.dispatcher);
 }
 
-auto gfx::createInstance(const InstanceSettings& desc) -> ManagedShared<Instance> {
+auto gfx::createInstance(const InstanceConfiguration& desc) -> ManagedShared<Instance> {
     raii::Context context;
 
     auto app_info = vk::ApplicationInfo()

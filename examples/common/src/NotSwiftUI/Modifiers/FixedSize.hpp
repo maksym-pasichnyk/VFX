@@ -12,11 +12,11 @@ public:
     explicit FixedSize(sp<View> content, bool horizontal, bool vertical)
         : content(std::move(content)), horizontal(horizontal), vertical(vertical) {}
 
-    void _draw(const sp<UIContext> &context, const Size &size) override {
-        content->_draw(context, size);
+    void _draw(const sp<Canvas> &canvas, const Size &size) override {
+        content->_draw(canvas, size);
     }
 
-    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
+    auto getPreferredSize(const ProposedSize &proposed) -> Size override {
         auto p = proposed;
         if (horizontal) {
             p.width = std::nullopt;
@@ -24,7 +24,7 @@ public:
         if (vertical) {
             p.height = std::nullopt;
         }
-        return content->_size(context, p);
+        return content->getPreferredSize(p);
     }
 };
 

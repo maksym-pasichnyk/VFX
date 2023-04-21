@@ -21,7 +21,7 @@ public:
 
 public:
     void update(float dt) override {
-        camera_projection_matrix = getPerspectiveProjection(glm::radians(60.0F), getAspectRatio(), 0.03F, 1000.0F);
+        camera_projection_matrix = getPerspectiveProjection(glm::radians(60.0F), platform->getAspectRatio(), 0.03F, 1000.0F);
         world_to_camera_matrix = glm::lookAtLH(glm::vec3(25.0F, 10.0F, 0.0F), glm::vec3(0.0F, 10.0F, 0.0F), glm::vec3(0, 1, 0));
 
         rocketParticleEmitter->update(dt);

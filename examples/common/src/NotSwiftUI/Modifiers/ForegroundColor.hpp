@@ -12,15 +12,15 @@ public:
         : content(std::move(content)), color(color) {}
 
 public:
-    void _draw(const sp<UIContext> &context, const Size &size) override {
-        context->saveState();
-        context->setFillColor(color);
-        content->_draw(context, size);
-        context->restoreState();
+    void _draw(const sp<Canvas> &canvas, const Size &size) override {
+        canvas->saveState();
+        canvas->setFillColor(color);
+        content->_draw(canvas, size);
+        canvas->restoreState();
     }
 
-    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
-        return content->_size(context, proposed);
+    auto getPreferredSize(const ProposedSize &proposed) -> Size override {
+        return content->getPreferredSize(proposed);
     }
 };
 

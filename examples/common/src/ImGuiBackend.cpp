@@ -1,5 +1,5 @@
-#include "UIRenderer.hpp"
-#include "UIContext.hpp"
+#include "ImGuiBackend.hpp"
+#include "Canvas.hpp"
 #include "Assets.hpp"
 #include "simd.hpp"
 
@@ -9,32 +9,30 @@ struct GuiShaderData {
     simd::float2 scale;
 };
 
-UIRenderer::UIRenderer(const ManagedShared<gfx::Device>& device)
-: device(device)
-, mDrawList(&mDrawListSharedData) {
+ImGuiBackend::ImGuiBackend(const ManagedShared<gfx::Device>& device) : device(device) {
     buildFonts();
     buildShaders();
     buildBuffers();
 
-    mDrawListSharedData.CurveTessellationTol = 0.10F;
+    im_shared_data.CurveTessellationTol = 0.10F;
 }
 
-void UIRenderer::buildFonts() {
+void ImGuiBackend::buildFonts() {
     ImFontConfig font_cfg = {};
     font_cfg.SizePixels = 72.0F;
 
-    mFontAtlas.AddFontDefault(&font_cfg);
-    mFontAtlas.Build();
+    im_font_atlas.AddFontDefault(&font_cfg);
+    im_font_atlas.Build();
 
     std::vector<uint32_t> pixels = {};
-    pixels.resize(mFontAtlas.TexWidth * mFontAtlas.TexHeight);
+    pixels.resize(im_font_atlas.TexWidth * im_font_atlas.TexHeight);
     for (size_t i = 0; i < pixels.size(); ++i) {
-        pixels[i] = IM_COL32(255, 255, 255, mFontAtlas.TexPixelsAlpha8[i]);
+        pixels[i] = IM_COL32(255, 255, 255, im_font_atlas.TexPixelsAlpha8[i]);
     }
 
     gfx::TextureSettings font_texture_description;
-    font_texture_description.width = static_cast<uint32_t>(mFontAtlas.TexWidth);
-    font_texture_description.height = static_cast<uint32_t>(mFontAtlas.TexHeight);
+    font_texture_description.width = static_cast<uint32_t>(im_font_atlas.TexWidth);
+    font_texture_description.height = static_cast<uint32_t>(im_font_atlas.TexHeight);
     font_texture_description.format = vk::Format::eR8G8B8A8Unorm;
     font_texture_description.usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
     font_texture = device->newTexture(font_texture_description);
@@ -49,14 +47,14 @@ void UIRenderer::buildFonts() {
     font_sampler_description.setAddressModeW(vk::SamplerAddressMode::eRepeat);
     font_sampler = device->newSampler(font_sampler_description);
 
-    mFontAtlas.SetTexID(font_texture->image);
+    im_font_atlas.SetTexID(font_texture->image);
 
-    mDrawListSharedData.Font = mFontAtlas.Fonts.front();
-    mDrawListSharedData.FontSize = mDrawListSharedData.Font->FontSize;
-    mDrawListSharedData.TexUvWhitePixel = mFontAtlas.TexUvWhitePixel;
+    im_shared_data.Font = im_font_atlas.Fonts.front();
+    im_shared_data.FontSize = im_shared_data.Font->FontSize;
+    im_shared_data.TexUvWhitePixel = im_font_atlas.TexUvWhitePixel;
 }
 
-void UIRenderer::buildShaders() {
+void ImGuiBackend::buildShaders() {
     auto vertexLibrary      = device->newLibrary(Assets::readFile("shaders/gui.vert.spv"));
     auto fragmentLibrary    = device->newLibrary(Assets::readFile("shaders/gui.frag.spv"));
 
@@ -86,7 +84,7 @@ void UIRenderer::buildShaders() {
     render_pipeline_state = device->newRenderPipelineState(description);
 }
 
-void UIRenderer::buildBuffers() {
+void ImGuiBackend::buildBuffers() {
     dynamic_buffer = device->newBuffer(
         vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer,
         5ULL * 1024ULL * 1024ULL,
@@ -94,29 +92,29 @@ void UIRenderer::buildBuffers() {
     );
 }
 
-void UIRenderer::resetForNewFrame() {
+void ImGuiBackend::resetForNewFrame() {
     dynamic_buffer_offset = 0;
 
-    mDrawList._ResetForNewFrame();
-    mDrawList.PushClipRect(ImVec2(0, 0), ImVec2(mScreenSize.width, mScreenSize.height));
-    mDrawList.PushTextureID(mFontAtlas.TexID);
+    im_draw_list._ResetForNewFrame();
+    im_draw_list.PushClipRect(ImVec2(0, 0), ImVec2(screen_size.width, screen_size.height));
+    im_draw_list.PushTextureID(im_font_atlas.TexID);
 }
 
-void UIRenderer::setCurrentContext() {
-    ImGui::SetCurrentContext(&mGuiContext);
+void ImGuiBackend::setCurrentContext() {
+    ImGui::SetCurrentContext(&im_gui_context);
 }
 
-auto UIRenderer::drawList() -> ImDrawList* {
-    return &mDrawList;
+auto ImGuiBackend::drawList() -> ImDrawList* {
+    return &im_draw_list;
 }
 
-void UIRenderer::draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder) {
-    if (mDrawList.IdxBuffer.Size == 0) {
+void ImGuiBackend::draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder) {
+    if (im_draw_list.IdxBuffer.Size == 0) {
         return;
     }
 
     GuiShaderData gui_shader_data = {};
-    gui_shader_data.scale = 2.0F / simd::float2{mScreenSize.width, mScreenSize.height};
+    gui_shader_data.scale = 2.0F / simd::float2{screen_size.width, screen_size.height};
 
     auto descriptor_set = encoder->getCommandBuffer()->newDescriptorSet(render_pipeline_state, 0);
 
@@ -145,17 +143,13 @@ void UIRenderer::draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder) {
     device->raii.raw.updateDescriptorSets(writes, {}, device->raii.dispatcher);
 
     vk::DeviceSize vertex_buffer_offset = dynamic_buffer_offset;
-    dynamic_buffer_offset += mDrawList.VtxBuffer.Size * sizeof(ImDrawVert);
+    dynamic_buffer_offset += im_draw_list.VtxBuffer.Size * sizeof(ImDrawVert);
 
     vk::DeviceSize index_buffer_offset  = dynamic_buffer_offset;
-    dynamic_buffer_offset += mDrawList.IdxBuffer.Size * sizeof(ImDrawIdx);
+    dynamic_buffer_offset += im_draw_list.IdxBuffer.Size * sizeof(ImDrawIdx);
 
-    std::memcpy(static_cast<std::byte*>(dynamic_buffer->contents()) + vertex_buffer_offset, mDrawList.VtxBuffer.Data, mDrawList.VtxBuffer.Size * sizeof(ImDrawVert));
-    std::memcpy(static_cast<std::byte*>(dynamic_buffer->contents()) + index_buffer_offset, mDrawList.IdxBuffer.Data, mDrawList.IdxBuffer.Size * sizeof(ImDrawIdx));
-
-
-//    mDescriptorSet.setSampler(font_sampler, 0);
-//    mDescriptorSet.setTexture(font_texture, 1);
+    std::memcpy(static_cast<std::byte*>(dynamic_buffer->contents()) + vertex_buffer_offset, im_draw_list.VtxBuffer.Data, im_draw_list.VtxBuffer.Size * sizeof(ImDrawVert));
+    std::memcpy(static_cast<std::byte*>(dynamic_buffer->contents()) + index_buffer_offset, im_draw_list.IdxBuffer.Data, im_draw_list.IdxBuffer.Size * sizeof(ImDrawIdx));
 
     encoder->setRenderPipelineState(render_pipeline_state);
     encoder->bindDescriptorSet(descriptor_set, 0);
@@ -163,11 +157,11 @@ void UIRenderer::draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder) {
     encoder->bindVertexBuffer(0, dynamic_buffer, vertex_buffer_offset);
     encoder->bindIndexBuffer(dynamic_buffer, index_buffer_offset, vk::IndexType::eUint16);
 
-    for (auto& drawCmd : std::span(mDrawList.CmdBuffer.Data, mDrawList.CmdBuffer.Size)) {
+    for (auto& drawCmd : std::span(im_draw_list.CmdBuffer.Data, im_draw_list.CmdBuffer.Size)) {
         encoder->drawIndexed(drawCmd.ElemCount, 1, drawCmd.IdxOffset, static_cast<int32_t>(drawCmd.VtxOffset), 0);
     }
 }
 
-void UIRenderer::setScreenSize(const Size& size) {
-    mScreenSize = size;
+void ImGuiBackend::setScreenSize(const Size& size) {
+    screen_size = size;
 }

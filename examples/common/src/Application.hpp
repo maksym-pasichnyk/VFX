@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Graphics.hpp"
-#include "UIContext.hpp"
-#include "UIRenderer.hpp"
+#include "Canvas.hpp"
+#include "ImGuiBackend.hpp"
 #include "NotSwiftUI/NotSwiftUI.hpp"
 
 #include <glm/glm.hpp>
@@ -17,73 +17,20 @@ struct ShaderData {
     alignas(16) glm::mat4x4 g_view_matrix;
 };
 
-struct Application {
+class WindowPlatform : public Object {
 public:
-    explicit Application(const char* title) {
+    explicit WindowPlatform(const char* title, uint32_t width, uint32_t height) {
         window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
-
-        gfx::InstanceSettings desc = {};
-        desc.name = title;
-        desc.version = 1;
-
-        instance = gfx::createInstance(desc);
-        adapter = instance->enumerateAdapters().front();
-        device = instance->createDevice(adapter);
-
-        VkSurfaceKHR raw_surface;
-        SDL_Vulkan_CreateSurface(window, instance->raii.raw, &raw_surface);
-
-        // todo: merge surface with swapchain?
-        surface = instance->wrapSurface(raw_surface);
-        swapchain = device->createSwapchain(surface);
-
-        gfx::SurfaceConfiguration config;
-        config.format = vk::Format::eB8G8R8A8Unorm;
-        config.color_space = vk::ColorSpaceKHR::eSrgbNonlinear;
-        config.image_count = 3;
-        config.present_mode = vk::PresentModeKHR::eFifo;
-        config.clipped = true;
-        swapchain->configure(config);
-
-        commandQueue = device->newCommandQueue();
-        commandBuffer = commandQueue->commandBuffer();
-
-        uiRenderer = sp<UIRenderer>::of(device);
-        uiContext = sp<UIContext>::of(uiRenderer->drawList());
     }
-
-    ~Application() {
+    ~WindowPlatform() override {
         SDL_DestroyWindow(window);
     }
 
 public:
-    void run() {
-        auto previous = std::chrono::steady_clock::now();
-
-        while (true) {
-            using seconds = std::chrono::duration<float, std::chrono::seconds::period>;
-
-            auto current = std::chrono::steady_clock::now();
-            auto elapsed = seconds(current - previous).count();
-            previous = current;
-
-            accumulateTotal -= accumulate[accumulateIndex];
-            accumulate[accumulateIndex] = elapsed;
-            accumulateTotal += accumulate[accumulateIndex];
-            accumulateIndex = (accumulateIndex + 1) % static_cast<int32_t>(std::size(accumulate));
-            accumulateCount = std::min(accumulateCount + 1, static_cast<int32_t>(std::size(accumulate)));
-            average = accumulateTotal / static_cast<float>(accumulateCount);
-
-            if (_pollEvents()) {
-                break;
-            }
-
-            uiRenderer->setCurrentContext();
-            uiRenderer->setScreenSize(getUISize(getWindowSize()));
-
-            update(elapsed);
-            render();
-        }
+    auto createSurface(const ManagedShared<gfx::Instance>& instance) -> ManagedShared<gfx::Surface> {
+        VkSurfaceKHR raw_surface;
+        SDL_Vulkan_CreateSurface(window, instance->raii.raw, &raw_surface);
+        return instance->wrapSurface(raw_surface);
     }
 
     auto getAspectRatio() -> float {
@@ -114,6 +61,71 @@ public:
         size.setWidth(width);
         size.setHeight(height);
         return size;
+    }
+
+private:
+    SDL_Window* window = nullptr;
+};
+
+struct Application {
+public:
+    explicit Application(const char* title) {
+        platform = sp<WindowPlatform>::of(title, 800, 600);
+
+        gfx::InstanceConfiguration instance_config = {};
+        instance_config.name = title;
+        instance_config.version = 1;
+
+        instance = gfx::createInstance(instance_config);
+        adapter = instance->enumerateAdapters().front();
+        device = instance->createDevice(adapter);
+
+        surface = platform->createSurface(instance);
+        swapchain = device->createSwapchain(surface);
+
+        gfx::SurfaceConfiguration surface_config = {};
+        surface_config.format = vk::Format::eB8G8R8A8Unorm;
+        surface_config.color_space = vk::ColorSpaceKHR::eSrgbNonlinear;
+        surface_config.image_count = 3;
+        surface_config.present_mode = vk::PresentModeKHR::eFifo;
+        surface_config.clipped = true;
+        swapchain->configure(surface_config);
+
+        commandQueue = device->newCommandQueue();
+        commandBuffer = commandQueue->commandBuffer();
+
+        imgui = sp<ImGuiBackend>::of(device);
+        canvas = sp<Canvas>::of(imgui->drawList());
+    }
+
+public:
+    void run() {
+        auto previous = std::chrono::steady_clock::now();
+
+        while (true) {
+            using seconds = std::chrono::duration<float, std::chrono::seconds::period>;
+
+            auto current = std::chrono::steady_clock::now();
+            auto elapsed = seconds(current - previous).count();
+            previous = current;
+
+            accumulateTotal -= accumulate[accumulateIndex];
+            accumulate[accumulateIndex] = elapsed;
+            accumulateTotal += accumulate[accumulateIndex];
+            accumulateIndex = (accumulateIndex + 1) % static_cast<int32_t>(std::size(accumulate));
+            accumulateCount = std::min(accumulateCount + 1, static_cast<int32_t>(std::size(accumulate)));
+            average = accumulateTotal / static_cast<float>(accumulateCount);
+
+            if (_pollEvents()) {
+                break;
+            }
+
+            imgui->setCurrentContext();
+            imgui->setScreenSize(getUISize(platform->getWindowSize()));
+
+            update(elapsed);
+            render();
+        }
     }
 
 public:
@@ -197,14 +209,14 @@ protected:
     }
 
     auto _drawView(const sp<View>& view) {
-        auto uiSize = getUISize(getWindowSize());
-        auto childSize = view->_size(uiContext, ProposedSize(uiSize));
+        auto uiSize = getUISize(platform->getWindowSize());
+        auto childSize = view->getPreferredSize(ProposedSize(uiSize));
         auto translate = view->translation(childSize, uiSize, Alignment::center());
 
-        uiContext->saveState();
-        uiContext->translateBy(translate.x, translate.y);
-        view->_draw(uiContext, childSize);
-        uiContext->restoreState();
+        canvas->saveState();
+        canvas->translateBy(translate.x, translate.y);
+        view->_draw(canvas, childSize);
+        canvas->restoreState();
     }
 
 public:
@@ -233,8 +245,7 @@ public:
 
 //todo: make this private
 protected:
-    SDL_Window*                         window          = {};
-
+    sp<WindowPlatform>                  platform        = {};
     float_t                             average         = {};
     float_t                             accumulate[60]  = {};
     float_t                             accumulateTotal = {};
@@ -250,6 +261,6 @@ protected:
     ManagedShared<gfx::CommandQueue>    commandQueue    = {};
     ManagedShared<gfx::CommandBuffer>   commandBuffer   = {};
 
-    sp<UIContext>                       uiContext;
-    sp<UIRenderer>                      uiRenderer;
+    sp<Canvas>                       canvas;
+    sp<ImGuiBackend>                      imgui;
 };

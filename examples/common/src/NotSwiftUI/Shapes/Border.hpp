@@ -12,8 +12,8 @@ private:
 public:
     explicit Border(float_t width) : width(width) {}
 
-    void path(const sp<UIContext>& context, const Size& size) override {
-        context->drawRect(size, width);
+    void path(const sp<Canvas>& canvas, const Size& size) override {
+        canvas->drawRect(size, width);
     }
 };
 

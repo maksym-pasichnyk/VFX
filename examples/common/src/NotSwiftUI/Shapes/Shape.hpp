@@ -1,8 +1,8 @@
 #pragma once
 
 #include "NotSwiftUI/Core/Size.hpp"
-#include "UIContext.hpp"
+#include "Canvas.hpp"
 
 struct Shape : Object {
-    virtual void path(const sp<UIContext>& context, const Size& size) = 0;
+    virtual void path(const sp<Canvas>& canvas, const Size& size) = 0;
 };

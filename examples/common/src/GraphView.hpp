@@ -100,82 +100,82 @@ public:
         }
 
     private:
-        void draw(const sp<UIContext> &context, bool selected) {
-            ImVec2 textSize1 = context->drawList()->_Data->Font->CalcTextSizeA(36.0F, FLT_MAX, FLT_MAX, mText.data(), mText.data() + mText.size(), nullptr);
+        void draw(const sp<Canvas> &canvas, bool selected) {
+            ImVec2 textSize1 = canvas->drawList()->_Data->Font->CalcTextSizeA(36.0F, FLT_MAX, FLT_MAX, mText.data(), mText.data() + mText.size(), nullptr);
 
-            context->saveState();
-            context->translateBy(mPosition.x, mPosition.y);
-            context->setFillColor(Color::rgba32(28, 28, 28, 245));
-            context->drawRectFilled(mSize, 5.0F);
+            canvas->saveState();
+            canvas->translateBy(mPosition.x, mPosition.y);
+            canvas->setFillColor(Color::rgba32(28, 28, 28, 245));
+            canvas->drawRectFilled(mSize, 5.0F);
             if (selected) {
-                context->setFillColor(Color::rgba32(4, 156, 227, 255));
+                canvas->setFillColor(Color::rgba32(4, 156, 227, 255));
             } else {
-                context->setFillColor(Color::rgba32(0, 0, 0, 255));
+                canvas->setFillColor(Color::rgba32(0, 0, 0, 255));
             }
-            context->drawRect(mSize, 2.0F, 5.0F);
-            context->drawLine(Point{0, 50.0F}, Point{mSize.width, 50.0F}, 2.0F);
-            context->setFillColor(Color::rgba32(255, 255, 255, 255));
-            context->translateBy(mSize.width * 0.5F, 50.0F * 0.5F);
-            context->translateBy(-textSize1.x * 0.5F, -textSize1.y * 0.5F);
-            context->drawText(mText, 36.0F);
-            context->restoreState();
+            canvas->drawRect(mSize, 2.0F, 5.0F);
+            canvas->drawLine(Point{0, 50.0F}, Point{mSize.width, 50.0F}, 2.0F);
+            canvas->setFillColor(Color::rgba32(255, 255, 255, 255));
+            canvas->translateBy(mSize.width * 0.5F, 50.0F * 0.5F);
+            canvas->translateBy(-textSize1.x * 0.5F, -textSize1.y * 0.5F);
+            canvas->drawText(mText, 36.0F);
+            canvas->restoreState();
 
             for (auto& port : mInputs) {
                 Point slot = _getSlotPosition(port);
 
-                context->saveState();
-                context->translateBy(slot.x, slot.y);
+                canvas->saveState();
+                canvas->translateBy(slot.x, slot.y);
 
-                context->translateBy(-10.0F, -10.0F);
-                context->setFillColor(Color::rgba32(37, 150, 190, 255));
-                context->drawCircleFilled(10.0F);
+                canvas->translateBy(-10.0F, -10.0F);
+                canvas->setFillColor(Color::rgba32(37, 150, 190, 255));
+                canvas->drawCircleFilled(10.0F);
 
                 if (port->mLinks.empty()) {
-                    context->translateBy(2.0F, 2.0F);
-                    context->setFillColor(Color::rgba32(0, 0, 0, 255));
-                    context->drawCircleFilled(8.0F);
+                    canvas->translateBy(2.0F, 2.0F);
+                    canvas->setFillColor(Color::rgba32(0, 0, 0, 255));
+                    canvas->drawCircleFilled(8.0F);
                 }
 
-                context->restoreState();
+                canvas->restoreState();
 
                 if (!port->mName.empty()) {
-                    ImVec2 textSize2 = context->drawList()->_Data->Font->CalcTextSizeA(28.0F, FLT_MAX, FLT_MAX, port->mName.data(), port->mName.data() + port->mName.size(), nullptr);
+                    ImVec2 textSize2 = canvas->drawList()->_Data->Font->CalcTextSizeA(28.0F, FLT_MAX, FLT_MAX, port->mName.data(), port->mName.data() + port->mName.size(), nullptr);
 
-                    context->saveState();
-                    context->translateBy(slot.x, slot.y);
-                    context->translateBy(20.0F, -textSize2.y * 0.5F);
-                    context->drawText(port->mName, 28.0F);
-                    context->restoreState();
+                    canvas->saveState();
+                    canvas->translateBy(slot.x, slot.y);
+                    canvas->translateBy(20.0F, -textSize2.y * 0.5F);
+                    canvas->drawText(port->mName, 28.0F);
+                    canvas->restoreState();
                 }
             }
 
             for (auto& port : mOutputs) {
                 Point slot = _getSlotPosition(port);
 
-                context->saveState();
-                context->translateBy(slot.x, slot.y);
-                context->translateBy(-10.0F, -10.0F);
+                canvas->saveState();
+                canvas->translateBy(slot.x, slot.y);
+                canvas->translateBy(-10.0F, -10.0F);
 
-                context->setFillColor(Color::rgba32(37, 150, 190, 255));
-                context->drawCircleFilled(10.0F);
+                canvas->setFillColor(Color::rgba32(37, 150, 190, 255));
+                canvas->drawCircleFilled(10.0F);
 
                 if (port->mLinks.empty()) {
-                    context->translateBy(2.0F, 2.0F);
-                    context->setFillColor(Color::rgba32(0, 0, 0, 255));
-                    context->drawCircleFilled(8.0F);
+                    canvas->translateBy(2.0F, 2.0F);
+                    canvas->setFillColor(Color::rgba32(0, 0, 0, 255));
+                    canvas->drawCircleFilled(8.0F);
                 }
 
-                context->restoreState();
+                canvas->restoreState();
 
                 if (!port->mName.empty()) {
-                    ImVec2 textSize3 = context->drawList()->_Data->Font->CalcTextSizeA(28.0F, FLT_MAX, FLT_MAX, port->mName.data(), port->mName.data() + port->mName.size(), nullptr);
+                    ImVec2 textSize3 = canvas->drawList()->_Data->Font->CalcTextSizeA(28.0F, FLT_MAX, FLT_MAX, port->mName.data(), port->mName.data() + port->mName.size(), nullptr);
 
-                    context->saveState();
-                    context->translateBy(slot.x, slot.y);
-                    context->translateBy(-20.0F, 0.0F);
-                    context->translateBy(-textSize3.x, -textSize3.y * 0.5F);
-                    context->drawText(port->mName, 28.0F);
-                    context->restoreState();
+                    canvas->saveState();
+                    canvas->translateBy(slot.x, slot.y);
+                    canvas->translateBy(-20.0F, 0.0F);
+                    canvas->translateBy(-textSize3.x, -textSize3.y * 0.5F);
+                    canvas->drawText(port->mName, 28.0F);
+                    canvas->restoreState();
                 }
             }
         }
@@ -224,51 +224,51 @@ private:
     sp<Link> mSelectedLink = {};
 
 private:
-    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
+    auto getPreferredSize(const ProposedSize &proposed) -> Size override {
         return proposed.orMax();
     }
 
-    void _draw(const sp<UIContext> &context, const Size& size) override {
+    void _draw(const sp<Canvas> &canvas, const Size& size) override {
         float invScale = 1.0F / mZoomScale;
 
-        context->saveState();
-        context->setFillColor(Color::rgba32(45, 45, 45, 255));
-        context->drawRectFilled(size);
-        context->setFillColor(Color{0.0F, 0.0F, 0.0F, 0.25F});
+        canvas->saveState();
+        canvas->setFillColor(Color::rgba32(45, 45, 45, 255));
+        canvas->drawRectFilled(size);
+        canvas->setFillColor(Color{0.0F, 0.0F, 0.0F, 0.25F});
 
         float_t cellSize = 50.0F * invScale;
         float_t x = std::fmod(mGridOffset.x * invScale, cellSize);
         float_t y = std::fmod(mGridOffset.y * invScale, cellSize);
         while (x < size.width) {
-            context->drawLine(Point{x, 0.0F}, Point{x, size.height}, 1.0F);
+            canvas->drawLine(Point{x, 0.0F}, Point{x, size.height}, 1.0F);
             x += cellSize;
         }
         while (y < size.height) {
-            context->drawLine(Point{0.0F, y}, Point{size.width, y}, 1.0F);
+            canvas->drawLine(Point{0.0F, y}, Point{size.width, y}, 1.0F);
             y += cellSize;
         }
-        context->restoreState();
+        canvas->restoreState();
 
-        context->saveState();
-        context->translateBy(mGridOffset.x, mGridOffset.y);
-        context->scaleBy(invScale, invScale);
+        canvas->saveState();
+        canvas->translateBy(mGridOffset.x, mGridOffset.y);
+        canvas->scaleBy(invScale, invScale);
 
         for (auto& link : mLinks) {
             Point pointA = link->mPortA->pNode->_getSlotPosition(link->mPortA);
             Point pointD = link->mPortB->pNode->_getSlotPosition(link->mPortB);
 
-            drawLink(context, pointA, pointD);
+            drawLink(canvas, pointA, pointD);
 
-//            int32_t indexA = context->drawList()->VtxBuffer.Size;
+//            int32_t indexA = canvas->drawList()->VtxBuffer.Size;
 //            if (mSelectedLink == link) {
-//                drawLink(context, pointA, pointD, IM_COL32(37, 150, 190, 255));
+//                drawLink(canvas, pointA, pointD, IM_COL32(37, 150, 190, 255));
 //            } else {
-//                drawLink(context, pointA, pointD, IM_COL32(255, 255, 255, 255));
+//                drawLink(canvas, pointA, pointD, IM_COL32(255, 255, 255, 255));
 //            }
-//            int32_t indexB = context->drawList()->VtxBuffer.Size;
+//            int32_t indexB = canvas->drawList()->VtxBuffer.Size;
 //
 //            for (int32_t i = indexA; i < indexB; ++i) {
-//                auto& vtx = context->drawList()->VtxBuffer[i];
+//                auto& vtx = canvas->drawList()->VtxBuffer[i];
 //                auto p = UIPoint(vtx.pos.x, vtx.pos.y) - mMousePosition;
 //
 //                if (std::abs(p.x) <= 10 && std::abs(p.y) <= 10) {
@@ -279,17 +279,17 @@ private:
         }
 
         if (mInteraction == Interaction::eDragLink) {
-            drawLink(context, mSelectedPort->pNode->_getSlotPosition(mSelectedPort), mCursorPosition);
+            drawLink(canvas, mSelectedPort->pNode->_getSlotPosition(mSelectedPort), mCursorPosition);
         }
 
         for (auto& node : mNodes) {
-            node->draw(context, node == mSelectedNode);
+            node->draw(canvas, node == mSelectedNode);
         }
 
-        context->restoreState();
+        canvas->restoreState();
     }
 
-    void drawLink(const sp<UIContext> &context, const Point& pointA, const Point& pointD, ImU32 color = IM_COL32(255, 255, 255, 255)) {
+    void drawLink(const sp<Canvas> &canvas, const Point& pointA, const Point& pointD, ImU32 color = IM_COL32(255, 255, 255, 255)) {
         Point pointB = pointA + Point{std::abs(pointD.x - pointA.x), 0.0F};
         Point pointC = pointD - Point{std::abs(pointD.x - pointA.x), 0.0F};
 
@@ -298,9 +298,9 @@ private:
         ImVec2 p3 = ImVec2(mGridOffset.x + pointC.x, mGridOffset.y + pointC.y);
         ImVec2 p4 = ImVec2(mGridOffset.x + pointD.x, mGridOffset.y + pointD.y);
 
-        context->drawList()->PathLineTo(p1);
-        context->drawList()->PathBezierCubicCurveTo(p2, p3, p4);
-        context->drawList()->PathStroke(color, 0, 5.0F);
+        canvas->drawList()->PathLineTo(p1);
+        canvas->drawList()->PathBezierCubicCurveTo(p2, p3, p4);
+        canvas->drawList()->PathStroke(color, 0, 5.0F);
     }
 
     auto findNodeAt(int32_t x, int32_t y) -> sp<Node> {

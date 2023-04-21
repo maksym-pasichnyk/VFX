@@ -31,3 +31,7 @@ void gfx::Buffer::setLabel(const std::string& name) {
 
     device->raii.raw.debugMarkerSetObjectNameEXT(info, device->raii.dispatcher);
 }
+
+auto gfx::Buffer::descriptorInfo() const -> vk::DescriptorBufferInfo {
+    return vk::DescriptorBufferInfo{raw, 0, VK_WHOLE_SIZE};
+}

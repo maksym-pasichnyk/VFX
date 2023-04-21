@@ -12,22 +12,19 @@ public:
         : text(std::move(text)), fontSize(fontSize) {}
 
 public:
-    void _draw(const sp<UIContext> &context, const Size &size) override {
-        auto font = context->drawList()->_Data->Font;
-
-        auto imSize = font->CalcTextSizeA(fontSize, FLT_MAX, size.width, text.data(), text.data() + text.size(), nullptr);
+    void _draw(const sp<Canvas> &canvas, const Size &size) override {
+        auto imSize = ImGui::GetDefaultFont()->CalcTextSizeA(fontSize, FLT_MAX, size.width, text.data(), text.data() + text.size(), nullptr);
         auto uiSize = Size{imSize.x, imSize.y};
         auto translate = translation(uiSize, size, Alignment::center());
 
-        context->saveState();
-        context->translateBy(translate.x, translate.y);
-        context->drawText(text, fontSize, font, size.width);
-        context->restoreState();
+        canvas->saveState();
+        canvas->translateBy(translate.x, translate.y);
+        canvas->drawText(text, fontSize, ImGui::GetDefaultFont(), size.width);
+        canvas->restoreState();
     }
 
-    auto _size(const sp<UIContext> &context, const ProposedSize& proposed) -> Size override {
-        auto font = context->drawList()->_Data->Font;
-        auto imSize = font->CalcTextSizeA(fontSize, FLT_MAX, proposed.orMax().width, text.data(), text.data() + text.size(), nullptr);
+    auto getPreferredSize(const ProposedSize& proposed) -> Size override {
+        auto imSize = ImGui::GetDefaultFont()->CalcTextSizeA(fontSize, FLT_MAX, proposed.orMax().width, text.data(), text.data() + text.size(), nullptr);
         return proposed.orDefault(imSize.x, imSize.y);
     }
 };

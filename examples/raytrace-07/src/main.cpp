@@ -120,7 +120,7 @@ private:
 
 public:
     void update(float_t dt) override {
-        camera.projection_matrix = perspective(glm::radians(60.0F), getAspectRatio(), 0.03F, 1000.0F);
+        camera.projection_matrix = perspective(glm::radians(60.0F), platform->getAspectRatio(), 0.03F, 1000.0F);
 
         glm::ivec2 input{
             (right ? 1 : 0) - (left ? 1 : 0),

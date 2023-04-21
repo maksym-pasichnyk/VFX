@@ -16,12 +16,12 @@ public:
     explicit ShapeView(sp<T> shape) : shape(std::move(shape)) {}
 
 public:
-    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
+    auto getPreferredSize(const ProposedSize &proposed) -> Size override {
         return proposed.orDefault(10.0F, 10.0F);
     }
 
-    void _draw(const sp<UIContext> &context, const Size &size) override {
-        shape->path(context, size);
+    void _draw(const sp<Canvas> &canvas, const Size &size) override {
+        shape->path(canvas, size);
     }
 };
 

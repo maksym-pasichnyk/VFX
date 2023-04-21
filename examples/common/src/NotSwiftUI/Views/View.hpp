@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Object.hpp"
-#include "UIContext.hpp"
+#include "Canvas.hpp"
 #include "NotSwiftUI/Core/Size.hpp"
 #include "NotSwiftUI/Core/Point.hpp"
 #include "NotSwiftUI/Core/Alignment.hpp"
@@ -21,12 +21,12 @@ struct View : Object {
         throw std::runtime_error("FatalError");
     }
 
-    virtual auto _size(const sp<UIContext> &context, const ProposedSize& proposed) -> Size {
-        return body()->_size(context, proposed);
+    virtual auto getPreferredSize(const ProposedSize& proposed) -> Size {
+        return body()->getPreferredSize(proposed);
     }
 
-    virtual void _draw(const sp<UIContext>& context, const Size& size) {
-        return body()->_draw(context, size);
+    virtual void _draw(const sp<Canvas>& canvas, const Size& size) {
+        return body()->_draw(canvas, size);
     }
 
     static auto translation(const Size& childSize, const Size& parentSize, const Alignment& alignment) -> Point {

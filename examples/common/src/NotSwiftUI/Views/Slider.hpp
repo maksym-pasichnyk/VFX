@@ -13,7 +13,7 @@ public:
     Slider(float_t current, float_t min, float_t max)
         : min(min), max(max), current(current) {}
 
-    void _draw(const sp<UIContext>& ctx, const Size &size) override {
+    void _draw(const sp<Canvas>& ctx, const Size &size) override {
         float sliderHeight = 4.0F;
         float sliderWidth = size.width;
         float knobRadius = 8.0F;
@@ -36,7 +36,7 @@ public:
         ctx->restoreState();
     }
 
-    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
+    auto getPreferredSize(const ProposedSize &proposed) -> Size override {
         return proposed.orDefault(200.0F, 20.0F);
     }
 };

@@ -1,7 +1,7 @@
 #include "Assets.hpp"
 #include "GraphView.hpp"
-#include "UIContext.hpp"
-#include "UIRenderer.hpp"
+#include "Canvas.hpp"
+#include "ImGuiBackend.hpp"
 #include "Application.hpp"
 
 #include "fmt/core.h"
@@ -33,7 +33,7 @@ public:
     }
 
     void render() override {
-        uiRenderer->setCurrentContext();
+        imgui->setCurrentContext();
 
         auto drawable = swapchain->nextDrawable();
         auto drawableSize = swapchain->drawableSize();
@@ -64,13 +64,13 @@ public:
             Alignment::topLeading()
         );
 
-        uiRenderer->resetForNewFrame();
+        imgui->resetForNewFrame();
         _drawView(view);
 
         auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
         encoder->setScissor(0, rendering_area);
         encoder->setViewport(0, rendering_viewport);
-        uiRenderer->draw(encoder);
+        imgui->draw(encoder);
         encoder->endEncoding();
 
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});

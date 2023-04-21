@@ -14,7 +14,7 @@ public:
         : children(std::move(children)), alignment(alignment), spacing(spacing.value_or(0.0F)) {}
 
 private:
-    void _draw(const sp<UIContext> &context, const Size &size) override {
+    void _draw(const sp<Canvas> &canvas, const Size &size) override {
         float_t stackX = alignment.defaultValue(size);
         float_t currentY = 0.0F;
 
@@ -22,21 +22,21 @@ private:
             auto childSize = sizes[i];
             float_t currentX = alignment.defaultValue(childSize);
 
-            context->saveState();
-            context->translateBy(stackX - currentX, currentY);
-            children[i]->_draw(context, childSize);
-            context->restoreState();
+            canvas->saveState();
+            canvas->translateBy(stackX - currentX, currentY);
+            children[i]->_draw(canvas, childSize);
+            canvas->restoreState();
 
             currentY += childSize.height + spacing;
         }
     }
 
-    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
+    auto getPreferredSize(const ProposedSize &proposed) -> Size override {
         if (children.empty()) {
             return Size::zero();
         }
 
-        layout(context, proposed);
+        layout(proposed);
 
         float_t width = ranges::accumulate(sizes, 0.0F, [](auto lhs, auto rhs) -> float_t {
             return std::max(lhs, rhs.width);
@@ -50,11 +50,11 @@ private:
         return Size{width, height};
     }
 
-    void layout(const sp<UIContext> &context, const ProposedSize &proposed) {
+    void layout(const ProposedSize &proposed) {
         auto flexibility = cxx::iter(children)
             .map([&](auto& child) {
-                auto lower = child->_size(context, ProposedSize(proposed.width, 0));
-                auto upper = child->_size(context, ProposedSize(proposed.width, std::numeric_limits<float_t>::max()));
+                auto lower = child->getPreferredSize(ProposedSize(proposed.width, 0));
+                auto upper = child->getPreferredSize(ProposedSize(proposed.width, std::numeric_limits<float_t>::max()));
                 return upper.height - lower.height;
             })
             .collect();
@@ -73,7 +73,7 @@ private:
             size_t idx = remainingIndices.front();
             remainingIndices.erase(remainingIndices.begin());
 
-            auto childSize = children[idx]->_size(context, ProposedSize(proposed.width, height));
+            auto childSize = children[idx]->getPreferredSize(ProposedSize(proposed.width, height));
             sizes[idx] = childSize;
 
             remainingHeight -= childSize.height;

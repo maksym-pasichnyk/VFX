@@ -319,7 +319,7 @@ private:
 
 public:
     void update(float_t dt) override {
-        camera_projection_matrix = getPerspectiveProjection(glm::radians(60.0F), getAspectRatio(), 0.03F, 1000.0F);
+        camera_projection_matrix = getPerspectiveProjection(glm::radians(60.0F), platform->getAspectRatio(), 0.03F, 1000.0F);
         world_to_camera_matrix = glm::lookAtLH(glm::vec3(2.0F, 2.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0, 1, 0));
         world_to_camera_matrix = glm::rotate(world_to_camera_matrix, angle, glm::vec3(0, 1, 0));
         angle += dt * 5.0F;

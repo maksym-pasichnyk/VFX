@@ -38,10 +38,7 @@ public:
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
         auto descriptor_set = commandBuffer->newDescriptorSet(renderPipelineState, 0);
-        vk::DescriptorBufferInfo buffer_info = {};
-        buffer_info.setBuffer(vertexBuffer->raw);
-        buffer_info.setOffset(0);
-        buffer_info.setRange(VK_WHOLE_SIZE);
+        auto descriptor_info = vertexBuffer->descriptorInfo();
 
         vk::WriteDescriptorSet buffer_write_info = {};
         buffer_write_info.setDstSet(descriptor_set);
@@ -49,7 +46,7 @@ public:
         buffer_write_info.setDstArrayElement(0);
         buffer_write_info.setDescriptorType(vk::DescriptorType::eStorageBuffer);
         buffer_write_info.setDescriptorCount(1);
-        buffer_write_info.setPBufferInfo(&buffer_info);
+        buffer_write_info.setPBufferInfo(&descriptor_info);
 
         device->raii.raw.updateDescriptorSets({buffer_write_info}, {}, device->raii.dispatcher);
 

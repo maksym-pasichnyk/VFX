@@ -24,7 +24,7 @@ public:
         , maxHeight(maxHeight)
         , alignment(alignment) {}
 
-    auto _size(const sp<UIContext> &context, const ProposedSize& p) -> Size override {
+    auto getPreferredSize(const ProposedSize& p) -> Size override {
         auto proposed = ProposedSize(p.width ?: idealWidth, p.height ?: idealHeight).orDefault(10.0F, 10.0F);
         if (minWidth.has_value()) {
             proposed.width = std::max(*minWidth, proposed.width);
@@ -39,7 +39,7 @@ public:
             proposed.height = std::min(*maxHeight, proposed.height);
         }
 
-        auto size = content->_size(context, ProposedSize(proposed));
+        auto size = content->getPreferredSize(ProposedSize(proposed));
         if (minWidth.has_value()) {
             size.width = std::max(*minWidth, std::min(size.width, proposed.width));
         }
@@ -55,14 +55,14 @@ public:
         return size;
     }
 
-    void _draw(const sp<UIContext>& context, const Size& size) override {
-        auto childSize = content->_size(context, ProposedSize(size));
+    void _draw(const sp<Canvas>& canvas, const Size& size) override {
+        auto childSize = content->getPreferredSize(ProposedSize(size));
         auto translate = translation(childSize, size, alignment);
 
-        context->saveState();
-        context->translateBy(translate.x, translate.y);
-        content->_draw(context, childSize);
-        context->restoreState();
+        canvas->saveState();
+        canvas->translateBy(translate.x, translate.y);
+        content->_draw(canvas, childSize);
+        canvas->restoreState();
     }
 };
 

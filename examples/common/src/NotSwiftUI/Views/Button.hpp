@@ -9,21 +9,21 @@ private:
 public:
     explicit Button(sp<struct View> text) : text(std::move(text)) {}
 
-    void _draw(const sp<UIContext> &context, const Size &size) override {
-        auto textSize = text->_size(context, ProposedSize(size));
+    void _draw(const sp<Canvas> &canvas, const Size &size) override {
+        auto textSize = text->getPreferredSize(ProposedSize(size));
         auto translate = translation(textSize, size, Alignment::center());
 
-        context->drawRectFilled(size, 5.0F);
+        canvas->drawRectFilled(size, 5.0F);
 
-        context->saveState();
-        context->translateBy(translate.x, translate.y);
-        context->setFillColor(Color{0.0F, 0.0F, 0.0F, 1.0F});
-        text->_draw(context, textSize);
-        context->restoreState();
+        canvas->saveState();
+        canvas->translateBy(translate.x, translate.y);
+        canvas->setFillColor(Color{0.0F, 0.0F, 0.0F, 1.0F});
+        text->_draw(canvas, textSize);
+        canvas->restoreState();
     }
 
-    auto _size(const sp<UIContext> &context, const ProposedSize &proposed) -> Size override {
-        auto textSize = text->_size(context, proposed);
+    auto getPreferredSize(const ProposedSize &proposed) -> Size override {
+        auto textSize = text->getPreferredSize(proposed);
         return proposed.orDefault(textSize.width, textSize.height);
     }
 };

@@ -7,14 +7,14 @@
 #include "Shape.hpp"
 
 struct Circle : Shape {
-    void path(const sp<UIContext>& context, const Size& size) override {
+    void path(const sp<Canvas>& canvas, const Size& size) override {
         float_t halfSize = std::min(size.width, size.height) * 0.5F;
         float_t dx = size.width * 0.5F - halfSize;
         float_t dy = size.height * 0.5F - halfSize;
 
-        context->saveState();
-        context->translateBy(dx, dy);
-        context->drawCircleFilled(halfSize);
-        context->restoreState();
+        canvas->saveState();
+        canvas->translateBy(dx, dy);
+        canvas->drawCircleFilled(halfSize);
+        canvas->restoreState();
     }
 };

@@ -2,11 +2,11 @@
 
 #include "Object.hpp"
 #include "Graphics.hpp"
-#include "UIContext.hpp"
+#include "Canvas.hpp"
 
-struct UIRenderer : Object {
+struct ImGuiBackend : Object {
 public:
-    explicit UIRenderer(const ManagedShared<gfx::Device>& device);
+    explicit ImGuiBackend(const ManagedShared<gfx::Device>& device);
 
 private:
     void buildFonts();
@@ -19,16 +19,15 @@ public:
 
     auto drawList() -> ImDrawList*;
     void draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder);
-    void setScale(float scale);
     void setScreenSize(const Size& size);
 
 private:
-    Size                                    mScreenSize             = Size::zero();
+    Size                                    screen_size             = Size::zero();
 
-    ImDrawList                              mDrawList;
-    ImFontAtlas                             mFontAtlas              = {};
-    ImGuiContext                            mGuiContext             = {&mFontAtlas};
-    ImDrawListSharedData                    mDrawListSharedData     = {};
+    ImFontAtlas                             im_font_atlas           = {};
+    ImGuiContext                            im_gui_context          = {&im_font_atlas};
+    ImDrawListSharedData                    im_shared_data          = {};
+    ImDrawList                              im_draw_list            = {&im_shared_data};
 
     ManagedShared<gfx::Device>              device                  = {};
     ManagedShared<gfx::Texture>             font_texture            = {};

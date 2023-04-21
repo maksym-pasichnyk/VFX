@@ -34,7 +34,7 @@ namespace gfx {
     struct Device;
     struct Surface;
 
-    struct InstanceSettings {
+    struct InstanceConfiguration {
         std::string name    = {};
         uint32_t    version = 0;
     };
@@ -54,5 +54,5 @@ namespace gfx {
         auto getSurfaceCapabilitiesKHR(vk::PhysicalDevice adapter, vk::SurfaceKHR surface) -> vk::SurfaceCapabilitiesKHR;
     };
 
-    extern auto createInstance(const InstanceSettings& desc) -> ManagedShared<Instance>;
+    extern auto createInstance(const InstanceConfiguration& desc) -> ManagedShared<Instance>;
 }
