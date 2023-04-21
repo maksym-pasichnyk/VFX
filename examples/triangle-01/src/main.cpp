@@ -92,7 +92,7 @@ private:
             {{+0.8F, +0.8F, +0.0F}, {0.0F, 0.0F, 1.0F}}
         };
 
-        vertexBuffer = device->newBuffer(vk::BufferUsageFlagBits::eStorageBuffer, sizeof(vertices), VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+        vertexBuffer = device->newBuffer(vk::BufferUsageFlagBits::eStorageBuffer, sizeof(vertices), gfx::StorageMode::eShared);
         std::memcpy(vertexBuffer->contents(), vertices, sizeof(vertices));
         vertexBuffer->didModifyRange(0, vertexBuffer->length());
     }

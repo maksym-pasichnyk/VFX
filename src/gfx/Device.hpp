@@ -29,6 +29,13 @@ namespace gfx {
     struct ComputePipelineState;
     struct RenderPipelineStateDescription;
 
+    enum class StorageMode {
+        ePrivate,
+        eManaged,
+        eShared,
+        eLazy,
+    };
+
     struct Device : ManagedObject<Device> {
         ManagedShared<Instance> instance;
         raii::Device            raii;
@@ -44,8 +51,8 @@ namespace gfx {
         void waitIdle();
         auto newTexture(const TextureSettings& description) -> ManagedShared<Texture>;
         auto newSampler(const vk::SamplerCreateInfo& info) -> ManagedShared<Sampler>;
-        auto newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAllocationCreateFlags options = 0) -> ManagedShared<Buffer>;
-        auto newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, VmaAllocationCreateFlags options = 0) -> ManagedShared<Buffer>;
+        auto newBuffer(vk::BufferUsageFlags usage, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options = 0) -> ManagedShared<Buffer>;
+        auto newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options = 0) -> ManagedShared<Buffer>;
         auto newLibrary(const std::vector<char>& bytes) -> ManagedShared<Library>;
         auto newRenderPipelineState(const RenderPipelineStateDescription& description) -> ManagedShared<RenderPipelineState>;
         auto newComputePipelineState(const ManagedShared<Function>& function) -> ManagedShared<ComputePipelineState>;

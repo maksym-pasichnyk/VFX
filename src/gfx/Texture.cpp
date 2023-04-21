@@ -14,7 +14,7 @@ gfx::Texture::~Texture() {
 }
 
 void gfx::Texture::replaceRegion(const void* data, uint64_t size) {
-    auto storageBuffer = device->newBuffer(vk::BufferUsageFlagBits::eTransferSrc, data, size, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+    auto storageBuffer = device->newBuffer(vk::BufferUsageFlagBits::eTransferSrc, data, size, StorageMode::eShared, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
     vk::BufferImageCopy buffer_image_copy = {};
     buffer_image_copy.setImageExtent(extent);

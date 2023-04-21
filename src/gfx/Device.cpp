@@ -397,23 +397,53 @@ auto gfx::Device::newSampler(const vk::SamplerCreateInfo& info) -> ManagedShared
     return MakeShared(new Sampler(MakeShared(this->retain()), raii.raw.createSampler(info, VK_NULL_HANDLE, raii.dispatcher)));
 }
 
-auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, VmaAllocationCreateFlags options) -> ManagedShared<Buffer> {
+auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options) -> ManagedShared<Buffer> {
     vk::BufferCreateInfo buffer_create_info = {};
     buffer_create_info.setSize(static_cast<vk::DeviceSize>(size));
     buffer_create_info.setUsage(usage);
 
     VmaAllocationCreateInfo allocation_create_info = {};
     allocation_create_info.flags = options;
-    allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
+    allocation_create_info.usage = VMA_MEMORY_USAGE_UNKNOWN;
+    switch (storage) {
+        case StorageMode::ePrivate: {
+            allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+            allocation_create_info.preferredFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+            break;
+        }
+        case StorageMode::eManaged: {
+            allocation_create_info.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+            allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+            allocation_create_info.preferredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+            allocation_create_info.preferredFlags |= VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+            break;
+        }
+        case StorageMode::eShared: {
+            allocation_create_info.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+            allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+            allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+            allocation_create_info.preferredFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+            allocation_create_info.preferredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+            allocation_create_info.preferredFlags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+            break;
+        }
+        case StorageMode::eLazy: {
+            allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+            allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
+            allocation_create_info.preferredFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+            allocation_create_info.preferredFlags |= VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
+            break;
+        }
+    }
 
     auto buffer = MakeShared(new Buffer(MakeShared(this->retain())));
     vmaCreateBuffer(allocator, reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info), &allocation_create_info, reinterpret_cast<VkBuffer*>(&buffer->raw), &buffer->allocation, nullptr);
     return buffer;
 }
 
-auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, VmaAllocationCreateFlags options) -> ManagedShared<Buffer> {
+auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options) -> ManagedShared<Buffer> {
     // todo: use transfer operation if buffer is not mappable
-    auto buffer = newBuffer(usage, size, options);
+    auto buffer = newBuffer(usage, size, storage, options);
     std::memcpy(buffer->contents(), pointer, size);
     buffer->didModifyRange(0, size);
     return buffer;

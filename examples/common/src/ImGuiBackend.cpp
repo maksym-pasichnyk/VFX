@@ -88,8 +88,8 @@ void ImGuiBackend::buildBuffers() {
     dynamic_buffer = device->newBuffer(
         vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer,
         5ULL * 1024ULL * 1024ULL,
-        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
-    );
+        gfx::StorageMode::eShared,
+        0);
 }
 
 void ImGuiBackend::resetForNewFrame() {

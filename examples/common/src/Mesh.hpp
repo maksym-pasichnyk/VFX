@@ -35,12 +35,12 @@ public:
         if (mIndices.empty()) {
             mIndexBuffer = {};
         } else {
-            mIndexBuffer = device->newBuffer(vk::BufferUsageFlagBits::eIndexBuffer, mIndices.data(), mIndices.size() * sizeof(uint32_t), VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+            mIndexBuffer = device->newBuffer(vk::BufferUsageFlagBits::eIndexBuffer, mIndices.data(), mIndices.size() * sizeof(uint32_t), gfx::StorageMode::eShared);
         }
         if (mVertices.empty()) {
             mVertexBuffer = {};
         } else {
-            mVertexBuffer = device->newBuffer(vk::BufferUsageFlagBits::eVertexBuffer, mVertices.data(), mVertices.size() * sizeof(Vertex), VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+            mVertexBuffer = device->newBuffer(vk::BufferUsageFlagBits::eVertexBuffer, mVertices.data(), mVertices.size() * sizeof(Vertex), gfx::StorageMode::eShared);
         }
     }
 
