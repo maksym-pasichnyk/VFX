@@ -14,45 +14,78 @@ struct Vertex {
 
 struct Mesh : Object {
 private:
-    std::vector<Vertex>         mVertices       = {};
-    std::vector<uint32_t>       mIndices        = {};
-    std::vector<Primitive>      mPrimitives     = {};
-    std::vector<glm::u32vec4>   mJoints         = {};
-    std::vector<glm::f32vec4>   mWeights        = {};
-    ManagedShared<gfx::Buffer>  mIndexBuffer    = {};
-    ManagedShared<gfx::Buffer>  mVertexBuffer   = {};
+    std::vector<Vertex>         vertices_       = {};
+    std::vector<uint32_t>       indices_        = {};
+    std::vector<Primitive>      primitives_     = {};
+    std::vector<glm::u32vec4>   joints_         = {};
+    std::vector<glm::f32vec4>   weights_        = {};
+    ManagedShared<gfx::Buffer>  index_buffer_   = {};
+    ManagedShared<gfx::Buffer>  vertex_buffer_  = {};
 
 public:
-    explicit Mesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, std::vector<Primitive> primitives, std::vector<glm::u32vec4> joints, std::vector<glm::f32vec4> weights)
-        : mVertices(std::move(vertices))
-        , mIndices(std::move(indices))
-        , mPrimitives(std::move(primitives))
-        , mJoints(std::move(joints))
-        , mWeights(std::move(weights)) {}
+    void setVertices(std::vector<Vertex> vertices) {
+        vertices_ = std::move(vertices);
+    }
+
+    void setIndices(std::vector<uint32_t> indices) {
+        indices_ = std::move(indices);
+    }
+
+    void setPrimitives(std::vector<Primitive> primitives) {
+        primitives_ = std::move(primitives);
+    }
+
+    void setJoints(std::vector<glm::u32vec4> joints) {
+        joints_ = std::move(joints);
+    }
+
+    void setWeights(std::vector<glm::f32vec4> weights) {
+        weights_ = std::move(weights);
+    }
+
+    auto getVertices() const -> const std::vector<Vertex>& {
+        return vertices_;
+    }
+
+    auto getIndices() const -> const std::vector<uint32_t>& {
+        return indices_;
+    }
+
+    auto getPrimitives() const -> const std::vector<Primitive>& {
+        return primitives_;
+    }
+
+    auto getJoints() const -> const std::vector<glm::u32vec4>& {
+        return joints_;
+    }
+
+    auto getWeights() const -> const std::vector<glm::f32vec4>& {
+        return weights_;
+    }
 
 public:
     void uploadMeshData(const ManagedShared<gfx::Device>& device) {
-        if (mIndices.empty()) {
-            mIndexBuffer = {};
+        if (indices_.empty()) {
+            index_buffer_ = {};
         } else {
-            mIndexBuffer = device->newBuffer(vk::BufferUsageFlagBits::eIndexBuffer, mIndices.data(), mIndices.size() * sizeof(uint32_t), gfx::StorageMode::eShared);
+            index_buffer_ = device->newBuffer(vk::BufferUsageFlagBits::eIndexBuffer, indices_.data(), indices_.size() * sizeof(uint32_t), gfx::StorageMode::eShared);
         }
-        if (mVertices.empty()) {
-            mVertexBuffer = {};
+        if (vertices_.empty()) {
+            vertex_buffer_ = {};
         } else {
-            mVertexBuffer = device->newBuffer(vk::BufferUsageFlagBits::eVertexBuffer, mVertices.data(), mVertices.size() * sizeof(Vertex), gfx::StorageMode::eShared);
+            vertex_buffer_ = device->newBuffer(vk::BufferUsageFlagBits::eVertexBuffer, vertices_.data(), vertices_.size() * sizeof(Vertex), gfx::StorageMode::eShared);
         }
     }
 
     void draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder) {
-        if (mIndexBuffer) {
-            encoder->bindIndexBuffer(mIndexBuffer, 0, vk::IndexType::eUint32);
+        if (index_buffer_) {
+            encoder->bindIndexBuffer(index_buffer_, 0, vk::IndexType::eUint32);
         }
-        if (mVertexBuffer) {
-            encoder->bindVertexBuffer(0, mVertexBuffer, 0);
+        if (vertex_buffer_) {
+            encoder->bindVertexBuffer(0, vertex_buffer_, 0);
         }
 
-        for (auto& primitive : mPrimitives) {
+        for (auto& primitive : primitives_) {
             if (primitive.numIndices > 0) {
                 encoder->drawIndexed(primitive.numIndices, 1, primitive.baseIndex, static_cast<int32_t>(primitive.baseVertex), 0);
             } else {

@@ -15,8 +15,8 @@ struct GlobalSharedData {
 };
 
 struct Camera {
-    glm::mat4x4 projection_matrix = {};
-    glm::mat4x4 world_to_camera_matrix = {};
+    glm::mat4x4 proj_matrix = {};
+    glm::mat4x4 view_matrix = {};
 };
 
 struct Transform {
@@ -115,13 +115,15 @@ private:
         std::vector<Primitive> primitives;
         primitives.emplace_back(0, 0, 0, static_cast<uint32_t>(vertices.size()));
 
-        cube = sp<Mesh>::of(vertices, std::vector<uint32_t>{}, primitives, std::vector<glm::u32vec4>{}, std::vector<glm::f32vec4>{});
+        cube = sp<Mesh>::of();
+        cube->setVertices(vertices);
+        cube->setPrimitives(primitives);
         cube->uploadMeshData(device);
     }
 
 public:
     void update(float_t dt) override {
-        camera.projection_matrix = perspective(glm::radians(60.0F), platform->getAspectRatio(), 0.03F, 1000.0F);
+        camera.proj_matrix = perspective(glm::radians(60.0F), platform->getAspectRatio(), 0.03F, 1000.0F);
 
         glm::ivec2 input{
             (right ? 1 : 0) - (left ? 1 : 0),
@@ -136,7 +138,7 @@ public:
         }
         camera_position = glm::lerp(camera_position, transform.position, dt * 10.0F);
 
-        camera.world_to_camera_matrix = glm::inverse(
+        camera.view_matrix = glm::inverse(
             glm::translate(glm::mat4x4(1.0F), camera_position) * glm::mat4(yaw_pitch_roll)
         );
     }
@@ -163,11 +165,11 @@ public:
         rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
         rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
-        auto vp = camera.projection_matrix * camera.world_to_camera_matrix;
+        auto vp = camera.proj_matrix * camera.view_matrix;
 
         GlobalSharedData shader_data = {};
-        shader_data.projection_matrix               = camera.projection_matrix;
-        shader_data.world_to_camera_matrix          = camera.world_to_camera_matrix;
+        shader_data.projection_matrix               = camera.proj_matrix;
+        shader_data.world_to_camera_matrix          = camera.view_matrix;
         shader_data.view_projection_matrix          = vp;
         shader_data.inverse_view_projection_matrix  = glm::inverse(vp);
         shader_data.camera_position                 = glm::vec4(camera_position, 1.0F);

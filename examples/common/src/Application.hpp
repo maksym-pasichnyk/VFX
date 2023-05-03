@@ -261,6 +261,6 @@ protected:
     ManagedShared<gfx::CommandQueue>    commandQueue    = {};
     ManagedShared<gfx::CommandBuffer>   commandBuffer   = {};
 
-    sp<Canvas>                       canvas;
-    sp<ImGuiBackend>                      imgui;
+    sp<Canvas>                          canvas;
+    sp<ImGuiBackend>                    imgui;
 };
