@@ -25,7 +25,7 @@ find_library(
 message(STATUS "MoltenVK: ${MoltenVK}")
 
 set(VMA_VERSION 3.0.1)
-FetchContent_Declare(VulkanMemoryAllocator URL "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/v${VMA_VERSION}.zip" DOWNLOAD_EXTRACT_TIMESTAMP ON)
+FetchContent_Declare(VulkanMemoryAllocator URL "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/v3.0.1.zip" DOWNLOAD_EXTRACT_TIMESTAMP ON)
 FetchContent_MakeAvailable(VulkanMemoryAllocator)
 
 set(SPDLOG_VERSION 1.11.0)
@@ -33,7 +33,7 @@ FetchContent_Declare(spdlog URL "https://github.com/gabime/spdlog/archive/v${SPD
 FetchContent_MakeAvailable(spdlog)
 
 set(SPIRV_REFLECT_VERSION 1.3.236.0)
-FetchContent_Declare(SPIRV-Reflect URL "https://github.com/KhronosGroup/SPIRV-Reflect/archive/refs/tags/sdk-${SPIRV_REFLECT_VERSION}.zip" DOWNLOAD_EXTRACT_TIMESTAMP ON)
+FetchContent_Declare(SPIRV-Reflect URL "https://github.com/KhronosGroup/SPIRV-Reflect/archive/refs/tags/sdk-1.3.236.0.zip" DOWNLOAD_EXTRACT_TIMESTAMP ON)
 FetchContent_MakeAvailable(SPIRV-Reflect)
 
 function(target_compile_shaders TARGET)

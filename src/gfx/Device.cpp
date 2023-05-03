@@ -357,7 +357,7 @@ void gfx::Device::waitIdle() {
 
 auto gfx::Device::newTexture(const TextureSettings& description) -> ManagedShared<Texture> {
     auto aspect = image_aspect_flags_table.at(description.format);
-    auto texture = MakeShared(new Texture(MakeShared(this->retain())));
+    auto texture = MakeShared(new Texture(shared_from_this()));
 
     texture->format = description.format;
     texture->extent.setWidth(description.width);
@@ -394,7 +394,7 @@ auto gfx::Device::newTexture(const TextureSettings& description) -> ManagedShare
 }
 
 auto gfx::Device::newSampler(const vk::SamplerCreateInfo& info) -> ManagedShared<Sampler> {
-    return MakeShared(new Sampler(MakeShared(this->retain()), raii.raw.createSampler(info, VK_NULL_HANDLE, raii.dispatcher)));
+    return MakeShared(new Sampler(shared_from_this(), raii.raw.createSampler(info, VK_NULL_HANDLE, raii.dispatcher)));
 }
 
 auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options) -> ManagedShared<Buffer> {
@@ -436,7 +436,7 @@ auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, StorageMo
         }
     }
 
-    auto buffer = MakeShared(new Buffer(MakeShared(this->retain())));
+    auto buffer = MakeShared(new Buffer(shared_from_this()));
     vmaCreateBuffer(allocator, reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info), &allocation_create_info, reinterpret_cast<VkBuffer*>(&buffer->raw), &buffer->allocation, nullptr);
     return buffer;
 }
@@ -454,7 +454,7 @@ auto gfx::Device::newLibrary(const std::vector<char>& bytes) -> ManagedShared<Li
     module_create_info.setCodeSize(bytes.size());
     module_create_info.setPCode(reinterpret_cast<const uint32_t *>(bytes.data()));
 
-    auto library = MakeShared(new Library(MakeShared(this->retain())));
+    auto library = MakeShared(new Library(shared_from_this()));
     library->raw = raii.raw.createShaderModule(module_create_info, VK_NULL_HANDLE, raii.dispatcher);
 
     spvReflectCreateShaderModule(module_create_info.codeSize, module_create_info.pCode, &library->spvReflectShaderModule);
@@ -494,7 +494,7 @@ auto gfx::Device::newRenderPipelineState(const gfx::RenderPipelineStateDescripti
         }
     }
     
-    auto state = MakeShared(new RenderPipelineState(MakeShared(this->retain())));
+    auto state = MakeShared(new RenderPipelineState(shared_from_this()));
 
     state->bind_group_layouts.resize(descriptor_sets.size());
     for (uint32_t i = 0; i < state->bind_group_layouts.size(); ++i) {
@@ -637,7 +637,7 @@ auto gfx::Device::newComputePipelineState(const ManagedShared<Function>& functio
         }
     }
 
-    auto state = MakeShared(new ComputePipelineState(MakeShared(this->retain())));
+    auto state = MakeShared(new ComputePipelineState(shared_from_this()));
     state->descriptor_set_layouts.resize(descriptor_sets.size());
     for (uint32_t i = 0; i < descriptor_sets.size(); ++i) {
         vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {};
@@ -673,9 +673,9 @@ auto gfx::Device::newCommandQueue() -> ManagedShared<CommandQueue> {
 
     auto pool = raii.raw.createCommandPool(command_pool_create_info, nullptr, raii.dispatcher);
 
-    return MakeShared(new CommandQueue(MakeShared(this->retain()), pool));
+    return MakeShared(new CommandQueue(shared_from_this(), pool));
 }
 
 auto gfx::Device::createSwapchain(const ManagedShared<Surface>& surface) -> ManagedShared<Swapchain> {
-    return MakeShared(new Swapchain(MakeShared(this->retain()), surface));
+    return MakeShared(new Swapchain(shared_from_this(), surface));
 }

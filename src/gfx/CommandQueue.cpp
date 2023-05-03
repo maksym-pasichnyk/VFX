@@ -7,5 +7,5 @@ gfx::CommandQueue::~CommandQueue() {
 }
 
 auto gfx::CommandQueue::commandBuffer() -> ManagedShared<CommandBuffer> {
-    return MakeShared(new CommandBuffer(device, MakeShared(this->retain())));
+    return MakeShared(new CommandBuffer(device, shared_from_this()));
 }

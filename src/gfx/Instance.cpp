@@ -164,11 +164,11 @@ auto gfx::Instance::createDevice(vk::PhysicalDevice adapter) -> ManagedShared<De
 
     auto queue = device.raw.getQueue(queue_family_index, 0, device.dispatcher);
 
-    return MakeShared(new Device(MakeShared(this->retain()), device, adapter, queue_family_index, 0, queue, allocator));
+    return MakeShared(new Device(shared_from_this(), device, adapter, queue_family_index, 0, queue, allocator));
 }
 
 auto gfx::Instance::wrapSurface(vk::SurfaceKHR surface) -> ManagedShared<Surface> {
-    return MakeShared(new Surface(MakeShared(this->retain()), surface));
+    return MakeShared(new Surface(shared_from_this(), surface));
 }
 
 auto gfx::Instance::getSurfaceCapabilitiesKHR(vk::PhysicalDevice adapter, vk::SurfaceKHR surface) -> vk::SurfaceCapabilitiesKHR {
