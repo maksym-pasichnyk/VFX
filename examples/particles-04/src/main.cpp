@@ -118,10 +118,10 @@ private:
     glm::mat4x4 camera_projection_matrix = {};
     glm::mat4x4 world_to_camera_matrix = {};
 
-    sp<ParticleSystem> rocketParticleSystem = {};
-    sp<ParticleSystem> sparkleParticleSystem = {};
-    sp<ParticleSystem> explosionParticleSystem = {};
-    sp<ParticleEmitter> rocketParticleEmitter = {};
+    ManagedShared<ParticleSystem> rocketParticleSystem = {};
+    ManagedShared<ParticleSystem> sparkleParticleSystem = {};
+    ManagedShared<ParticleSystem> explosionParticleSystem = {};
+    ManagedShared<ParticleEmitter> rocketParticleEmitter = {};
 
     std::default_random_engine random_engine = {};
 };

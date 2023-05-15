@@ -4,19 +4,19 @@
 
 struct Overlay : View {
 private:
-    sp<View> content;
-    sp<View> overlay;
+    ManagedShared<View> content;
+    ManagedShared<View> overlay;
     Alignment alignment;
 
 public:
-    explicit Overlay(sp<View> content, sp<View> overlay, Alignment alignment)
+    explicit Overlay(ManagedShared<View> content, ManagedShared<View> overlay, Alignment alignment)
         : content(std::move(content)), overlay(std::move(overlay)), alignment(alignment) {}
 
     auto getPreferredSize(const ProposedSize& proposed) -> Size override {
         return content->getPreferredSize(proposed);
     }
 
-    void _draw(const sp<Canvas>& canvas, const Size& size) override {
+    void _draw(const ManagedShared<Canvas>& canvas, const Size& size) override {
         content->_draw(canvas, size);
 
         auto childSize = overlay->getPreferredSize(ProposedSize(size));
@@ -29,6 +29,6 @@ public:
     }
 };
 
-inline auto View::overlay(sp<View> overlay, Alignment alignment) {
+inline auto View::overlay(ManagedShared<View> overlay, Alignment alignment) {
     return MakeShared<Overlay>(shared_from_this(), std::move(overlay), alignment);
 }

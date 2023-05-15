@@ -7,6 +7,9 @@
 #include <optional>
 
 namespace gfx {
+    struct CommandBuffer;
+    struct RenderCommandEncoder;
+
     struct RenderPipelineColorBlendAttachmentStateArray {
         std::vector<vk::PipelineColorBlendAttachmentState> elements = {};
 
@@ -24,34 +27,21 @@ namespace gfx {
     };
 
     struct MultisampleState : ManagedObject<MultisampleState> {
-        vk::SampleCountFlagBits         rasterization_samples       = vk::SampleCountFlagBits::e1;
         bool                            sample_shading_enable       = false;
         float                           min_sample_shading          = 1.0F;
         vk::Optional<vk::SampleMask>    sample_mask                 = nullptr;
     };
 
     struct DepthStencilStateDescription {
-        bool                    depth_test_enable           = false;
-        bool                    depth_write_enable          = false;
-        vk::CompareOp           depth_compare_op            = vk::CompareOp::eAlways;
+        bool                    isDepthTestEnabled          = false;
+        bool                    isDepthWriteEnabled         = false;
+        vk::CompareOp           depthCompareFunction        = vk::CompareOp::eAlways;
         bool                    depth_bounds_test_enable    = false;
         bool                    stencil_test_enable         = false;
-        vk::StencilOpState      front                       = {};
-        vk::StencilOpState      back                        = {};
+        vk::StencilOpState      frontFaceStencil            = {};
+        vk::StencilOpState      backFaceStencil             = {};
         float                   min_depth_bounds            = 0.0F;
         float                   max_depth_bounds            = 1.0F;
-    };
-
-    struct DepthStencilState : ManagedObject<DepthStencilState> {
-        bool                depth_test_enable           = {};
-        bool                depth_write_enable          = {};
-        vk::CompareOp       depth_compare_op            = {};
-        bool                depth_bounds_test_enable    = {};
-        bool                stencil_test_enable         = {};
-        vk::StencilOpState  front                       = {};
-        vk::StencilOpState  back                        = {};
-        float               min_depth_bounds            = {};
-        float               max_depth_bounds            = {};
     };
 
     struct VertexInputState {
@@ -71,16 +61,39 @@ namespace gfx {
         RenderPipelineColorAttachmentFormatArray        colorAttachmentFormats      = {};
         RenderPipelineColorBlendAttachmentStateArray    colorBlendAttachments       = {};
 
+
         // InputAssemblyState
         vk::PrimitiveTopology                           inputPrimitiveTopology      = vk::PrimitiveTopology::eTriangleList;
         bool                                            primitiveRestartEnable      = {};
 
         // MultisampleState
+        uint32_t                                        rasterSampleCount           = 1;
         bool                                            isAlphaToCoverageEnabled    = {};
         bool                                            isAlphaToOneEnabled         = {};
     };
 
-    struct RenderPipelineState : ManagedObject<RenderPipelineState> {
+    class DepthStencilState : public ManagedObject<DepthStencilState> {
+        friend Device;
+        friend RenderCommandEncoder;
+
+    private:
+        bool                isDepthTestEnabled      = {};
+        bool                isDepthWriteEnabled     = {};
+        vk::CompareOp       depthCompareFunction    = {};
+        bool                isDepthBoundsTestEnabled   = {};
+        bool                isStencilTestEnabled       = {};
+        vk::StencilOpState  frontFaceStencil        = {};
+        vk::StencilOpState  backFaceStencil         = {};
+        float               minDepthBounds          = {};
+        float               maxDepthBounds          = {};
+    };
+
+    class RenderPipelineState : public ManagedObject<RenderPipelineState> {
+        friend Device;
+        friend CommandBuffer;
+        friend RenderCommandEncoder;
+
+    private:
         ManagedShared<Device>                           device                      = {};
         ManagedShared<Function>                         vertexFunction              = {};
         ManagedShared<Function>                         fragmentFunction            = {};
@@ -94,6 +107,7 @@ namespace gfx {
         RenderPipelineColorBlendAttachmentStateArray    colorBlendAttachments       = {};
         vk::PrimitiveTopology                           inputPrimitiveTopology      = {};
         bool                                            primitiveRestartEnable      = {};
+        uint32_t                                        rasterSampleCount           = {};
         bool                                            isAlphaToCoverageEnabled    = {};
         bool                                            isAlphaToOneEnabled         = {};
 
@@ -102,6 +116,7 @@ namespace gfx {
         std::map<std::size_t, vk::Pipeline>             pipelines                   = {};
         std::vector<vk::DescriptorSetLayout>            bindGroupLayouts            = {};
 
+    public:
         explicit RenderPipelineState(ManagedShared<Device> device);
         ~RenderPipelineState() override;
     };

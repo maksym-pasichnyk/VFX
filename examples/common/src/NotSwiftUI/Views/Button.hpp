@@ -4,12 +4,12 @@
 
 struct Button : View {
 private:
-    sp<struct View> text;
+    ManagedShared<struct View> text;
 
 public:
-    explicit Button(sp<struct View> text) : text(std::move(text)) {}
+    explicit Button(ManagedShared<struct View> text) : text(std::move(text)) {}
 
-    void _draw(const sp<Canvas> &canvas, const Size &size) override {
+    void _draw(const ManagedShared<Canvas> &canvas, const Size &size) override {
         auto textSize = text->getPreferredSize(ProposedSize(size));
         auto translate = translation(textSize, size, Alignment::center());
 
@@ -28,6 +28,6 @@ public:
     }
 };
 
-static auto Button(sp<struct View> text) {
+static auto Button(ManagedShared<struct View> text) {
     return MakeShared<struct Button>(std::move(text));
 }

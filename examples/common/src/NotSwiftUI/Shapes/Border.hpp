@@ -12,7 +12,7 @@ private:
 public:
     explicit Border(float_t width) : width(width) {}
 
-    void path(const sp<Canvas>& canvas, const Size& size) override {
+    void path(const ManagedShared<Canvas>& canvas, const Size& size) override {
         canvas->drawRect(size, width);
     }
 };

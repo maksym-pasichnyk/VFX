@@ -208,7 +208,7 @@ protected:
         return quit;
     }
 
-    auto _drawView(const sp<View>& view) {
+    auto _drawView(const ManagedShared<View>& view) {
         auto uiSize = getUISize(platform->getWindowSize());
         auto childSize = view->getPreferredSize(ProposedSize(uiSize));
         auto translate = view->translation(childSize, uiSize, Alignment::center());
@@ -245,7 +245,7 @@ public:
 
 //todo: make this private
 protected:
-    sp<WindowPlatform>                  platform        = {};
+    ManagedShared<WindowPlatform>       platform        = {};
     float_t                             average         = {};
     float_t                             accumulate[60]  = {};
     float_t                             accumulateTotal = {};
@@ -261,6 +261,6 @@ protected:
     ManagedShared<gfx::CommandQueue>    commandQueue    = {};
     ManagedShared<gfx::CommandBuffer>   commandBuffer   = {};
 
-    sp<Canvas>                          canvas;
-    sp<ImGuiBackend>                    imgui;
+    ManagedShared<Canvas>               canvas;
+    ManagedShared<ImGuiBackend>         imgui;
 };

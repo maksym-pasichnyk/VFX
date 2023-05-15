@@ -6,8 +6,8 @@
 
 struct Scene : ManagedObject<Scene> {
 private:
-    std::vector<sp<Node>> mNodes;
+    std::vector<ManagedShared<Node>> mNodes;
 
 public:
-    explicit Scene(std::vector<sp<Node>> nodes) : mNodes(std::move(nodes)) {}
+    explicit Scene(std::vector<ManagedShared<Node>> nodes) : mNodes(std::move(nodes)) {}
 };

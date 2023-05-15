@@ -464,15 +464,15 @@ auto gfx::Device::newLibrary(const std::vector<char>& bytes) -> ManagedShared<Li
 
 auto gfx::Device::newDepthStencilState(DepthStencilStateDescription const& description) -> ManagedShared<DepthStencilState> {
     auto depth_stencil_state = MakeShared<DepthStencilState>();
-    depth_stencil_state->depth_test_enable = description.depth_test_enable;
-    depth_stencil_state->depth_write_enable = description.depth_write_enable;
-    depth_stencil_state->depth_compare_op = description.depth_compare_op;
-    depth_stencil_state->depth_bounds_test_enable = description.depth_bounds_test_enable;
-    depth_stencil_state->stencil_test_enable = description.stencil_test_enable;
-    depth_stencil_state->front = description.front;
-    depth_stencil_state->back = description.back;
-    depth_stencil_state->min_depth_bounds = description.min_depth_bounds;
-    depth_stencil_state->max_depth_bounds = description.max_depth_bounds;
+    depth_stencil_state->isDepthTestEnabled = description.isDepthTestEnabled;
+    depth_stencil_state->isDepthWriteEnabled = description.isDepthWriteEnabled;
+    depth_stencil_state->depthCompareFunction = description.depthCompareFunction;
+    depth_stencil_state->isDepthBoundsTestEnabled = description.depth_bounds_test_enable;
+    depth_stencil_state->isStencilTestEnabled = description.stencil_test_enable;
+    depth_stencil_state->frontFaceStencil = description.frontFaceStencil;
+    depth_stencil_state->backFaceStencil = description.backFaceStencil;
+    depth_stencil_state->minDepthBounds = description.min_depth_bounds;
+    depth_stencil_state->maxDepthBounds = description.max_depth_bounds;
     return depth_stencil_state;
 }
 
@@ -512,7 +512,6 @@ auto gfx::Device::newRenderPipelineState(RenderPipelineStateDescription const& d
     state->vertexFunction           = description.vertexFunction;
     state->fragmentFunction         = description.fragmentFunction;
     state->tessellationState        = description.tessellationState;
-//    state->rasterizationState       = description.rasterizationState;
     state->multisampleState         = description.multisampleState;
     state->vertexInputState         = description.vertexInputState;
     state->viewMask                 = description.viewMask;
@@ -522,6 +521,7 @@ auto gfx::Device::newRenderPipelineState(RenderPipelineStateDescription const& d
     state->colorBlendAttachments    = description.colorBlendAttachments;
     state->inputPrimitiveTopology   = description.inputPrimitiveTopology;
     state->primitiveRestartEnable   = description.primitiveRestartEnable;
+    state->rasterSampleCount        = description.rasterSampleCount;
     state->isAlphaToCoverageEnabled = description.isAlphaToCoverageEnabled;
     state->isAlphaToOneEnabled      = description.isAlphaToOneEnabled;
 

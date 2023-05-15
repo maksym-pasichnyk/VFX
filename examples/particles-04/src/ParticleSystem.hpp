@@ -40,7 +40,7 @@ public:
 private:
     void buildShaders() {
         gfx::DepthStencilStateDescription depthStencilStateDescription;
-        depthStencilStateDescription.depth_test_enable = true;
+        depthStencilStateDescription.isDepthTestEnabled = true;
 
         mDepthStencilState = mDevice->newDepthStencilState(depthStencilStateDescription);
 

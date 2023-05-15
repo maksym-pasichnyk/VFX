@@ -93,7 +93,7 @@ public:
     }
 
 private:
-    sp<GraphView> graphView;
+    ManagedShared<GraphView> graphView;
 };
 
 auto main(int argc, char** argv) -> int32_t {

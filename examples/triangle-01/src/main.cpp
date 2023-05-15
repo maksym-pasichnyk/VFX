@@ -98,7 +98,7 @@ private:
     }
 
 private:
-    sp<View> content;
+    ManagedShared<View> content;
     ManagedShared<gfx::Buffer> vertexBuffer;
     ManagedShared<gfx::RenderPipelineState> renderPipelineState;
 };

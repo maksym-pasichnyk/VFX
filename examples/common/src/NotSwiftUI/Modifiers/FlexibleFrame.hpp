@@ -4,7 +4,7 @@
 
 struct FlexibleFrame : View {
 private:
-    sp<View> content;
+    ManagedShared<View> content;
     std::optional<float_t> minWidth;
     std::optional<float_t> idealWidth;
     std::optional<float_t> maxWidth;
@@ -14,7 +14,7 @@ private:
     Alignment alignment;
 
 public:
-    explicit FlexibleFrame(sp<View> content, std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment)
+    explicit FlexibleFrame(ManagedShared<View> content, std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment)
         : content(std::move(content))
         , minWidth(minWidth)
         , idealWidth(idealWidth)
@@ -55,7 +55,7 @@ public:
         return size;
     }
 
-    void _draw(const sp<Canvas>& canvas, const Size& size) override {
+    void _draw(const ManagedShared<Canvas>& canvas, const Size& size) override {
         auto childSize = content->getPreferredSize(ProposedSize(size));
         auto translate = translation(childSize, size, alignment);
 

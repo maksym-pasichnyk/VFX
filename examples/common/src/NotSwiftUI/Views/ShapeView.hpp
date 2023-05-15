@@ -10,22 +10,22 @@
 template<std::derived_from<Shape> T>
 struct ShapeView : View {
 private:
-    sp<T> shape;
+    ManagedShared<T> shape;
 
 public:
-    explicit ShapeView(sp<T> shape) : shape(std::move(shape)) {}
+    explicit ShapeView(ManagedShared<T> shape) : shape(std::move(shape)) {}
 
 public:
     auto getPreferredSize(const ProposedSize &proposed) -> Size override {
         return proposed.orDefault(10.0F, 10.0F);
     }
 
-    void _draw(const sp<Canvas> &canvas, const Size &size) override {
+    void _draw(const ManagedShared<Canvas> &canvas, const Size &size) override {
         shape->path(canvas, size);
     }
 };
 
 template<std::derived_from<Shape> T>
-static auto Shape(sp<T> shape) {
+static auto Shape(ManagedShared<T> shape) {
     return MakeShared<struct ShapeView<T>>(std::move(shape));
 }

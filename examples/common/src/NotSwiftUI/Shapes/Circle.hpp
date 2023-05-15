@@ -7,7 +7,7 @@
 #include "Shape.hpp"
 
 struct Circle : Shape {
-    void path(const sp<Canvas>& canvas, const Size& size) override {
+    void path(const ManagedShared<Canvas>& canvas, const Size& size) override {
         float_t halfSize = std::min(size.width, size.height) * 0.5F;
         float_t dx = size.width * 0.5F - halfSize;
         float_t dy = size.height * 0.5F - halfSize;

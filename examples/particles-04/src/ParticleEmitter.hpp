@@ -4,12 +4,12 @@
 
 struct ParticleEmitter : ManagedObject<ParticleEmitter> {
 protected:
-    sp<ParticleSystem> mParticleSystem;
+    ManagedShared<ParticleSystem> mParticleSystem;
     float mEmitRate = {};
     float mTime = {};
 
 public:
-    ParticleEmitter(sp<ParticleSystem> particleSystem, float emitRate)
+    ParticleEmitter(ManagedShared<ParticleSystem> particleSystem, float emitRate)
         : mParticleSystem(std::move(particleSystem)), mEmitRate(std::max(emitRate, 0.01F)) {}
 
 public:

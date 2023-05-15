@@ -45,7 +45,7 @@ public:
         Capacity mCapacity;
         Direction mDirection;
 
-        std::set<sp<Link>> mLinks = {};
+        std::set<ManagedShared<Link>> mLinks = {};
 
     private:
         explicit Port(Node* node, size_t index, std::string name, Capacity capacity, Direction direction)
@@ -60,8 +60,8 @@ public:
         Size mSize = Size{450.0F, 250.0F};
         Point mPosition = Point::zero();
 
-        std::vector<sp<Port>> mInputs = {};
-        std::vector<sp<Port>> mOutputs = {};
+        std::vector<ManagedShared<Port>> mInputs = {};
+        std::vector<ManagedShared<Port>> mOutputs = {};
 
     private:
         explicit Node(std::string text) : mText(std::move(text)) {}
@@ -100,7 +100,7 @@ public:
         }
 
     private:
-        void draw(const sp<Canvas> &canvas, bool selected) {
+        void draw(const ManagedShared<Canvas> &canvas, bool selected) {
             ImVec2 textSize1 = canvas->drawList()->_Data->Font->CalcTextSizeA(36.0F, FLT_MAX, FLT_MAX, mText.data(), mText.data() + mText.size(), nullptr);
 
             canvas->saveState();
@@ -180,7 +180,7 @@ public:
             }
         }
 
-        auto _getSlotPosition(const sp<Port>& port) -> Point {
+        auto _getSlotPosition(const ManagedShared<Port>& port) -> Point {
             if (port->mDirection == Port::Direction::eInput) {
                 float x = mPosition.x + 10.0F + 10.0F + 10.0F;
                 float y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * static_cast<float>(port->mIndex);
@@ -197,11 +197,11 @@ public:
         friend GraphView;
 
     private:
-        sp<Port> mPortA;
-        sp<Port> mPortB;
+        ManagedShared<Port> mPortA;
+        ManagedShared<Port> mPortB;
 
     private:
-        explicit Link(sp<Port> portA, sp<Port> portB)
+        explicit Link(ManagedShared<Port> portA, ManagedShared<Port> portB)
             : mPortA(std::move(portA)), mPortB(std::move(portB)){}
     };
 
@@ -210,8 +210,8 @@ private:
     float_t mTargetZoomScale = 2.0F;
     Point mTargetZoomPoint = Point();
 
-    std::list<sp<Node>> mNodes = {};
-    std::list<sp<Link>> mLinks = {};
+    std::list<ManagedShared<Node>> mNodes = {};
+    std::list<ManagedShared<Link>> mLinks = {};
 
     Point mGridOffset = Point();
     Point mStartPosition = Point();
@@ -219,16 +219,16 @@ private:
     Point mCursorPosition = Point();
     Interaction mInteraction = Interaction::eNone;
 
-    sp<Node> mSelectedNode = {};
-    sp<Port> mSelectedPort = {};
-    sp<Link> mSelectedLink = {};
+    ManagedShared<Node> mSelectedNode = {};
+    ManagedShared<Port> mSelectedPort = {};
+    ManagedShared<Link> mSelectedLink = {};
 
 private:
     auto getPreferredSize(const ProposedSize &proposed) -> Size override {
         return proposed.orMax();
     }
 
-    void _draw(const sp<Canvas> &canvas, const Size& size) override {
+    void _draw(const ManagedShared<Canvas> &canvas, const Size& size) override {
         float invScale = 1.0F / mZoomScale;
 
         canvas->saveState();
@@ -289,7 +289,7 @@ private:
         canvas->restoreState();
     }
 
-    void drawLink(const sp<Canvas> &canvas, const Point& pointA, const Point& pointD, ImU32 color = IM_COL32(255, 255, 255, 255)) {
+    void drawLink(const ManagedShared<Canvas> &canvas, const Point& pointA, const Point& pointD, ImU32 color = IM_COL32(255, 255, 255, 255)) {
         Point pointB = pointA + Point{std::abs(pointD.x - pointA.x), 0.0F};
         Point pointC = pointD - Point{std::abs(pointD.x - pointA.x), 0.0F};
 
@@ -303,7 +303,7 @@ private:
         canvas->drawList()->PathStroke(color, 0, 5.0F);
     }
 
-    auto findNodeAt(int32_t x, int32_t y) -> sp<Node> {
+    auto findNodeAt(int32_t x, int32_t y) -> ManagedShared<Node> {
         auto uiPoint = Point{static_cast<float_t>(x), static_cast<float_t>(y)};
 
         for (auto& node : ranges::reverse_view(mNodes)) {
@@ -319,7 +319,7 @@ private:
         return {};
     }
 
-    auto findPortAt(const sp<Node>& node, int32_t x, int32_t y) -> sp<Port> {
+    auto findPortAt(const ManagedShared<Node>& node, int32_t x, int32_t y) -> ManagedShared<Port> {
         auto uiPoint = Point{static_cast<float_t>(x), static_cast<float_t>(y)};
 
         for (auto& port : node->mInputs) {
@@ -337,7 +337,7 @@ private:
         return {};
     }
 
-    auto addLink(const sp<Port>& portA, const sp<Port>& portB) -> sp<Link> {
+    auto addLink(const ManagedShared<Port>& portA, const ManagedShared<Port>& portB) -> ManagedShared<Link> {
         for (auto& link : mLinks) {
             if (link->mPortA == portA && link->mPortB == portB) {
                 return {};
@@ -356,7 +356,7 @@ private:
         return link;
     }
 
-    void removeNode(const sp<Node>& node) {
+    void removeNode(const ManagedShared<Node>& node) {
         for (auto& port : node->mInputs) {
             if (port == mSelectedPort) {
                 mSelectedPort = {};
@@ -376,7 +376,7 @@ private:
         }
     }
 
-    void removeLinks(const sp<Port>& port) {
+    void removeLinks(const ManagedShared<Port>& port) {
         for (auto& link : auto(port->mLinks)) {
             link->mPortA->mLinks.erase(link);
             link->mPortB->mLinks.erase(link);
@@ -385,7 +385,7 @@ private:
     }
 
 public:
-    auto addNode(std::string text) -> sp<Node> {
+    auto addNode(std::string text) -> ManagedShared<Node> {
         return mNodes.emplace_back(TransferPtr(new Node(std::move(text))));
     }
 

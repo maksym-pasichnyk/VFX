@@ -79,7 +79,7 @@ namespace gfx {
             RenderCommandEncoderPipeline    = 1 << 0
         };
 
-        uint32_t                            flags                       = {};
+        uint32_t                            flags_                      = {};
         ManagedShared<CommandBuffer>        commandBuffer               = {};
         ManagedShared<DepthStencilState>    depthStencilState_          = {};
         ManagedShared<RenderPipelineState>  renderPipelineState_        = {};

@@ -78,7 +78,7 @@ public:
     }
 
 private:
-    sp<View> content;
+    ManagedShared<View> content;
 };
 
 auto main(int argc, char** argv) -> int32_t {

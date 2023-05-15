@@ -4,15 +4,15 @@
 
 struct ForegroundColor : View {
 private:
-    sp<View> content;
+    ManagedShared<View> content;
     Color color;
 
 public:
-    explicit ForegroundColor(sp<View> content, const Color& color)
+    explicit ForegroundColor(ManagedShared<View> content, const Color& color)
         : content(std::move(content)), color(color) {}
 
 public:
-    void _draw(const sp<Canvas> &canvas, const Size &size) override {
+    void _draw(const ManagedShared<Canvas> &canvas, const Size &size) override {
         canvas->saveState();
         canvas->setFillColor(color);
         content->_draw(canvas, size);

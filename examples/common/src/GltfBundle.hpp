@@ -16,10 +16,10 @@
 #include "fmt/format.h"
 
 struct GltfBundle {
-    std::vector<sp<Skin>>       skins = {};
-    std::vector<sp<Mesh>>       meshes = {};
-    std::vector<sp<Scene>>      scenes = {};
-    std::vector<sp<Animation>>  animations = {};
+    std::vector<ManagedShared<Skin>>       skins = {};
+    std::vector<ManagedShared<Mesh>>       meshes = {};
+    std::vector<ManagedShared<Scene>>      scenes = {};
+    std::vector<ManagedShared<Animation>>  animations = {};
 
     static auto open(const std::string& path) -> GltfBundle {
         auto bytes = Assets::readFile(path);
@@ -156,7 +156,7 @@ struct GltfBundle {
             bundle.skins.emplace_back(MakeShared<Skin>(skin.skeleton, skin.joints, std::move(inverseBindMatrices)));
         }
 
-        std::vector<sp<Node>> nodes = {};
+        std::vector<ManagedShared<Node>> nodes = {};
 
         for (auto& node : model.nodes) {
             glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -185,11 +185,11 @@ struct GltfBundle {
                 auto z = static_cast<float>(node.scale[2]);
                 scale = glm::vec3(x, y, z);
             }
-            sp<Skin> skin = {};
+            ManagedShared<Skin> skin = {};
             if (node.skin >= 0) {
                 skin = bundle.skins.at(node.skin);
             }
-            sp<Mesh> mesh = {};
+            ManagedShared<Mesh> mesh = {};
             if (node.mesh >= 0) {
                 mesh = bundle.meshes.at(node.mesh);
             }

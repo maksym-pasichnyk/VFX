@@ -289,7 +289,7 @@ private:
     Camera camera;
     Transform transform;
 
-    sp<Mesh> cube;
+    ManagedShared<Mesh> cube;
 
     bool forward = false;
     bool backward = false;
