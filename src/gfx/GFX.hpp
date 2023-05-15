@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Instance.hpp"
+#include "Adapter.hpp"
 #include "Surface.hpp"
-#include "Device.hpp"
 #include "Buffer.hpp"
 #include "Device.hpp"
 #include "Object.hpp"

@@ -77,7 +77,7 @@ void gfx::Swapchain::configure(const SurfaceConfiguration& config) {
         view_create_info.setFormat(config.format);
         view_create_info.setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
-        auto texture = MakeShared(new Texture(device));
+        auto texture = MakeShared<Texture>(device);
         texture->extent.setWidth(capabilities.currentExtent.width);
         texture->extent.setHeight(capabilities.currentExtent.height);
         texture->extent.setDepth(1);

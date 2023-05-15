@@ -2,7 +2,7 @@
 
 #include "ParticleSystem.hpp"
 
-struct ParticleEmitter : Object {
+struct ParticleEmitter : ManagedObject<ParticleEmitter> {
 protected:
     sp<ParticleSystem> mParticleSystem;
     float mEmitRate = {};

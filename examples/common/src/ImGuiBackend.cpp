@@ -30,7 +30,7 @@ void ImGuiBackend::buildFonts() {
         pixels[i] = IM_COL32(255, 255, 255, im_font_atlas.TexPixelsAlpha8[i]);
     }
 
-    gfx::TextureSettings font_texture_description;
+    gfx::TextureDescription font_texture_description;
     font_texture_description.width = static_cast<uint32_t>(im_font_atlas.TexWidth);
     font_texture_description.height = static_cast<uint32_t>(im_font_atlas.TexHeight);
     font_texture_description.format = vk::Format::eR8G8B8A8Unorm;
@@ -73,7 +73,6 @@ void ImGuiBackend::buildShaders() {
     };
 
     description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-    description.depthStencilState.depth_test_enable = false;
 
     description.colorBlendAttachments[0].setBlendEnable(true);
     description.colorBlendAttachments[0].setColorBlendOp(vk::BlendOp::eAdd);

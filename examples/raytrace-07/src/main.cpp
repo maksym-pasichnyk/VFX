@@ -115,7 +115,7 @@ private:
         std::vector<Primitive> primitives;
         primitives.emplace_back(0, 0, 0, static_cast<uint32_t>(vertices.size()));
 
-        cube = sp<Mesh>::of();
+        cube = MakeShared<Mesh>();
         cube->setVertices(vertices);
         cube->setPrimitives(primitives);
         cube->uploadMeshData(device);

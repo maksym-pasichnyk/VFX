@@ -23,7 +23,7 @@ public:
     struct Node;
     struct Link;
 
-    struct Port : Object {
+    struct Port : ManagedObject<Port> {
         friend Node;
         friend GraphView;
 
@@ -52,7 +52,7 @@ public:
             : pNode(node), mIndex(index), mName(std::move(name)), mCapacity(capacity), mDirection(direction) {}
     };
 
-    struct Node : Object {
+    struct Node : ManagedObject<Node> {
         friend GraphView;
 
     private:
@@ -193,7 +193,7 @@ public:
         }
     };
 
-    struct Link : Object {
+    struct Link : ManagedObject<Link> {
         friend GraphView;
 
     private:

@@ -4,7 +4,7 @@
 
 #include <vector>
 
-struct Scene : Object {
+struct Scene : ManagedObject<Scene> {
 private:
     std::vector<sp<Node>> mNodes;
 

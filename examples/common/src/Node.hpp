@@ -7,7 +7,7 @@
 #include <list>
 #include <vector>
 
-struct Node : Object {
+struct Node : ManagedObject<Node> {
 private:
     Node* mParent = {};
 
@@ -32,11 +32,11 @@ public:
             return;
         }
         if (mParent) {
-            erase(mParent->mChildren, RetainPtr(this));
+            erase(mParent->mChildren, shared_from_this());
         }
         mParent = node.get();
         if (mParent) {
-            mParent->mChildren.emplace_back(RetainPtr(this));
+            mParent->mChildren.emplace_back(shared_from_this());
         }
     }
 };

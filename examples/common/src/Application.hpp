@@ -17,7 +17,7 @@ struct ShaderData {
     alignas(16) glm::mat4x4 g_view_matrix;
 };
 
-class WindowPlatform : public Object {
+class WindowPlatform : public ManagedObject<WindowPlatform> {
 public:
     explicit WindowPlatform(const char* title, uint32_t width, uint32_t height) {
         window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
@@ -70,7 +70,7 @@ private:
 struct Application {
 public:
     explicit Application(const char* title) {
-        platform = sp<WindowPlatform>::of(title, 800, 600);
+        platform = MakeShared<WindowPlatform>(title, 800, 600);
 
         gfx::InstanceConfiguration instance_config = {};
         instance_config.name = title;
@@ -94,8 +94,8 @@ public:
         commandQueue = device->newCommandQueue();
         commandBuffer = commandQueue->commandBuffer();
 
-        imgui = sp<ImGuiBackend>::of(device);
-        canvas = sp<Canvas>::of(imgui->drawList());
+        imgui = MakeShared<ImGuiBackend>(device);
+        canvas = MakeShared<Canvas>(imgui->drawList());
     }
 
 public:
@@ -252,7 +252,7 @@ protected:
     int32_t                             accumulateCount = {};
     int32_t                             accumulateIndex = {};
 
-    vk::PhysicalDevice                  adapter         = {};
+    ManagedShared<gfx::Adapter>         adapter         = {};
     ManagedShared<gfx::Device>          device          = {};
     ManagedShared<gfx::Instance>        instance        = {};
     ManagedShared<gfx::Surface>         surface         = {};

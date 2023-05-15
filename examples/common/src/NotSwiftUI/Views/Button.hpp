@@ -29,5 +29,5 @@ public:
 };
 
 static auto Button(sp<struct View> text) {
-    return sp<struct Button>::of(std::move(text));
+    return MakeShared<struct Button>(std::move(text));
 }

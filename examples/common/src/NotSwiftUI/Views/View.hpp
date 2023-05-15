@@ -9,7 +9,7 @@
 
 #include <optional>
 
-struct View : Object {
+struct View : ManagedObject<View> {
     auto frame(std::optional<float_t> width, std::optional<float_t> height, Alignment alignment = Alignment::center());
     auto frame(std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment = Alignment::center());
     auto border(const Color& color, float_t width);

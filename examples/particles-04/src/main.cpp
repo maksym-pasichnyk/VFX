@@ -7,16 +7,16 @@
 struct Game : Application {
 public:
     Game() : Application("Particles-04") {
-        explosionParticleSystem = sp<ParticleSystem>::of(device, 1000);
+        explosionParticleSystem = MakeShared<ParticleSystem>(device, 1000);
         explosionParticleSystem->updateEvent().connect<&Game::onExplosionParticleUpdate>(this);
 
-        sparkleParticleSystem = sp<ParticleSystem>::of(device, 1000);
+        sparkleParticleSystem = MakeShared<ParticleSystem>(device, 1000);
         sparkleParticleSystem->updateEvent().connect<&Game::onSparkleParticleUpdate>(this);
 
-        rocketParticleSystem = sp<ParticleSystem>::of(device, 1000);
+        rocketParticleSystem = MakeShared<ParticleSystem>(device, 1000);
         rocketParticleSystem->updateEvent().connect<&Game::onRocketParticleUpdate>(this);
         rocketParticleSystem->deathEvent().connect<&Game::onRocketParticleDeath>(this);
-        rocketParticleEmitter = sp<RocketParticleEmitter>::of(rocketParticleSystem, 2.5F);
+        rocketParticleEmitter = MakeShared<RocketParticleEmitter>(rocketParticleSystem, 2.5F);
     }
 
 public:
@@ -60,14 +60,12 @@ public:
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
         auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
-        encoder->setRenderPipelineState(rocketParticleSystem->renderPipelineState());
-        encoder->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
         encoder->setScissor(0, rendering_area);
         encoder->setViewport(0, rendering_viewport);
 
-        rocketParticleSystem->draw(encoder);
-        sparkleParticleSystem->draw(encoder);
-        explosionParticleSystem->draw(encoder);
+        rocketParticleSystem->draw(encoder, shader_data);
+        sparkleParticleSystem->draw(encoder, shader_data);
+        explosionParticleSystem->draw(encoder, shader_data);
 
         encoder->endEncoding();
 

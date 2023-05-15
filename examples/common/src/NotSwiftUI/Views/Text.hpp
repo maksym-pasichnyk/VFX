@@ -30,5 +30,5 @@ public:
 };
 
 static auto Text(std::string text, float_t fontSize) {
-    return sp<struct Text>::of(std::move(text), fontSize);
+    return MakeShared<struct Text>(std::move(text), fontSize);
 }

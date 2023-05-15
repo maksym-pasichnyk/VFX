@@ -33,6 +33,7 @@ namespace gfx::raii {
 namespace gfx {
     struct Device;
     struct Surface;
+    struct Adapter;
 
     struct InstanceConfiguration {
         std::string name    = {};
@@ -40,15 +41,15 @@ namespace gfx {
     };
 
     struct Instance : ManagedObject<Instance> {
-        raii::Context context;
-        raii::Instance raii;
-        vk::DebugUtilsMessengerEXT messenger;
+        raii::Context               context;
+        raii::Instance              raii;
+        vk::DebugUtilsMessengerEXT  messenger;
 
         explicit Instance(raii::Context context, raii::Instance raii, vk::DebugUtilsMessengerEXT messenger);
         ~Instance() override;
 
-        auto enumerateAdapters() -> std::vector<vk::PhysicalDevice>;
-        auto createDevice(vk::PhysicalDevice adapter) -> ManagedShared<Device>;
+        auto enumerateAdapters() -> std::vector<ManagedShared<Adapter>>;
+        auto createDevice(ManagedShared<Adapter> adapter) -> ManagedShared<Device>;
         auto wrapSurface(vk::SurfaceKHR surface) -> ManagedShared<Surface>;
 
         auto getSurfaceCapabilitiesKHR(vk::PhysicalDevice adapter, vk::SurfaceKHR surface) -> vk::SurfaceCapabilitiesKHR;

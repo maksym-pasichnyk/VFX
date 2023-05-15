@@ -12,7 +12,7 @@ gfx::Library::~Library() {
 auto gfx::Library::newFunction(std::string name) -> ManagedShared<Function> {
     for (auto& sep : std::span(spvReflectShaderModule.entry_points, spvReflectShaderModule.entry_point_count)) {
         if (name == sep.name) {
-            return MakeShared(new Function(shared_from_this(), std::move(name), &sep));
+            return MakeShared<Function>(shared_from_this(), std::move(name), &sep);
         }
     }
     return {};

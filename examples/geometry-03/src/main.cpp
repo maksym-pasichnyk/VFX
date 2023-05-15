@@ -13,10 +13,13 @@ private:
         auto vertexLibrary = device->newLibrary(Assets::readFile("shaders/geometry.vert.spv"));
         auto fragmentLibrary = device->newLibrary(Assets::readFile("shaders/geometry.frag.spv"));
 
-        gfx::RenderPipelineStateDescription description;
-        description.vertexFunction = vertexLibrary->newFunction("main");
-        description.fragmentFunction = fragmentLibrary->newFunction("main");
-        description.vertexInputState = {
+        gfx::DepthStencilStateDescription depthStencilStateDescription;
+        depthStencilState = device->newDepthStencilState(depthStencilStateDescription);
+
+        gfx::RenderPipelineStateDescription renderPipelineStateDescription;
+        renderPipelineStateDescription.vertexFunction = vertexLibrary->newFunction("main");
+        renderPipelineStateDescription.fragmentFunction = fragmentLibrary->newFunction("main");
+        renderPipelineStateDescription.vertexInputState = {
             .bindings = {
                 vk::VertexInputBindingDescription{0, sizeof(Vertex), vk::VertexInputRate::eVertex}
             },
@@ -27,10 +30,10 @@ private:
             }
         };
 
-        description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-        description.colorBlendAttachments[0].setBlendEnable(false);
+        renderPipelineStateDescription.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
+        renderPipelineStateDescription.colorBlendAttachments[0].setBlendEnable(false);
 
-        renderPipelineState = device->newRenderPipelineState(description);
+        renderPipelineState = device->newRenderPipelineState(renderPipelineStateDescription);
         sampler = device->newSampler(vk::SamplerCreateInfo{
             .magFilter = vk::Filter::eNearest,
             .minFilter = vk::Filter::eNearest,
@@ -40,7 +43,7 @@ private:
             .addressModeW = vk::SamplerAddressMode::eRepeat,
         });
 
-        texture = device->newTexture(gfx::TextureSettings{
+        texture = device->newTexture(gfx::TextureDescription{
             .width = 1,
             .height = 1,
             .format = vk::Format::eR8G8B8A8Unorm,
@@ -123,6 +126,7 @@ public:
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
         auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
+        encoder->setDepthStencilState(depthStencilState);
         encoder->setRenderPipelineState(renderPipelineState);
         encoder->bindDescriptorSet(descriptorSet, 0);
         encoder->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
@@ -147,6 +151,7 @@ private:
 
     ManagedShared<gfx::Sampler>             sampler;
     ManagedShared<gfx::Texture>             texture;
+    ManagedShared<gfx::DepthStencilState>   depthStencilState;
     ManagedShared<gfx::RenderPipelineState> renderPipelineState;
 };
 

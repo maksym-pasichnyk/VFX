@@ -24,9 +24,11 @@ namespace gfx {
     struct Drawable;
     struct Swapchain;
     struct CommandQueue;
-    struct TextureSettings;
+    struct TextureDescription;
+    struct DepthStencilState;
     struct RenderPipelineState;
     struct ComputePipelineState;
+    struct DepthStencilStateDescription;
     struct RenderPipelineStateDescription;
 
     enum class StorageMode {
@@ -49,14 +51,15 @@ namespace gfx {
         ~Device() override;
 
         void waitIdle();
-        auto newTexture(const TextureSettings& description) -> ManagedShared<Texture>;
+        auto newTexture(const TextureDescription& description) -> ManagedShared<Texture>;
         auto newSampler(const vk::SamplerCreateInfo& info) -> ManagedShared<Sampler>;
         auto newBuffer(vk::BufferUsageFlags usage, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options = 0) -> ManagedShared<Buffer>;
         auto newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options = 0) -> ManagedShared<Buffer>;
         auto newLibrary(const std::vector<char>& bytes) -> ManagedShared<Library>;
-        auto newRenderPipelineState(const RenderPipelineStateDescription& description) -> ManagedShared<RenderPipelineState>;
-        auto newComputePipelineState(const ManagedShared<Function>& function) -> ManagedShared<ComputePipelineState>;
+        auto newDepthStencilState(DepthStencilStateDescription const& description) -> ManagedShared<DepthStencilState>;
+        auto newRenderPipelineState(RenderPipelineStateDescription const& description) -> ManagedShared<RenderPipelineState>;
+        auto newComputePipelineState(ManagedShared<Function> const& function) -> ManagedShared<ComputePipelineState>;
         auto newCommandQueue() -> ManagedShared<CommandQueue>;
-        auto createSwapchain(const ManagedShared<Surface>& surface) -> ManagedShared<Swapchain>;
+        auto createSwapchain(ManagedShared<Surface> const& surface) -> ManagedShared<Swapchain>;
     };
 }

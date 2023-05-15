@@ -12,7 +12,7 @@ struct Vertex {
     alignas(16) glm::vec2 uv;
 };
 
-struct Mesh : Object {
+struct Mesh : ManagedObject<Mesh> {
 private:
     std::vector<Vertex>         vertices_       = {};
     std::vector<uint32_t>       indices_        = {};

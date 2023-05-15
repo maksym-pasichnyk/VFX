@@ -7,19 +7,19 @@ public:
             HStack(VerticalAlignment::center(), std::nullopt, {
                 VStack(HorizontalAlignment::center(), std::nullopt, {
                     HStack(VerticalAlignment::center(), std::nullopt, {
-                        Shape(sp<Circle>::of()),
-                        Shape(sp<Circle>::of()),
-                        Shape(sp<Circle>::of()),
+                        Shape(MakeShared<Circle>()),
+                        Shape(MakeShared<Circle>()),
+                        Shape(MakeShared<Circle>()),
                     }),
                     HStack(VerticalAlignment::center(), std::nullopt, {
-                        Shape(sp<Circle>::of()),
-                        Shape(sp<Circle>::of()),
-                        Shape(sp<Circle>::of()),
+                        Shape(MakeShared<Circle>()),
+                        Shape(MakeShared<Circle>()),
+                        Shape(MakeShared<Circle>()),
                     }),
                     HStack(VerticalAlignment::center(), std::nullopt, {
-                        Shape(sp<Circle>::of()),
-                        Shape(sp<Circle>::of()),
-                        Shape(sp<Circle>::of()),
+                        Shape(MakeShared<Circle>()),
+                        Shape(MakeShared<Circle>()),
+                        Shape(MakeShared<Circle>()),
                     })
                 })
             })
@@ -59,7 +59,7 @@ public:
         commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-        auto ctx = sp<Canvas>::of(imgui->drawList());
+        auto ctx = MakeShared<Canvas>(imgui->drawList());
 
         imgui->resetForNewFrame();
         _drawView(content);

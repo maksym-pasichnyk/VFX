@@ -10,6 +10,20 @@
 
 #include "spdlog/spdlog.h"
 
+#include "vulkan/vulkan_hash.hpp"
+
+template<typename Fn>
+struct Lazy : Fn {
+    using Fn::operator();
+
+    operator auto() {
+        return (*this)();
+    }
+};
+
+template<typename Fn>
+Lazy(Fn) -> Lazy<Fn>;
+
 gfx::CommandBuffer::CommandBuffer(const ManagedShared<Device>& device, const ManagedShared<CommandQueue>& queue) : device(device), queue(queue) {
     vk::CommandBufferAllocateInfo allocate_info = {};
     allocate_info.setCommandPool(queue->raw);
@@ -106,7 +120,7 @@ auto gfx::CommandBuffer::newDescriptorSet(const ManagedShared<RenderPipelineStat
         vk::DescriptorSetAllocateInfo allocate_info = {};
         allocate_info.setDescriptorPool(pool);
         allocate_info.setDescriptorSetCount(1);
-        allocate_info.setPSetLayouts(&render_pipeline_state->bind_group_layouts[index]);
+        allocate_info.setPSetLayouts(&render_pipeline_state->bindGroupLayouts[index]);
 
         vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
         vk::Result result = device->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, device->raii.dispatcher);
@@ -139,7 +153,7 @@ auto gfx::CommandBuffer::newDescriptorSet(const ManagedShared<RenderPipelineStat
     vk::DescriptorSetAllocateInfo allocate_info = {};
     allocate_info.setDescriptorPool(pool);
     allocate_info.setDescriptorSetCount(1);
-    allocate_info.setPSetLayouts(&render_pipeline_state->bind_group_layouts[index]);
+    allocate_info.setPSetLayouts(&render_pipeline_state->bindGroupLayouts[index]);
 
     vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
     vk::Result result = device->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, device->raii.dispatcher);
@@ -150,7 +164,7 @@ auto gfx::CommandBuffer::newDescriptorSet(const ManagedShared<RenderPipelineStat
 }
 
 auto gfx::CommandBuffer::newRenderCommandEncoder(const RenderingInfo& info) -> ManagedShared<RenderCommandEncoder> {
-    auto encoder = MakeShared(new RenderCommandEncoder(shared_from_this()));
+    auto encoder = MakeShared<RenderCommandEncoder>(shared_from_this());
     encoder->_beginRendering(info);
     return encoder;
 }
@@ -160,7 +174,18 @@ auto gfx::CommandBuffer::newComputeCommandEncoder() -> ManagedShared<ComputeComm
     return {};
 }
 
-gfx::RenderCommandEncoder::RenderCommandEncoder(const ManagedShared<CommandBuffer>& commandBuffer) : commandBuffer(commandBuffer) {}
+gfx::RenderCommandEncoder::RenderCommandEncoder(const ManagedShared<CommandBuffer>& commandBuffer) : commandBuffer(commandBuffer) {
+    depthClampEnable_           = false;
+    rasterizerDiscardEnable_    = false;
+    polygonMode_                = vk::PolygonMode::eFill;
+    lineWidth_                  = 1.0F;
+    cullMode_                   = vk::CullModeFlagBits::eNone;
+    frontFace_                  = vk::FrontFace::eClockwise;
+    depthBiasEnable_            = false;
+    depthBiasConstantFactor_    = 0.0F;
+    depthBiasClamp_             = 0.0F;
+    depthBiasSlopeFactor_       = 0.0F;
+}
 
 void gfx::RenderCommandEncoder::_beginRendering(const RenderingInfo& info) {
     vk::RenderingAttachmentInfo depthAttachment = {};
@@ -246,6 +271,142 @@ void gfx::RenderCommandEncoder::_endRendering() {
     commandBuffer->raw.endRendering(commandBuffer->device->raii.dispatcher);
 }
 
+void gfx::RenderCommandEncoder::_setup() {
+    if ((flags & RenderCommandEncoderPipeline) == RenderCommandEncoderPipeline) {
+        flags &= ~RenderCommandEncoderPipeline;
+
+        std::size_t key = 0;
+        VULKAN_HPP_HASH_COMBINE(key, depthStencilState_.get());
+        VULKAN_HPP_HASH_COMBINE(key, renderPipelineState_.get());
+        VULKAN_HPP_HASH_COMBINE(key, depthClampEnable_);
+        VULKAN_HPP_HASH_COMBINE(key, rasterizerDiscardEnable_);
+        VULKAN_HPP_HASH_COMBINE(key, polygonMode_);
+        VULKAN_HPP_HASH_COMBINE(key, lineWidth_);
+        VULKAN_HPP_HASH_COMBINE(key, cullMode_);
+        VULKAN_HPP_HASH_COMBINE(key, frontFace_);
+        VULKAN_HPP_HASH_COMBINE(key, depthBiasEnable_);
+        VULKAN_HPP_HASH_COMBINE(key, depthBiasConstantFactor_);
+        VULKAN_HPP_HASH_COMBINE(key, depthBiasClamp_);
+        VULKAN_HPP_HASH_COMBINE(key, depthBiasSlopeFactor_);
+
+        auto it = renderPipelineState_->pipelines.emplace(key, Lazy{
+            [&]() -> vk::Pipeline {
+                vk::PipelineViewportStateCreateInfo viewport_state = {};
+                viewport_state.setViewportCount(1);
+                viewport_state.setScissorCount(1);
+
+                vk::PipelineInputAssemblyStateCreateInfo input_assembly_state = {};
+                input_assembly_state.setTopology(renderPipelineState_->inputPrimitiveTopology);
+                input_assembly_state.setPrimitiveRestartEnable(renderPipelineState_->primitiveRestartEnable);
+
+                vk::PipelineRasterizationStateCreateInfo rasterization_state = {};
+                rasterization_state.setDepthClampEnable(depthClampEnable_);
+                rasterization_state.setRasterizerDiscardEnable(rasterizerDiscardEnable_);
+                rasterization_state.setPolygonMode(polygonMode_);
+                rasterization_state.setLineWidth(lineWidth_);
+                rasterization_state.setCullMode(cullMode_);
+                rasterization_state.setFrontFace(frontFace_);
+                rasterization_state.setDepthBiasEnable(depthBiasEnable_);
+                rasterization_state.setDepthBiasConstantFactor(depthBiasConstantFactor_);
+                rasterization_state.setDepthBiasClamp(depthBiasClamp_);
+                rasterization_state.setDepthBiasSlopeFactor(depthBiasSlopeFactor_);
+
+                vk::PipelineTessellationStateCreateInfo tessellation_state = {};
+                if (renderPipelineState_->tessellationState) {
+                    tessellation_state.setPatchControlPoints(renderPipelineState_->tessellationState->patch_control_points);
+                }
+
+                vk::PipelineMultisampleStateCreateInfo multisample_state = {};
+                if (renderPipelineState_->multisampleState) {
+                    multisample_state.setRasterizationSamples(renderPipelineState_->multisampleState->rasterization_samples);
+                    multisample_state.setSampleShadingEnable(renderPipelineState_->multisampleState->sample_shading_enable);
+                    multisample_state.setMinSampleShading(renderPipelineState_->multisampleState->min_sample_shading);
+                    multisample_state.setPSampleMask(renderPipelineState_->multisampleState->sample_mask);
+                    multisample_state.setAlphaToCoverageEnable(renderPipelineState_->isAlphaToCoverageEnabled);
+                    multisample_state.setAlphaToOneEnable(renderPipelineState_->isAlphaToOneEnabled);
+                }
+
+                vk::PipelineDepthStencilStateCreateInfo depth_stencil_state = {};
+
+                auto dynamicStates = std::array{
+                    vk::DynamicState::eViewport,
+                    vk::DynamicState::eScissor
+                };
+
+                vk::PipelineDynamicStateCreateInfo dynamic_state = {};
+                dynamic_state.setDynamicStates(dynamicStates);
+
+                std::vector<vk::PipelineShaderStageCreateInfo> stages = {};
+
+                vk::PipelineShaderStageCreateInfo vertex_stage = {};
+                vertex_stage.setStage(vk::ShaderStageFlagBits::eVertex);
+                vertex_stage.setModule(renderPipelineState_->vertexFunction->library->raw);
+                vertex_stage.setPName(renderPipelineState_->vertexFunction->name.c_str());
+                stages.emplace_back(vertex_stage);
+
+                vk::PipelineShaderStageCreateInfo fragment_stage = {};
+                fragment_stage.setStage(vk::ShaderStageFlagBits::eFragment);
+                fragment_stage.setModule(renderPipelineState_->fragmentFunction->library->raw);
+                fragment_stage.setPName(renderPipelineState_->fragmentFunction->name.c_str());
+                stages.emplace_back(fragment_stage);
+
+                vk::PipelineVertexInputStateCreateInfo vertex_input_state = {};
+                vertex_input_state.setVertexBindingDescriptions(renderPipelineState_->vertexInputState.bindings);
+                vertex_input_state.setVertexAttributeDescriptions(renderPipelineState_->vertexInputState.attributes);
+
+                vk::PipelineColorBlendStateCreateInfo color_blend_state = {};
+                color_blend_state.setAttachments(renderPipelineState_->colorBlendAttachments.elements);
+
+                vk::PipelineRenderingCreateInfo rendering = {};
+                rendering.setViewMask(renderPipelineState_->viewMask);
+                rendering.setColorAttachmentFormats(renderPipelineState_->colorAttachmentFormats.elements);
+                rendering.setDepthAttachmentFormat(renderPipelineState_->depthAttachmentFormat);
+                rendering.setStencilAttachmentFormat(renderPipelineState_->stencilAttachmentFormat);
+
+                vk::GraphicsPipelineCreateInfo pipeline_create_info = {};
+                pipeline_create_info.setPNext(&rendering);
+                pipeline_create_info.setStages(stages);
+                pipeline_create_info.setPVertexInputState(&vertex_input_state);
+                pipeline_create_info.setPInputAssemblyState(&input_assembly_state);
+                pipeline_create_info.setPViewportState(&viewport_state);
+                pipeline_create_info.setPRasterizationState(&rasterization_state);
+                pipeline_create_info.setPTessellationState(&tessellation_state);
+                pipeline_create_info.setPMultisampleState(&multisample_state);
+
+                if (depthStencilState_) {
+                    depth_stencil_state.setDepthTestEnable(depthStencilState_->depth_test_enable);
+                    depth_stencil_state.setDepthWriteEnable(depthStencilState_->depth_write_enable);
+                    depth_stencil_state.setDepthCompareOp(depthStencilState_->depth_compare_op);
+                    depth_stencil_state.setDepthBoundsTestEnable(depthStencilState_->depth_bounds_test_enable);
+                    depth_stencil_state.setMinDepthBounds(depthStencilState_->min_depth_bounds);
+                    depth_stencil_state.setMaxDepthBounds(depthStencilState_->max_depth_bounds);
+                    depth_stencil_state.setStencilTestEnable(depthStencilState_->stencil_test_enable);
+                    depth_stencil_state.setFront(depthStencilState_->front);
+                    depth_stencil_state.setBack(depthStencilState_->back);
+
+                    pipeline_create_info.setPDepthStencilState(&depth_stencil_state);
+                }
+
+                pipeline_create_info.setPColorBlendState(&color_blend_state);
+                pipeline_create_info.setPDynamicState(&dynamic_state);
+                pipeline_create_info.setLayout(renderPipelineState_->pipelineLayout);
+                pipeline_create_info.setRenderPass(nullptr);
+                pipeline_create_info.setSubpass(0);
+                pipeline_create_info.setBasePipelineHandle(nullptr);
+                pipeline_create_info.setBasePipelineIndex(0);
+
+                vk::Pipeline pipeline;
+                vk::resultCheck(commandBuffer->device->raii.raw.createGraphicsPipelines(renderPipelineState_->cache, 1, &pipeline_create_info, nullptr, &pipeline, commandBuffer->device->raii.dispatcher), "Failed to create graphics pipeline");
+                return pipeline;
+            }
+        });
+
+        auto pipeline = it.first->second;
+
+        commandBuffer->raw.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline, commandBuffer->device->raii.dispatcher);
+    }
+}
+
 auto gfx::RenderCommandEncoder::getCommandBuffer() -> ManagedShared<CommandBuffer> {
     return commandBuffer;
 }
@@ -254,9 +415,64 @@ void gfx::RenderCommandEncoder::endEncoding() {
     _endRendering();
 }
 
-void gfx::RenderCommandEncoder::setRenderPipelineState(const ManagedShared<RenderPipelineState>& pipelineState) {
-    currentPipelineState = pipelineState;
-    commandBuffer->raw.bindPipeline(vk::PipelineBindPoint::eGraphics, currentPipelineState->pipeline, commandBuffer->device->raii.dispatcher);
+void gfx::RenderCommandEncoder::setDepthClampEnable(bool depthClampEnable) {
+    flags |= RenderCommandEncoderPipeline;
+    depthClampEnable_ = depthClampEnable;
+}
+
+void gfx::RenderCommandEncoder::setRasterizerDiscardEnable(bool rasterizerDiscardEnable) {
+    flags |= RenderCommandEncoderPipeline;
+    rasterizerDiscardEnable_ = rasterizerDiscardEnable;
+}
+
+void gfx::RenderCommandEncoder::setPolygonMode(vk::PolygonMode polygonMode) {
+    flags |= RenderCommandEncoderPipeline;
+    polygonMode_ = polygonMode;
+}
+
+void gfx::RenderCommandEncoder::setLineWidth(float lineWidth) {
+    flags |= RenderCommandEncoderPipeline;
+    lineWidth_ = lineWidth;
+}
+
+void gfx::RenderCommandEncoder::setCullMode(vk::CullModeFlagBits cullMode) {
+    flags |= RenderCommandEncoderPipeline;
+    cullMode_ = cullMode;
+}
+
+void gfx::RenderCommandEncoder::setFrontFace(vk::FrontFace frontFace) {
+    flags |= RenderCommandEncoderPipeline;
+    frontFace_ = frontFace;
+}
+
+void gfx::RenderCommandEncoder::setDepthBiasEnable(bool depthBiasEnable) {
+    flags |= RenderCommandEncoderPipeline;
+    depthBiasEnable_ = depthBiasEnable;
+}
+
+void gfx::RenderCommandEncoder::setDepthBiasConstantFactor(float depthBiasConstantFactor) {
+    flags |= RenderCommandEncoderPipeline;
+    depthBiasConstantFactor_ = depthBiasConstantFactor;
+}
+
+void gfx::RenderCommandEncoder::setDepthBiasClamp(float depthBiasClamp) {
+    flags |= RenderCommandEncoderPipeline;
+    depthBiasClamp_ = depthBiasClamp;
+}
+
+void gfx::RenderCommandEncoder::setDepthBiasSlopeFactor(float depthBiasSlopeFactor) {
+    flags |= RenderCommandEncoderPipeline;
+    depthBiasSlopeFactor_ = depthBiasSlopeFactor;
+}
+
+void gfx::RenderCommandEncoder::setDepthStencilState(ManagedShared<DepthStencilState> depthStencilState) {
+    flags |= RenderCommandEncoderPipeline;
+    depthStencilState_ = std::move(depthStencilState);
+}
+
+void gfx::RenderCommandEncoder::setRenderPipelineState(ManagedShared<RenderPipelineState> renderPipelineState) {
+    flags |= RenderCommandEncoderPipeline;
+    renderPipelineState_ = std::move(renderPipelineState);
 }
 
 void gfx::RenderCommandEncoder::setScissor(uint32_t firstScissor, const vk::Rect2D& rect) {
@@ -276,19 +492,21 @@ void gfx::RenderCommandEncoder::bindVertexBuffer(int firstBinding, const Managed
 }
 
 void gfx::RenderCommandEncoder::draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
+    _setup();
     commandBuffer->raw.draw(vertexCount, instanceCount, firstVertex, firstInstance, commandBuffer->device->raii.dispatcher);
 }
 
 void gfx::RenderCommandEncoder::drawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
+    _setup();
     commandBuffer->raw.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, commandBuffer->device->raii.dispatcher);
 }
 
 void gfx::RenderCommandEncoder::bindDescriptorSet(vk::DescriptorSet descriptorSet, uint32_t slot) {
-    commandBuffer->raw.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, currentPipelineState->pipeline_layout, slot, 1, &descriptorSet, 0, nullptr, commandBuffer->device->raii.dispatcher);
+    commandBuffer->raw.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, renderPipelineState_->pipelineLayout, slot, 1, &descriptorSet, 0, nullptr, commandBuffer->device->raii.dispatcher);
 }
 
 void gfx::RenderCommandEncoder::pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data) {
-    commandBuffer->raw.pushConstants(currentPipelineState->pipeline_layout, stageFlags, offset, size, data, commandBuffer->device->raii.dispatcher);
+    commandBuffer->raw.pushConstants(renderPipelineState_->pipelineLayout, stageFlags, offset, size, data, commandBuffer->device->raii.dispatcher);
 }
 
 void gfx::ComputeCommandEncoder::setComputePipelineState(const ManagedShared<ComputePipelineState>& state) {

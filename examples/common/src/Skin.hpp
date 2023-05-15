@@ -5,7 +5,7 @@
 
 #include <vector>
 
-struct Skin : Object {
+struct Skin : ManagedObject<Skin> {
 private:
     int32_t mSkeleton;
     std::vector<int32_t> mJoints;

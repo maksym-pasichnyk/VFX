@@ -6,7 +6,7 @@
 #include "Particle.hpp"
 #include "Graphics.hpp"
 
-struct ParticleSystem : Object {
+struct ParticleSystem : ManagedObject<ParticleSystem> {
 private:
     struct Instance {
         glm::vec3 position;
@@ -18,6 +18,7 @@ private:
     ManagedShared<gfx::Buffer> mQuadIndexBuffer;
     ManagedShared<gfx::Buffer> mQuadVertexBuffer;
     ManagedShared<gfx::Buffer> mInstanceVertexBuffer;
+    ManagedShared<gfx::DepthStencilState> mDepthStencilState;
     ManagedShared<gfx::RenderPipelineState> mRenderPipelineState;
 
     size_t mInstanceCount = {};
@@ -38,13 +39,18 @@ public:
 
 private:
     void buildShaders() {
+        gfx::DepthStencilStateDescription depthStencilStateDescription;
+        depthStencilStateDescription.depth_test_enable = true;
+
+        mDepthStencilState = mDevice->newDepthStencilState(depthStencilStateDescription);
+
         auto vertexLibrary = mDevice->newLibrary(Assets::readFile("shaders/particles.vert.spv"));
         auto fragmentLibrary = mDevice->newLibrary(Assets::readFile("shaders/particles.frag.spv"));
 
-        gfx::RenderPipelineStateDescription description;
-        description.vertexFunction = vertexLibrary->newFunction("main");
-        description.fragmentFunction = fragmentLibrary->newFunction("main");
-        description.vertexInputState = {
+        gfx::RenderPipelineStateDescription renderPipelineStateDescription;
+        renderPipelineStateDescription.vertexFunction = vertexLibrary->newFunction("main");
+        renderPipelineStateDescription.fragmentFunction = fragmentLibrary->newFunction("main");
+        renderPipelineStateDescription.vertexInputState = {
             .bindings = {
                 vk::VertexInputBindingDescription{0, sizeof(glm::vec3), vk::VertexInputRate::eVertex},
                 vk::VertexInputBindingDescription{1, sizeof(Instance), vk::VertexInputRate::eInstance}
@@ -56,16 +62,16 @@ private:
             }
         };
 
-        description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-        description.depthStencilState.depth_test_enable = true;
+        renderPipelineStateDescription.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
+//        description.depthStencilState->depth_test_enable = true;
 
-        description.colorBlendAttachments[0].setBlendEnable(true);
-        description.colorBlendAttachments[0].setColorBlendOp(vk::BlendOp::eAdd);
-        description.colorBlendAttachments[0].setAlphaBlendOp(vk::BlendOp::eAdd);
-        description.colorBlendAttachments[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
-        description.colorBlendAttachments[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
+        renderPipelineStateDescription.colorBlendAttachments[0].setBlendEnable(true);
+        renderPipelineStateDescription.colorBlendAttachments[0].setColorBlendOp(vk::BlendOp::eAdd);
+        renderPipelineStateDescription.colorBlendAttachments[0].setAlphaBlendOp(vk::BlendOp::eAdd);
+        renderPipelineStateDescription.colorBlendAttachments[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
+        renderPipelineStateDescription.colorBlendAttachments[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
 
-        mRenderPipelineState = mDevice->newRenderPipelineState(description);
+        mRenderPipelineState = mDevice->newRenderPipelineState(renderPipelineStateDescription);
     }
 
     void buildBuffers() {
@@ -114,14 +120,18 @@ public:
         }
     }
 
-    auto renderPipelineState() -> ManagedShared<gfx::RenderPipelineState> {
+    auto getRenderPipelineState() -> ManagedShared<gfx::RenderPipelineState> {
         return mRenderPipelineState;
     }
 
-    void draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder) {
+    void draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder, const ShaderData& shader_data) {
         if (mInstanceCount == 0) {
             return;
         }
+
+        encoder->setDepthStencilState(mDepthStencilState);
+        encoder->setRenderPipelineState(mRenderPipelineState);
+        encoder->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
 
         encoder->bindIndexBuffer(mQuadIndexBuffer, 0, vk::IndexType::eUint32);
         encoder->bindVertexBuffer(0, mQuadVertexBuffer, 0);

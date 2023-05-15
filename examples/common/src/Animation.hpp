@@ -29,7 +29,7 @@ public:
         : interpolation(std::move(interpolation)), inputs(std::move(inputs)), outputs(std::move(outputs)) {}
 };
 
-struct Animation : Object {
+struct Animation : ManagedObject<Animation> {
 private:
     std::string name;
     std::vector<AnimationSampler> samplers;

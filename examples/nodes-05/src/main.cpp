@@ -9,7 +9,7 @@
 struct Game : Application {
 public:
     Game() : Application("Nodes-05") {
-        graphView = sp<GraphView>::of();
+        graphView = MakeShared<GraphView>();
 
         auto nodeA = graphView->addNode("Node A");
         nodeA->addOutput("Return Value", GraphView::Port::Capacity::eMulti);

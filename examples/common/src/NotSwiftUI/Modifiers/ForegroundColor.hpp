@@ -25,5 +25,5 @@ public:
 };
 
 inline auto View::foregroundColor(const Color& color) {
-    return sp<ForegroundColor>::of(RetainPtr(this), color);
+    return MakeShared<ForegroundColor>(shared_from_this(), color);
 }

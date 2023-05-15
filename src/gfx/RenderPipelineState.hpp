@@ -3,6 +3,7 @@
 #include "Device.hpp"
 #include "Function.hpp"
 
+#include <map>
 #include <optional>
 
 namespace gfx {
@@ -18,38 +19,18 @@ namespace gfx {
         auto operator[](size_t i) -> vk::Format&;
     };
 
-    struct InputAssemblyState {
-        vk::PrimitiveTopology   topology                    = vk::PrimitiveTopology::eTriangleList;
-        bool                    primitive_restart_enable    = false;
-    };
-
-    struct TessellationState {
+    struct TessellationState : ManagedObject<TessellationState> {
         uint32_t patch_control_points = 3;
     };
 
-    struct RasterizationState {
-        bool                    depth_clamp_enable          = false;
-        bool                    discard_enable              = false;
-        vk::PolygonMode         polygon_mode                = vk::PolygonMode::eFill;
-        float                   line_width                  = 1.0F;
-        vk::CullModeFlagBits    cull_mode                   = vk::CullModeFlagBits::eNone;
-        vk::FrontFace           front_face                  = vk::FrontFace::eClockwise;
-        bool                    depth_bias_enable           = false;
-        float                   depth_bias_constant_factor  = 0.0F;
-        float                   depth_bias_clamp            = 0.0F;
-        float                   depth_bias_slope_factor     = 0.0F;
-    };
-
-    struct MultisampleState {
+    struct MultisampleState : ManagedObject<MultisampleState> {
         vk::SampleCountFlagBits         rasterization_samples       = vk::SampleCountFlagBits::e1;
         bool                            sample_shading_enable       = false;
         float                           min_sample_shading          = 1.0F;
         vk::Optional<vk::SampleMask>    sample_mask                 = nullptr;
-        bool                            alpha_to_coverage_enable    = false;
-        bool                            alpha_to_one_enable         = false;
     };
 
-    struct DepthStencilState {
+    struct DepthStencilStateDescription {
         bool                    depth_test_enable           = false;
         bool                    depth_write_enable          = false;
         vk::CompareOp           depth_compare_op            = vk::CompareOp::eAlways;
@@ -61,32 +42,65 @@ namespace gfx {
         float                   max_depth_bounds            = 1.0F;
     };
 
+    struct DepthStencilState : ManagedObject<DepthStencilState> {
+        bool                depth_test_enable           = {};
+        bool                depth_write_enable          = {};
+        vk::CompareOp       depth_compare_op            = {};
+        bool                depth_bounds_test_enable    = {};
+        bool                stencil_test_enable         = {};
+        vk::StencilOpState  front                       = {};
+        vk::StencilOpState  back                        = {};
+        float               min_depth_bounds            = {};
+        float               max_depth_bounds            = {};
+    };
+
     struct VertexInputState {
         std::vector<vk::VertexInputBindingDescription>      bindings    = {};
         std::vector<vk::VertexInputAttributeDescription>    attributes  = {};
     };
 
     struct RenderPipelineStateDescription {
-        ManagedShared<Function>                         vertexFunction          = {};
-        ManagedShared<Function>                         fragmentFunction        = {};
-        InputAssemblyState                              inputAssemblyState      = {};
-        TessellationState                               tessellationState       = {};
-        RasterizationState                              rasterizationState      = {};
-        MultisampleState                                multisampleState        = {};
-        DepthStencilState                               depthStencilState       = {};
-        VertexInputState                                vertexInputState        = {};
-        uint32_t                                        viewMask                = {};
-        vk::Format                                      depthAttachmentFormat   = vk::Format::eUndefined;
-        vk::Format                                      stencilAttachmentFormat = vk::Format::eUndefined;
-        RenderPipelineColorAttachmentFormatArray        colorAttachmentFormats  = {};
-        RenderPipelineColorBlendAttachmentStateArray    colorBlendAttachments   = {};
+        ManagedShared<Function>                         vertexFunction              = {};
+        ManagedShared<Function>                         fragmentFunction            = {};
+        ManagedShared<TessellationState>                tessellationState           = MakeShared<TessellationState>();
+        ManagedShared<MultisampleState>                 multisampleState            = MakeShared<MultisampleState>();
+        VertexInputState                                vertexInputState            = {};
+        uint32_t                                        viewMask                    = {};
+        vk::Format                                      depthAttachmentFormat       = vk::Format::eUndefined;
+        vk::Format                                      stencilAttachmentFormat     = vk::Format::eUndefined;
+        RenderPipelineColorAttachmentFormatArray        colorAttachmentFormats      = {};
+        RenderPipelineColorBlendAttachmentStateArray    colorBlendAttachments       = {};
+
+        // InputAssemblyState
+        vk::PrimitiveTopology                           inputPrimitiveTopology      = vk::PrimitiveTopology::eTriangleList;
+        bool                                            primitiveRestartEnable      = {};
+
+        // MultisampleState
+        bool                                            isAlphaToCoverageEnabled    = {};
+        bool                                            isAlphaToOneEnabled         = {};
     };
 
     struct RenderPipelineState : ManagedObject<RenderPipelineState> {
-        ManagedShared<Device>                   device              = {};
-        vk::Pipeline                            pipeline            = {};
-        vk::PipelineLayout                      pipeline_layout     = {};
-        std::vector<vk::DescriptorSetLayout>    bind_group_layouts  = {};
+        ManagedShared<Device>                           device                      = {};
+        ManagedShared<Function>                         vertexFunction              = {};
+        ManagedShared<Function>                         fragmentFunction            = {};
+        ManagedShared<TessellationState>                tessellationState           = {};
+        ManagedShared<MultisampleState>                 multisampleState            = {};
+        VertexInputState                                vertexInputState            = {};
+        uint32_t                                        viewMask                    = {};
+        vk::Format                                      depthAttachmentFormat       = {};
+        vk::Format                                      stencilAttachmentFormat     = {};
+        RenderPipelineColorAttachmentFormatArray        colorAttachmentFormats      = {};
+        RenderPipelineColorBlendAttachmentStateArray    colorBlendAttachments       = {};
+        vk::PrimitiveTopology                           inputPrimitiveTopology      = {};
+        bool                                            primitiveRestartEnable      = {};
+        bool                                            isAlphaToCoverageEnabled    = {};
+        bool                                            isAlphaToOneEnabled         = {};
+
+        vk::PipelineCache                               cache                       = {};
+        vk::PipelineLayout                              pipelineLayout              = {};
+        std::map<std::size_t, vk::Pipeline>             pipelines                   = {};
+        std::vector<vk::DescriptorSetLayout>            bindGroupLayouts            = {};
 
         explicit RenderPipelineState(ManagedShared<Device> device);
         ~RenderPipelineState() override;

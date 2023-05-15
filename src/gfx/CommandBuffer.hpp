@@ -4,6 +4,7 @@
 #include "Texture.hpp"
 #include "ClearColor.hpp"
 #include "CommandQueue.hpp"
+#include "RenderPipelineState.hpp"
 
 #include <optional>
 
@@ -74,8 +75,25 @@ namespace gfx {
     private:
         friend CommandBuffer;
 
-        ManagedShared<CommandBuffer> commandBuffer;
-        ManagedShared<RenderPipelineState> currentPipelineState;
+        enum : uint32_t {
+            RenderCommandEncoderPipeline    = 1 << 0
+        };
+
+        uint32_t                            flags                       = {};
+        ManagedShared<CommandBuffer>        commandBuffer               = {};
+        ManagedShared<DepthStencilState>    depthStencilState_          = {};
+        ManagedShared<RenderPipelineState>  renderPipelineState_        = {};
+
+        bool                                depthClampEnable_           = {};
+        bool                                rasterizerDiscardEnable_    = {};
+        vk::PolygonMode                     polygonMode_                = {};
+        float                               lineWidth_                  = {};
+        vk::CullModeFlagBits                cullMode_                   = {};
+        vk::FrontFace                       frontFace_                  = {};
+        bool                                depthBiasEnable_            = {};
+        float                               depthBiasConstantFactor_    = {};
+        float                               depthBiasClamp_             = {};
+        float                               depthBiasSlopeFactor_       = {};
 
     public:
         RenderCommandEncoder(const ManagedShared<CommandBuffer>& commandBuffer);
@@ -83,11 +101,23 @@ namespace gfx {
     private:
         void _beginRendering(const RenderingInfo& info);
         void _endRendering();
+        void _setup();
 
     public:
         auto getCommandBuffer() -> ManagedShared<CommandBuffer>;
         void endEncoding();
-        void setRenderPipelineState(const ManagedShared<RenderPipelineState>& pipelineState);
+        void setDepthClampEnable(bool depthClampEnable);
+        void setRasterizerDiscardEnable(bool rasterizerDiscardEnable);
+        void setPolygonMode(vk::PolygonMode polygonMode);
+        void setLineWidth(float lineWidth);
+        void setCullMode(vk::CullModeFlagBits cullMode);
+        void setFrontFace(vk::FrontFace frontFace);
+        void setDepthBiasEnable(bool depthBiasEnable);
+        void setDepthBiasConstantFactor(float depthBiasConstantFactor);
+        void setDepthBiasClamp(float depthBiasClamp);
+        void setDepthBiasSlopeFactor(float depthBiasSlopeFactor);
+        void setDepthStencilState(ManagedShared<DepthStencilState> depthStencilState);
+        void setRenderPipelineState(ManagedShared<RenderPipelineState> renderPipelineState);
         void setScissor(uint32_t firstScissor, const vk::Rect2D& rect);
         void setViewport(uint32_t firstViewport, const vk::Viewport& viewport);
         void bindIndexBuffer(const ManagedShared<Buffer>& buffer, vk::DeviceSize offset, vk::IndexType indexType);

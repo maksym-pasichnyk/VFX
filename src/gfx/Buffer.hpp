@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Instance.hpp"
+#include "vk_mem_alloc.h"
 
 namespace gfx {
     struct Device;

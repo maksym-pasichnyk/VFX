@@ -27,5 +27,5 @@ public:
 
 template<std::derived_from<Shape> T>
 static auto Shape(sp<T> shape) {
-    return sp<struct ShapeView<T>>::of(std::move(shape));
+    return MakeShared<struct ShapeView<T>>(std::move(shape));
 }

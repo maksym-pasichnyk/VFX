@@ -3,6 +3,7 @@
 #include "Instance.hpp"
 #include "Surface.hpp"
 #include "Device.hpp"
+#include "Adapter.hpp"
 
 #include "spdlog/spdlog.h"
 
@@ -77,11 +78,10 @@ auto gfx::createInstance(const InstanceConfiguration& desc) -> ManagedShared<Ins
 
     auto messenger = instance.raw.createDebugUtilsMessengerEXT(debug_create_info, nullptr, instance.dispatcher);
 
-    return MakeShared(new Instance(std::move(context), instance, messenger));
+    return MakeShared<Instance>(std::move(context), instance, messenger);
 }
-
-auto gfx::Instance::createDevice(vk::PhysicalDevice adapter) -> ManagedShared<Device> {
-    auto queue_family_properties = adapter.getQueueFamilyProperties(raii.dispatcher);
+auto gfx::Instance::createDevice(ManagedShared<Adapter> adapter) -> ManagedShared<Device> {
+    auto queue_family_properties = adapter->gpu.getQueueFamilyProperties(raii.dispatcher);
 
     float queue_priority = 1.0F;
     uint32_t queue_family_index = 0;
@@ -93,19 +93,12 @@ auto gfx::Instance::createDevice(vk::PhysicalDevice adapter) -> ManagedShared<De
     }
 
     auto queue_create_info = vk::DeviceQueueCreateInfo()
-        .setQueueFamilyIndex(queue_family_index)
-        .setQueuePriorities(queue_priority);
+            .setQueueFamilyIndex(queue_family_index)
+            .setQueuePriorities(queue_priority);
 
     auto queue_create_infos = std::array{
-        queue_create_info
+            queue_create_info
     };
-
-    // get all supported device extensions
-    auto supported_extensions = adapter.enumerateDeviceExtensionProperties(nullptr, raii.dispatcher);
-
-    for (auto& extension : supported_extensions) {
-        spdlog::info("{}", extension.extensionName);
-    }
 
     auto layers = std::vector<const char*>{};
 
@@ -131,7 +124,7 @@ auto gfx::Instance::createDevice(vk::PhysicalDevice adapter) -> ManagedShared<De
         .setPNext(&timeline_semaphore_features)
         .setDynamicRendering(VK_TRUE);
 
-    auto features_2 = adapter.getFeatures2(raii.dispatcher)
+    auto features_2 = adapter->gpu.getFeatures2(raii.dispatcher)
         .setPNext(&dynamic_rendering_features);
 
     auto create_info = vk::DeviceCreateInfo()
@@ -141,7 +134,7 @@ auto gfx::Instance::createDevice(vk::PhysicalDevice adapter) -> ManagedShared<De
         .setPEnabledExtensionNames(extensions);
 
     auto device = raii::Device(
-        adapter.createDevice(create_info, nullptr, raii.dispatcher),
+        adapter->gpu.createDevice(create_info, nullptr, raii.dispatcher),
         raii.dispatcher.vkGetDeviceProcAddr
     );
 
@@ -150,7 +143,7 @@ auto gfx::Instance::createDevice(vk::PhysicalDevice adapter) -> ManagedShared<De
     functions.vkGetInstanceProcAddr = raii.dispatcher.vkGetInstanceProcAddr;
 
     VmaAllocatorCreateInfo allocator_create_info = {};
-    allocator_create_info.physicalDevice = adapter;
+    allocator_create_info.physicalDevice = adapter->gpu;
     allocator_create_info.device = device.raw;
     allocator_create_info.pVulkanFunctions = &functions;
     allocator_create_info.instance = raii.raw;
@@ -158,23 +151,29 @@ auto gfx::Instance::createDevice(vk::PhysicalDevice adapter) -> ManagedShared<De
 
     VmaAllocator allocator;
     VkResult result = vmaCreateAllocator(&allocator_create_info, &allocator);
-    if (result != VK_SUCCESS) {
-        spdlog::error("Failed to create allocator");
-    }
+    vk::resultCheck(static_cast<vk::Result>(result), "Failed to create allocator");
 
     auto queue = device.raw.getQueue(queue_family_index, 0, device.dispatcher);
-
-    return MakeShared(new Device(shared_from_this(), device, adapter, queue_family_index, 0, queue, allocator));
+    return MakeShared<Device>(shared_from_this(), device, adapter->gpu, queue_family_index, 0, queue, allocator);
 }
 
 auto gfx::Instance::wrapSurface(vk::SurfaceKHR surface) -> ManagedShared<Surface> {
-    return MakeShared(new Surface(shared_from_this(), surface));
+    return MakeShared<Surface>(shared_from_this(), surface);
 }
 
 auto gfx::Instance::getSurfaceCapabilitiesKHR(vk::PhysicalDevice adapter, vk::SurfaceKHR surface) -> vk::SurfaceCapabilitiesKHR {
     return adapter.getSurfaceCapabilitiesKHR(surface, raii.dispatcher);
 }
 
-auto gfx::Instance::enumerateAdapters() -> std::vector<vk::PhysicalDevice> {
-    return raii.raw.enumeratePhysicalDevices(raii.dispatcher);
+auto gfx::Instance::enumerateAdapters() -> std::vector<ManagedShared<Adapter>> {
+    auto gpus = raii.raw.enumeratePhysicalDevices(raii.dispatcher);
+
+    std::vector<ManagedShared<Adapter>> adapters = {};
+    adapters.reserve(gpus.size());
+
+    for (auto& gpu : gpus) {
+        adapters.emplace_back(TransferPtr(new Adapter(shared_from_this(), gpu)));
+    }
+
+    return adapters;
 }

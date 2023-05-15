@@ -30,5 +30,5 @@ public:
 };
 
 inline auto View::overlay(sp<View> overlay, Alignment alignment) {
-    return sp<Overlay>::of(RetainPtr(this), std::move(overlay), alignment);
+    return MakeShared<Overlay>(shared_from_this(), std::move(overlay), alignment);
 }

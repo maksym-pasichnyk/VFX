@@ -4,7 +4,7 @@
 #include "Graphics.hpp"
 #include "Canvas.hpp"
 
-struct ImGuiBackend : Object {
+struct ImGuiBackend : ManagedObject<ImGuiBackend> {
 public:
     explicit ImGuiBackend(const ManagedShared<gfx::Device>& device);
 
