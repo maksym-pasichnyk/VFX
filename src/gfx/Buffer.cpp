@@ -1,10 +1,9 @@
 #include "Device.hpp"
 #include "Buffer.hpp"
 
-gfx::Buffer::Buffer(ManagedShared<Device> device) : device(std::move(device)), raw(nullptr), allocation(nullptr) {}
-gfx::Buffer::Buffer(ManagedShared<Device> device, vk::Buffer raw, VmaAllocation allocation) : device(std::move(device)), raw(raw), allocation(allocation) {}
+gfx::Buffer::Buffer(rc<Device> device, vk::Buffer handle, VmaAllocation allocation) : device(std::move(device)), handle(handle), allocation(allocation) {}
 gfx::Buffer::~Buffer() {
-    vmaDestroyBuffer(device->allocator, raw, allocation);
+    vmaDestroyBuffer(device->allocator, handle, allocation);
 }
 
 auto gfx::Buffer::contents() -> void* {
@@ -23,15 +22,15 @@ auto gfx::Buffer::didModifyRange(vk::DeviceSize offset, vk::DeviceSize size) -> 
     vmaFlushAllocation(device->allocator, allocation, offset, size);
 }
 
-void gfx::Buffer::setLabel(const std::string& name) {
+void gfx::Buffer::setLabel(std::string const& name) {
     vk::DebugMarkerObjectNameInfoEXT info = {};
     info.setObjectType(vk::DebugReportObjectTypeEXT::eBuffer);
-    info.setObject(uint64_t(VkBuffer(raw)));
+    info.setObject(uint64_t(VkBuffer(handle)));
     info.setPObjectName(name.c_str());
 
-    device->raii.raw.debugMarkerSetObjectNameEXT(info, device->raii.dispatcher);
+    device->handle.debugMarkerSetObjectNameEXT(info, device->dispatcher);
 }
 
 auto gfx::Buffer::descriptorInfo() const -> vk::DescriptorBufferInfo {
-    return vk::DescriptorBufferInfo{raw, 0, VK_WHOLE_SIZE};
+    return vk::DescriptorBufferInfo{handle, 0, VK_WHOLE_SIZE};
 }

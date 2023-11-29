@@ -9,8 +9,7 @@ public:
     }
 
 public:
-    void update(float dt) override {
-    }
+    void update(float dt) override {}
 
     void render() override {
         auto drawable = swapchain->nextDrawable();
@@ -47,8 +46,7 @@ public:
         buffer_write_info.setDescriptorType(vk::DescriptorType::eStorageBuffer);
         buffer_write_info.setDescriptorCount(1);
         buffer_write_info.setPBufferInfo(&descriptor_info);
-
-        device->raii.raw.updateDescriptorSets({buffer_write_info}, {}, device->raii.dispatcher);
+        device->handle.updateDescriptorSets({buffer_write_info}, {}, device->dispatcher);
 
         auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
         encoder->setRenderPipelineState(renderPipelineState);
@@ -98,9 +96,9 @@ private:
     }
 
 private:
-    ManagedShared<View> content;
-    ManagedShared<gfx::Buffer> vertexBuffer;
-    ManagedShared<gfx::RenderPipelineState> renderPipelineState;
+    rc<View> content;
+    rc<gfx::Buffer> vertexBuffer;
+    rc<gfx::RenderPipelineState> renderPipelineState;
 };
 
 auto main(int argc, char** argv) -> int32_t {

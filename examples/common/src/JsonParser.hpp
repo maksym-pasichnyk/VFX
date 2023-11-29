@@ -19,5 +19,5 @@ private:
 
     static void trim(std::istream& stream);
     static auto check(std::istream& stream, char ch) -> bool;
-    static void expect(std::istream& stream, char ch, const std::string& msg);
+    static void expect(std::istream& stream, char ch, std::string const& msg);
 };

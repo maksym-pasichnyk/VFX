@@ -9,15 +9,15 @@
 
 #include <optional>
 
-struct View : ManagedObject<View> {
+struct View : public ManagedObject {
     auto frame(std::optional<float_t> width, std::optional<float_t> height, Alignment alignment = Alignment::center());
     auto frame(std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment = Alignment::center());
     auto border(const Color& color, float_t width);
-    auto overlay(ManagedShared<View> overlay, Alignment alignment = Alignment::center());
+    auto overlay(rc<View> overlay, Alignment alignment = Alignment::center());
     auto fixedSize(bool horizontal, bool vertical);
     auto foregroundColor(const Color& color);
 
-    virtual auto body() -> ManagedShared<View> {
+    virtual auto body() -> rc<View> {
         throw std::runtime_error("FatalError");
     }
 
@@ -25,7 +25,7 @@ struct View : ManagedObject<View> {
         return body()->getPreferredSize(proposed);
     }
 
-    virtual void _draw(const ManagedShared<Canvas>& canvas, const Size& size) {
+    virtual void _draw(const rc<Canvas>& canvas, const Size& size) {
         return body()->_draw(canvas, size);
     }
 

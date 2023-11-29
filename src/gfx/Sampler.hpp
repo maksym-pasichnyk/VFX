@@ -3,14 +3,13 @@
 #include "Device.hpp"
 
 namespace gfx {
-    struct Sampler : ManagedObject<Sampler> {
-        ManagedShared<Device>   device;
-        vk::Sampler             raw;
+    struct Sampler : public ManagedObject {
+        rc<Device>  device;
+        vk::Sampler handle;
 
-        explicit Sampler();
-        explicit Sampler(ManagedShared<Device> device, vk::Sampler raw);
+        explicit Sampler(rc<Device> device, vk::SamplerCreateInfo const& create_info);
         ~Sampler() override;
 
-        void setLabel(const std::string& name);
+        void setLabel(this Sampler& self, std::string const& name);
     };
 }

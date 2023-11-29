@@ -6,7 +6,7 @@
 #include "Particle.hpp"
 #include "Graphics.hpp"
 
-struct ParticleSystem : ManagedObject<ParticleSystem> {
+struct ParticleSystem : public ManagedObject {
 private:
     struct Instance {
         glm::vec3 position;
@@ -14,12 +14,12 @@ private:
     };
 
 private:
-    ManagedShared<gfx::Device> mDevice;
-    ManagedShared<gfx::Buffer> mQuadIndexBuffer;
-    ManagedShared<gfx::Buffer> mQuadVertexBuffer;
-    ManagedShared<gfx::Buffer> mInstanceVertexBuffer;
-    ManagedShared<gfx::DepthStencilState> mDepthStencilState;
-    ManagedShared<gfx::RenderPipelineState> mRenderPipelineState;
+    rc<gfx::Device> mDevice;
+    rc<gfx::Buffer> mQuadIndexBuffer;
+    rc<gfx::Buffer> mQuadVertexBuffer;
+    rc<gfx::Buffer> mInstanceVertexBuffer;
+    rc<gfx::DepthStencilState> mDepthStencilState;
+    rc<gfx::RenderPipelineState> mRenderPipelineState;
 
     size_t mInstanceCount = {};
     std::vector<Particle> mParticles = {};
@@ -29,7 +29,7 @@ private:
     Signal<void(Particle&, float)> mParticleUpdateEvent = {};
 
 public:
-    explicit ParticleSystem(ManagedShared<gfx::Device> device, size_t capacity) : mDevice(std::move(device)) {
+    explicit ParticleSystem(rc<gfx::Device> device, size_t capacity) : mDevice(std::move(device)) {
         mParticles.resize(capacity);
         mInstances.resize(capacity);
 
@@ -120,11 +120,11 @@ public:
         }
     }
 
-    auto getRenderPipelineState() -> ManagedShared<gfx::RenderPipelineState> {
+    auto getRenderPipelineState() -> rc<gfx::RenderPipelineState> {
         return mRenderPipelineState;
     }
 
-    void draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder, const ShaderData& shader_data) {
+    void draw(const rc<gfx::RenderCommandEncoder>& encoder, const ShaderData& shader_data) {
         if (mInstanceCount == 0) {
             return;
         }

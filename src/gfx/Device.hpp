@@ -38,28 +38,25 @@ namespace gfx {
         eLazy,
     };
 
-    struct Device : ManagedObject<Device> {
-        ManagedShared<Instance> instance;
-        raii::Device            raii;
-        vk::PhysicalDevice      adapter;
-        uint32_t                family_index;
-        uint32_t                queue_index;
-        vk::Queue               queue;
-        VmaAllocator            allocator;
+    struct Device : public ManagedObject {
+        rc<Adapter>                 adapter;
+        vk::Device                  handle;
+        vk::raii::DeviceDispatcher  dispatcher;
+        VmaAllocator                allocator;
 
-        explicit Device(ManagedShared<Instance> instance, raii::Device raii, vk::PhysicalDevice adapter, uint32_t family_index, uint32_t queue_index, vk::Queue raw_queue, VmaAllocator allocator);
+        explicit Device(rc<Adapter> adapter, vk::DeviceCreateInfo const& create_info);
         ~Device() override;
 
-        void waitIdle();
-        auto newTexture(const TextureDescription& description) -> ManagedShared<Texture>;
-        auto newSampler(const vk::SamplerCreateInfo& info) -> ManagedShared<Sampler>;
-        auto newBuffer(vk::BufferUsageFlags usage, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options = 0) -> ManagedShared<Buffer>;
-        auto newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options = 0) -> ManagedShared<Buffer>;
-        auto newLibrary(const std::vector<char>& bytes) -> ManagedShared<Library>;
-        auto newDepthStencilState(DepthStencilStateDescription const& description) -> ManagedShared<DepthStencilState>;
-        auto newRenderPipelineState(RenderPipelineStateDescription const& description) -> ManagedShared<RenderPipelineState>;
-        auto newComputePipelineState(ManagedShared<Function> const& function) -> ManagedShared<ComputePipelineState>;
-        auto newCommandQueue() -> ManagedShared<CommandQueue>;
-        auto createSwapchain(ManagedShared<Surface> const& surface) -> ManagedShared<Swapchain>;
+        void waitIdle(this Device& self);
+        auto newTexture(this Device& self, const TextureDescription& description) -> rc<Texture>;
+        auto newSampler(this Device& self, const vk::SamplerCreateInfo& info) -> rc<Sampler>;
+        auto newBuffer(this Device& self, vk::BufferUsageFlags usage, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options = 0) -> rc<Buffer>;
+        auto newBuffer(this Device& self, vk::BufferUsageFlags usage, const void* pointer, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options = 0) -> rc<Buffer>;
+        auto newLibrary(this Device& self, std::span<char const> bytes) -> rc<Library>;
+        auto newDepthStencilState(this Device& self, DepthStencilStateDescription const& description) -> rc<DepthStencilState>;
+        auto newRenderPipelineState(this Device& self, RenderPipelineStateDescription const& description) -> rc<RenderPipelineState>;
+        auto newComputePipelineState(this Device& self, rc<Function> const& function) -> rc<ComputePipelineState>;
+        auto newCommandQueue(this Device& self) -> rc<CommandQueue>;
+        auto createSwapchain(this Device& self, rc<Surface> const& surface) -> rc<Swapchain>;
     };
 }

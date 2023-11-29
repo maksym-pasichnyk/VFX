@@ -3,16 +3,13 @@
 #include "Instance.hpp"
 
 namespace gfx {
-    struct Device;
+    struct Adapter : public ManagedObject {
+        rc<Instance>        instance;
+        vk::PhysicalDevice  handle;
 
-    struct Adapter : ManagedObject<Adapter> {
-        friend Instance;
+        explicit Adapter(rc<Instance> instance, vk::PhysicalDevice handle);
 
-    private:
-        ManagedShared<Instance> instance    = {};
-        vk::PhysicalDevice      gpu         = {};
-
-    private:
-        explicit Adapter(ManagedShared<Instance> instance, vk::PhysicalDevice gpu);
+        auto getSurfaceCapabilities(this Adapter& self, rc<Surface> const& surface) -> vk::SurfaceCapabilitiesKHR;
+        auto createDevice(this Adapter& self, vk::DeviceCreateInfo const& create_info) -> rc<Device>;
     };
 }

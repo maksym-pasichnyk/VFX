@@ -24,57 +24,57 @@ struct Lazy : Fn {
 template<typename Fn>
 Lazy(Fn) -> Lazy<Fn>;
 
-gfx::CommandBuffer::CommandBuffer(const ManagedShared<Device>& device, const ManagedShared<CommandQueue>& queue) : device(device), queue(queue) {
+gfx::CommandBuffer::CommandBuffer(rc<Device> const& device, rc<CommandQueue> const& queue) : device(device), queue(queue) {
     vk::CommandBufferAllocateInfo allocate_info = {};
-    allocate_info.setCommandPool(queue->raw);
+    allocate_info.setCommandPool(queue->handle);
     allocate_info.setLevel(vk::CommandBufferLevel::ePrimary);
     allocate_info.setCommandBufferCount(1);
-    vk::resultCheck(device->raii.raw.allocateCommandBuffers(&allocate_info, &raw, device->raii.dispatcher), "Failed to allocate command buffer");
+    vk::resultCheck(device->handle.allocateCommandBuffers(&allocate_info, &handle, device->dispatcher), "Failed to allocate command buffer");
 
     vk::FenceCreateInfo fence_create_info = {};
-    vk::resultCheck(device->raii.raw.createFence(&fence_create_info, nullptr, &fence, device->raii.dispatcher), "Failed to create fence");
+    vk::resultCheck(device->handle.createFence(&fence_create_info, nullptr, &fence, device->dispatcher), "Failed to create fence");
 
     vk::SemaphoreCreateInfo semaphore_create_info = {};
-    vk::resultCheck(device->raii.raw.createSemaphore(&semaphore_create_info, nullptr, &semaphore, device->raii.dispatcher), "Failed to create semaphore");
+    vk::resultCheck(device->handle.createSemaphore(&semaphore_create_info, nullptr, &semaphore, device->dispatcher), "Failed to create semaphore");
 
 //    vk::DescriptorPoolCreateInfo pool_create_info = {};
 //    pool_create_info.setMaxSets(1024);
 //    pool_create_info.setPoolSizes(pool_sizes);
-//    auto pool = raii.raw.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, raii.dispatcher);
+//    auto pool = raii.handle.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, raii.dispatcher);
 }
 
 gfx::CommandBuffer::~CommandBuffer() {
-    device->raii.raw.destroySemaphore(semaphore, nullptr, device->raii.dispatcher);
-    device->raii.raw.destroyFence(fence, nullptr, device->raii.dispatcher);
+    device->handle.destroySemaphore(semaphore, nullptr, device->dispatcher);
+    device->handle.destroyFence(fence, nullptr, device->dispatcher);
 
     for (auto& value : descriptor_pools) {
-        device->raii.raw.destroyDescriptorPool(value, nullptr, device->raii.dispatcher);
+        device->handle.destroyDescriptorPool(value, nullptr, device->dispatcher);
     }
 }
 
-void gfx::CommandBuffer::begin(const vk::CommandBufferBeginInfo& info) {
-    raw.begin(info, device->raii.dispatcher);
+void gfx::CommandBuffer::begin(vk::CommandBufferBeginInfo const& begin_info) {
+    handle.begin(begin_info, device->dispatcher);
 
     for (auto& value : descriptor_pools) {
-        device->raii.raw.resetDescriptorPool(value, {}, device->raii.dispatcher);
+        device->handle.resetDescriptorPool(value, {}, device->dispatcher);
     }
 }
 
 void gfx::CommandBuffer::end() {
-    raw.end(device->raii.dispatcher);
+    handle.end(device->dispatcher);
 }
 
 void gfx::CommandBuffer::submit() {
     vk::SubmitInfo submit_info = {};
     submit_info.setCommandBufferCount(1);
-    submit_info.setPCommandBuffers(&raw);
+    submit_info.setPCommandBuffers(&handle);
     submit_info.setSignalSemaphoreCount(1);
     submit_info.setPSignalSemaphores(&semaphore);
 
-    vk::resultCheck(device->raii.raw.resetFences(1, &fence, device->raii.dispatcher), "Failed to reset fence");
+    vk::resultCheck(device->handle.resetFences(1, &fence, device->dispatcher), "Failed to reset fence");
 
     // todo: get valid device for submit
-    device->queue.submit(submit_info, fence, device->raii.dispatcher);
+    device->handle.getQueue(0, 0, device->dispatcher).submit(submit_info, fence, device->dispatcher);
 }
 
 void gfx::CommandBuffer::present(const gfx::Drawable& drawable) {
@@ -85,17 +85,17 @@ void gfx::CommandBuffer::present(const gfx::Drawable& drawable) {
     present_info.setPImageIndices(&drawable.drawableIndex);
 
     // todo: get valid device for present
-    vk::Result result = device->queue.presentKHR(present_info, device->raii.dispatcher);
+    auto result = device->handle.getQueue(0, 0, device->dispatcher).presentKHR(present_info, device->dispatcher);
     if (result != vk::Result::eErrorOutOfDateKHR && result != vk::Result::eSuboptimalKHR && result != vk::Result::eSuccess) {
         throw std::runtime_error(vk::to_string(result));
     }
 }
 
 void gfx::CommandBuffer::waitUntilCompleted() {
-    vk::resultCheck(device->raii.raw.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max(), device->raii.dispatcher), "Failed to wait for fence");
+    vk::resultCheck(device->handle.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max(), device->dispatcher), "Failed to wait for fence");
 }
 
-void gfx::CommandBuffer::setImageLayout(const ManagedShared<Texture>& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask) {
+void gfx::CommandBuffer::setImageLayout(const rc<Texture>& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask) {
     vk::ImageMemoryBarrier2 barrier = {};
     barrier.setSrcStageMask(srcStageMask);
     barrier.setSrcAccessMask(srcAccessMask);
@@ -112,10 +112,10 @@ void gfx::CommandBuffer::setImageLayout(const ManagedShared<Texture>& texture, v
     dependency_info.setImageMemoryBarrierCount(1);
     dependency_info.setPImageMemoryBarriers(&barrier);
 
-    raw.pipelineBarrier2(dependency_info, device->raii.dispatcher);
+    handle.pipelineBarrier2(dependency_info, device->dispatcher);
 }
 
-auto gfx::CommandBuffer::newDescriptorSet(const ManagedShared<RenderPipelineState>& render_pipeline_state, uint32_t index) -> vk::DescriptorSet {
+auto gfx::CommandBuffer::newDescriptorSet(const rc<RenderPipelineState>& render_pipeline_state, uint32_t index) -> vk::DescriptorSet {
     for (auto pool : descriptor_pools) {
         vk::DescriptorSetAllocateInfo allocate_info = {};
         allocate_info.setDescriptorPool(pool);
@@ -123,7 +123,7 @@ auto gfx::CommandBuffer::newDescriptorSet(const ManagedShared<RenderPipelineStat
         allocate_info.setPSetLayouts(&render_pipeline_state->bindGroupLayouts[index]);
 
         vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
-        vk::Result result = device->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, device->raii.dispatcher);
+        vk::Result result = device->handle.allocateDescriptorSets(&allocate_info, &descriptor_set, device->dispatcher);
         if (result == vk::Result::eSuccess) {
             return descriptor_set;
         }
@@ -147,7 +147,7 @@ auto gfx::CommandBuffer::newDescriptorSet(const ManagedShared<RenderPipelineStat
     pool_create_info.setMaxSets(1024);
     pool_create_info.setPoolSizes(pool_sizes);
 
-    auto pool = device->raii.raw.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, device->raii.dispatcher);
+    auto pool = device->handle.createDescriptorPool(pool_create_info, VK_NULL_HANDLE, device->dispatcher);
     descriptor_pools.push_back(pool);
 
     vk::DescriptorSetAllocateInfo allocate_info = {};
@@ -156,25 +156,25 @@ auto gfx::CommandBuffer::newDescriptorSet(const ManagedShared<RenderPipelineStat
     allocate_info.setPSetLayouts(&render_pipeline_state->bindGroupLayouts[index]);
 
     vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
-    vk::Result result = device->raii.raw.allocateDescriptorSets(&allocate_info, &descriptor_set, device->raii.dispatcher);
+    vk::Result result = device->handle.allocateDescriptorSets(&allocate_info, &descriptor_set, device->dispatcher);
     if (result == vk::Result::eSuccess) {
         return descriptor_set;
     }
     return VK_NULL_HANDLE;
 }
 
-auto gfx::CommandBuffer::newRenderCommandEncoder(const RenderingInfo& info) -> ManagedShared<RenderCommandEncoder> {
+auto gfx::CommandBuffer::newRenderCommandEncoder(const RenderingInfo& info) -> rc<RenderCommandEncoder> {
     auto encoder = MakeShared<RenderCommandEncoder>(shared_from_this());
     encoder->_beginRendering(info);
     return encoder;
 }
 
-auto gfx::CommandBuffer::newComputeCommandEncoder() -> ManagedShared<ComputeCommandEncoder> {
+auto gfx::CommandBuffer::newComputeCommandEncoder() -> rc<ComputeCommandEncoder> {
     // todo: create compute command encoder
     return {};
 }
 
-gfx::RenderCommandEncoder::RenderCommandEncoder(const ManagedShared<CommandBuffer>& commandBuffer) : commandBuffer(commandBuffer) {
+gfx::RenderCommandEncoder::RenderCommandEncoder(const rc<CommandBuffer>& commandBuffer) : commandBuffer(commandBuffer) {
     depthClampEnable_           = false;
     rasterizerDiscardEnable_    = false;
     polygonMode_                = vk::PolygonMode::eFill;
@@ -264,11 +264,11 @@ void gfx::RenderCommandEncoder::_beginRendering(const RenderingInfo& info) {
         rendering_info.setPStencilAttachment(&stencilAttachment);
     }
 
-    commandBuffer->raw.beginRendering(rendering_info, commandBuffer->device->raii.dispatcher);
+    commandBuffer->handle.beginRendering(rendering_info, commandBuffer->device->dispatcher);
 }
 
 void gfx::RenderCommandEncoder::_endRendering() {
-    commandBuffer->raw.endRendering(commandBuffer->device->raii.dispatcher);
+    commandBuffer->handle.endRendering(commandBuffer->device->dispatcher);
 }
 
 void gfx::RenderCommandEncoder::_setup() {
@@ -352,13 +352,13 @@ void gfx::RenderCommandEncoder::_setup() {
 
             vk::PipelineShaderStageCreateInfo vertex_stage = {};
             vertex_stage.setStage(vk::ShaderStageFlagBits::eVertex);
-            vertex_stage.setModule(renderPipelineState_->vertexFunction->library->raw);
+            vertex_stage.setModule(renderPipelineState_->vertexFunction->library->handle);
             vertex_stage.setPName(renderPipelineState_->vertexFunction->name.c_str());
             stages.emplace_back(vertex_stage);
 
             vk::PipelineShaderStageCreateInfo fragment_stage = {};
             fragment_stage.setStage(vk::ShaderStageFlagBits::eFragment);
-            fragment_stage.setModule(renderPipelineState_->fragmentFunction->library->raw);
+            fragment_stage.setModule(renderPipelineState_->fragmentFunction->library->handle);
             fragment_stage.setPName(renderPipelineState_->fragmentFunction->name.c_str());
             stages.emplace_back(fragment_stage);
 
@@ -408,18 +408,18 @@ void gfx::RenderCommandEncoder::_setup() {
             pipeline_create_info.setBasePipelineIndex(0);
 
             vk::Pipeline pipeline;
-            vk::resultCheck(commandBuffer->device->raii.raw.createGraphicsPipelines(renderPipelineState_->cache, 1, &pipeline_create_info, nullptr, &pipeline, commandBuffer->device->raii.dispatcher), "Failed to create graphics pipeline");
+            vk::resultCheck(commandBuffer->device->handle.createGraphicsPipelines(renderPipelineState_->cache, 1, &pipeline_create_info, nullptr, &pipeline, commandBuffer->device->dispatcher), "Failed to create graphics pipeline");
             return pipeline;
         }
         });
 
         auto pipeline = it.first->second;
 
-        commandBuffer->raw.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline, commandBuffer->device->raii.dispatcher);
+        commandBuffer->handle.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline, commandBuffer->device->dispatcher);
     }
 }
 
-auto gfx::RenderCommandEncoder::getCommandBuffer() -> ManagedShared<CommandBuffer> {
+auto gfx::RenderCommandEncoder::getCommandBuffer() -> rc<CommandBuffer> {
     return commandBuffer;
 }
 
@@ -497,14 +497,14 @@ void gfx::RenderCommandEncoder::setDepthBiasSlopeFactor(float depthBiasSlopeFact
     }
 }
 
-void gfx::RenderCommandEncoder::setDepthStencilState(ManagedShared<DepthStencilState> depthStencilState) {
+void gfx::RenderCommandEncoder::setDepthStencilState(rc<DepthStencilState> depthStencilState) {
     if (depthStencilState_ != depthStencilState) {
         flags_ |= RenderCommandEncoderPipeline;
         depthStencilState_ = std::move(depthStencilState);
     }
 }
 
-void gfx::RenderCommandEncoder::setRenderPipelineState(ManagedShared<RenderPipelineState> renderPipelineState) {
+void gfx::RenderCommandEncoder::setRenderPipelineState(rc<RenderPipelineState> renderPipelineState) {
     if (renderPipelineState_ != renderPipelineState) {
         flags_ |= RenderCommandEncoderPipeline;
         renderPipelineState_ = std::move(renderPipelineState);
@@ -512,51 +512,51 @@ void gfx::RenderCommandEncoder::setRenderPipelineState(ManagedShared<RenderPipel
 }
 
 void gfx::RenderCommandEncoder::setScissor(uint32_t firstScissor, const vk::Rect2D& rect) {
-    commandBuffer->raw.setScissor(firstScissor, 1, &rect, commandBuffer->device->raii.dispatcher);
+    commandBuffer->handle.setScissor(firstScissor, 1, &rect, commandBuffer->device->dispatcher);
 }
 
 void gfx::RenderCommandEncoder::setViewport(uint32_t firstViewport, const vk::Viewport& viewport) {
-    commandBuffer->raw.setViewport(firstViewport, 1, &viewport, commandBuffer->device->raii.dispatcher);
+    commandBuffer->handle.setViewport(firstViewport, 1, &viewport, commandBuffer->device->dispatcher);
 }
 
-void gfx::RenderCommandEncoder::bindIndexBuffer(const ManagedShared<Buffer>& buffer, vk::DeviceSize offset, vk::IndexType indexType) {
-    commandBuffer->raw.bindIndexBuffer(buffer->raw, offset, indexType, commandBuffer->device->raii.dispatcher);
+void gfx::RenderCommandEncoder::bindIndexBuffer(const rc<Buffer>& buffer, vk::DeviceSize offset, vk::IndexType indexType) {
+    commandBuffer->handle.bindIndexBuffer(buffer->handle, offset, indexType, commandBuffer->device->dispatcher);
 }
 
-void gfx::RenderCommandEncoder::bindVertexBuffer(int firstBinding, const ManagedShared<Buffer>& buffer, vk::DeviceSize offset) {
-    commandBuffer->raw.bindVertexBuffers(firstBinding, 1, &buffer->raw, &offset, commandBuffer->device->raii.dispatcher);
+void gfx::RenderCommandEncoder::bindVertexBuffer(int firstBinding, const rc<Buffer>& buffer, vk::DeviceSize offset) {
+    commandBuffer->handle.bindVertexBuffers(firstBinding, 1, &buffer->handle, &offset, commandBuffer->device->dispatcher);
 }
 
 void gfx::RenderCommandEncoder::draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
     _setup();
-    commandBuffer->raw.draw(vertexCount, instanceCount, firstVertex, firstInstance, commandBuffer->device->raii.dispatcher);
+    commandBuffer->handle.draw(vertexCount, instanceCount, firstVertex, firstInstance, commandBuffer->device->dispatcher);
 }
 
 void gfx::RenderCommandEncoder::drawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
     _setup();
-    commandBuffer->raw.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, commandBuffer->device->raii.dispatcher);
+    commandBuffer->handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, commandBuffer->device->dispatcher);
 }
 
 void gfx::RenderCommandEncoder::bindDescriptorSet(vk::DescriptorSet descriptorSet, uint32_t slot) {
-    commandBuffer->raw.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, renderPipelineState_->pipelineLayout, slot, 1, &descriptorSet, 0, nullptr, commandBuffer->device->raii.dispatcher);
+    commandBuffer->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, renderPipelineState_->pipelineLayout, slot, 1, &descriptorSet, 0, nullptr, commandBuffer->device->dispatcher);
 }
 
 void gfx::RenderCommandEncoder::pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data) {
-    commandBuffer->raw.pushConstants(renderPipelineState_->pipelineLayout, stageFlags, offset, size, data, commandBuffer->device->raii.dispatcher);
+    commandBuffer->handle.pushConstants(renderPipelineState_->pipelineLayout, stageFlags, offset, size, data, commandBuffer->device->dispatcher);
 }
 
-void gfx::ComputeCommandEncoder::setComputePipelineState(const ManagedShared<ComputePipelineState>& state) {
-    commandBuffer->raw.bindPipeline(vk::PipelineBindPoint::eCompute, state->pipeline, commandBuffer->device->raii.dispatcher);
+void gfx::ComputeCommandEncoder::setComputePipelineState(const rc<ComputePipelineState>& state) {
+    commandBuffer->handle.bindPipeline(vk::PipelineBindPoint::eCompute, state->pipeline, commandBuffer->device->dispatcher);
 }
 
 void gfx::ComputeCommandEncoder::bindDescriptorSet(vk::DescriptorSet descriptorSet, uint32_t slot) {
-    commandBuffer->raw.bindDescriptorSets(vk::PipelineBindPoint::eCompute, currentPipelineState->pipeline_layout, slot, 1, &descriptorSet, 0, nullptr, commandBuffer->device->raii.dispatcher);
+    commandBuffer->handle.bindDescriptorSets(vk::PipelineBindPoint::eCompute, currentPipelineState->pipeline_layout, slot, 1, &descriptorSet, 0, nullptr, commandBuffer->device->dispatcher);
 }
 
 void gfx::ComputeCommandEncoder::pushConstants(vk::ShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* data) {
-    commandBuffer->raw.pushConstants(currentPipelineState->pipeline_layout, stageFlags, offset, size, data, commandBuffer->device->raii.dispatcher);
+    commandBuffer->handle.pushConstants(currentPipelineState->pipeline_layout, stageFlags, offset, size, data, commandBuffer->device->dispatcher);
 }
 
 void gfx::ComputeCommandEncoder::dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
-    commandBuffer->raw.dispatch(groupCountX, groupCountY, groupCountZ, commandBuffer->device->raii.dispatcher);
+    commandBuffer->handle.dispatch(groupCountX, groupCountY, groupCountZ, commandBuffer->device->dispatcher);
 }

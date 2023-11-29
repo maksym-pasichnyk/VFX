@@ -1,16 +1,17 @@
 #include "Sampler.hpp"
 
-gfx::Sampler::Sampler() : device(), raw(nullptr) {}
-gfx::Sampler::Sampler(ManagedShared<Device> device, vk::Sampler raw) : device(std::move(device)), raw(raw) {}
-gfx::Sampler::~Sampler() {
-    device->raii.raw.destroySampler(raw, VK_NULL_HANDLE, device->raii.dispatcher);
+gfx::Sampler::Sampler(rc<Device> device, vk::SamplerCreateInfo const& create_info) : device(std::move(device)) {
+    this->handle = this->device->handle.createSampler(create_info, VK_NULL_HANDLE, this->device->dispatcher);
 }
 
-void gfx::Sampler::setLabel(const std::string& name) {
+gfx::Sampler::~Sampler() {
+    this->device->handle.destroySampler(this->handle, VK_NULL_HANDLE, this->device->dispatcher);
+}
+
+void gfx::Sampler::setLabel(this Sampler& self, std::string const& name) {
     vk::DebugMarkerObjectNameInfoEXT info = {};
     info.setObjectType(vk::DebugReportObjectTypeEXT::eSampler);
-    info.setObject(uint64_t(VkSampler(raw)));
+    info.setObject(uint64_t(VkSampler(self.handle)));
     info.setPObjectName(name.c_str());
-
-    device->raii.raw.debugMarkerSetObjectNameEXT(info, device->raii.dispatcher);
+    self.device->handle.debugMarkerSetObjectNameEXT(info, self.device->dispatcher);
 }

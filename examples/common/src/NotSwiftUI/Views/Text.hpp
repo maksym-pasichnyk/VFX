@@ -12,7 +12,7 @@ public:
         : text(std::move(text)), fontSize(fontSize) {}
 
 public:
-    void _draw(const ManagedShared<Canvas> &canvas, const Size &size) override {
+    void _draw(const rc<Canvas> &canvas, const Size &size) override {
         auto imSize = ImGui::GetDefaultFont()->CalcTextSizeA(fontSize, FLT_MAX, size.width, text.data(), text.data() + text.size(), nullptr);
         auto uiSize = Size{imSize.x, imSize.y};
         auto translate = translation(uiSize, size, Alignment::center());

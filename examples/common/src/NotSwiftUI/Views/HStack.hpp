@@ -6,17 +6,17 @@
 
 struct HStack : View {
 private:
-    std::vector<ManagedShared<View>> children;
+    std::vector<rc<View>> children;
     VerticalAlignment alignment;
     float_t spacing;
 
     std::vector<Size> sizes = {};
 
 public:
-    explicit HStack(std::vector<ManagedShared<View>> children, VerticalAlignment alignment = VerticalAlignment::center(), std::optional<float_t> spacing = {})
+    explicit HStack(std::vector<rc<View>> children, VerticalAlignment alignment = VerticalAlignment::center(), std::optional<float_t> spacing = {})
         : children(std::move(children)), alignment(alignment), spacing(spacing.value_or(0.0F)) {}
 
-    void _draw(const ManagedShared<Canvas> &canvas, const Size &size) override {
+    void _draw(const rc<Canvas> &canvas, const Size &size) override {
         float_t stackY = alignment.defaultValue(size);
         float_t currentX = 0.0F;
 
@@ -86,6 +86,6 @@ public:
     }
 };
 
-static auto HStack(VerticalAlignment alignment, std::optional<float_t> spacing, std::vector<ManagedShared<View>> children) {
+static auto HStack(VerticalAlignment alignment, std::optional<float_t> spacing, std::vector<rc<View>> children) {
     return MakeShared<struct HStack>(std::move(children), alignment, spacing);
 }

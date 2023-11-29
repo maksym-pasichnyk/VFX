@@ -8,14 +8,14 @@ namespace gfx {
     struct Device;
     struct Function;
 
-    struct Library : ManagedObject<Library> {
-        ManagedShared<Device> device;
-        vk::ShaderModule raw;
+    struct Library : public ManagedObject {
+        rc<Device> device;
+        vk::ShaderModule handle;
         SpvReflectShaderModule spvReflectShaderModule;
 
-        explicit Library(ManagedShared<Device> device);
+        explicit Library(rc<Device> device, vk::ShaderModuleCreateInfo const& create_info);
         ~Library() override;
 
-        auto newFunction(std::string name) -> ManagedShared<Function>;
+        auto newFunction(this Library& self, std::string name) -> rc<Function>;
     };
 }

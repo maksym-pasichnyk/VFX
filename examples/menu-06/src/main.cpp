@@ -58,7 +58,7 @@ public:
     }
 
 private:
-    ManagedShared<View> content;
+    rc<View> content;
 };
 
 auto main(int argc, char** argv) -> int32_t {

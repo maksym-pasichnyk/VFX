@@ -5,172 +5,124 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
 #include <typeinfo>
 
 template<typename T>
-class ManagedShared;
+class rc;
 
-template<typename T>
-auto TransferPtr(T* object_) -> ManagedShared<T>;
-
-// TODO: remove template when Deducing this will be supported
-template<typename T>
 class ManagedObject {
 protected:
-    ManagedObject() : counter(1) {
-//        fprintf(stdout, "Allocate(%s) %p\n", typeid(T).name(), this);
-    }
-    virtual ~ManagedObject() {
-//        fprintf(stdout, "Deallocate(%s) %p\n", typeid(T).name(), this);
-    }
+    explicit ManagedObject() : __strong_references(1) {}
+    virtual ~ManagedObject() = default;
 
 public:
-    auto retain() -> T* {
-        counter += 1;
-        return static_cast<T*>(this);
+    template<typename Self>
+    auto retain(this Self& self) -> Self* {
+        self.__strong_references += 1;
+        return std::addressof(self);
     }
 
-    void release() {
-        counter -= 1;
-        if (counter == 0) {
-            delete this;
+    template<typename Self>
+    void release(this Self& self) {
+        if (self.__strong_references.fetch_sub(1) == 1) {
+            delete std::addressof(self);
         }
     }
 
-    auto weak_from_this() -> ManagedShared<T> {
-        return TransferPtr(this);
-    }
-
-    auto shared_from_this() -> ManagedShared<T> {
-        return TransferPtr(retain());
+    template<typename Self>
+    auto shared_from_this(this Self& self) -> rc<Self> {
+        return rc(self.retain());
     }
 
 private:
-    std::atomic_uint32_t counter = {};
+    std::atomic_uint64_t __strong_references = {};
 };
 
 template<typename T>
-class ManagedShared {
-//    template<typename U> friend auto RetainPtr(U* pointer) -> SharedPtr<U>;
-    template<typename U> friend auto TransferPtr(U* object) -> ManagedShared<U>;
-
+class rc final {
 public:
-    constexpr ManagedShared() noexcept = default;
+    template<typename U>
+    friend class rc;
 
-    ManagedShared(const ManagedShared<T>& other) : object_(other.get()) {
-        if (object_) {
-            object_->ManagedObject::retain();
+    constexpr rc() noexcept : __handle(nullptr) {}
+    constexpr explicit rc(T* object) noexcept : __handle(object) {}
+
+    rc(rc<T> const& other) : __handle(other.get()) {
+        if (__handle) {
+            __handle->ManagedObject::retain();
         }
     }
 
     template<typename U>
-    ManagedShared(const ManagedShared<U>& other) : object_(other.get()) {
-        if (object_) {
-            object_->ManagedObject::retain();
+    rc(rc<U> const& other) : __handle(other.get()) {
+        if (__handle) {
+            __handle->ManagedObject::retain();
         }
     }
 
-    ManagedShared(ManagedShared<T>&& other) noexcept : object_(other.get()) {
-        other.detach();
-    }
+    rc(rc<T>&& other) noexcept = default;
 
     template<typename U>
-    ManagedShared(ManagedShared<U>&& other) noexcept : object_(other.get()) {
-        other.detach();
-    }
-
-    ~ManagedShared() {
-        if (object_) {
-            object_->ManagedObject::release();
-        }
-    }
+    rc(rc<U>&& other) noexcept : __handle(other.detach()) {}
 
 public:
-    constexpr auto get() const noexcept -> T* {
-        return object_;
+    constexpr auto get(this rc const& self) noexcept -> T* {
+        return self.__handle.get();
     }
 
-    constexpr void detach() noexcept {
-        object_ = nullptr;
+    constexpr auto detach(this rc& self) noexcept -> T* {
+        return self.__handle.release();
     }
 
 public:
-    auto operator=(const ManagedShared<T>& other) -> ManagedShared<T>& {
-        if (object_ != other.object_) {
-            if (object_ != nullptr) {
-                object_->ManagedObject::release();
-            }
-            object_ = other.get();
-            if (object_ != nullptr) {
-                object_->ManagedObject::retain();
-            }
-        }
-        return *this;
+    auto operator=(this rc& self, rc<T> const& other) -> rc<T>& {
+        self = auto(other);
+        return self;
     }
 
-    template<typename U>
-    auto operator=(const ManagedShared<U>& other) -> ManagedShared<T>& {
-        if (object_ != other.get()) {
-            if (object_ != nullptr) {
-                object_->ManagedObject::release();
-            }
-            object_ = other.get();
-            if (object_ != nullptr) {
-                object_->ManagedObject::retain();
-            }
-        }
-        return *this;
+//    template<typename U>
+//    auto operator=(rc<U> const& other) -> rc<T>& {
+//        *this = auto(other);
+//        return *this;
+//    }
+
+    auto operator=(this rc& self, rc<T>&& other) -> rc<T>& {
+        self.__handle.swap(other.__handle);
+        return self;
     }
 
-    auto operator=(ManagedShared<T>&& other) -> ManagedShared<T>& {
-        if (object_ != other.object_) {
-            if (object_ != nullptr) {
-                object_->ManagedObject::release();
-            }
-            object_ = other.get();
-        }
-        other.detach();
-        return *this;
+//    template<typename U>
+//    auto operator=(rc<U>&& other) -> rc<T>& {
+//        __handle.swap(other.__handle);
+//        return *this;
+//    }
+
+    constexpr explicit operator bool(this rc const& self) noexcept {
+        return self.__handle.get() != nullptr;
     }
 
-    template<typename U>
-    auto operator=(ManagedShared<U>&& other) -> ManagedShared<T>& {
-        if (object_ != other.get()) {
-            if (object_ != nullptr) {
-                object_->ManagedObject::release();
-            }
-            object_ = other.get();
-        }
-        other.detach();
-        return *this;
+    constexpr auto operator->(this rc const& self) noexcept -> T* {
+        return self.__handle.get();
     }
 
-    constexpr explicit operator bool() const noexcept {
-        return object_ != nullptr;
+    constexpr auto operator*(this rc const& self) noexcept -> T& {
+        return *self.__handle.get();
     }
 
-    constexpr auto operator->() const noexcept -> T* {
-        return object_;
-    }
-
-    constexpr auto operator*() const noexcept -> T& {
-        return *object_;
-    }
-
-    auto operator<=>(const ManagedShared<T>& other) const = default;
+    friend auto operator<=>(rc<T> const&, rc<T> const&) noexcept = default;
 
 private:
-    T* object_ = nullptr;
-};
+    struct __deleter {
+        static void operator()(T* ptr) {
+            ptr->ManagedObject::release();
+        }
+    };
 
-template<typename T>
-inline auto TransferPtr(T* object) -> ManagedShared<T> {
-    ManagedShared<T> shared = {};
-    shared.object_ = object;
-    return shared;
-}
+    std::unique_ptr<T, __deleter> __handle;
+};
 
 template<typename T, typename... Args>
-inline auto MakeShared(Args&&... args) -> ManagedShared<T> {
-    return TransferPtr(new T(std::forward<Args>(args)...));
+inline auto MakeShared(Args&&... args) -> rc<T> {
+    return rc(new T(std::forward<Args>(args)...));
 }

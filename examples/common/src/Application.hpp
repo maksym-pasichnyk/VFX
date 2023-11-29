@@ -17,7 +17,7 @@ struct ShaderData {
     alignas(16) glm::mat4x4 g_view_matrix;
 };
 
-class WindowPlatform : public ManagedObject<WindowPlatform> {
+class WindowPlatform : public ManagedObject {
 public:
     explicit WindowPlatform(const char* title, uint32_t width, uint32_t height) {
         window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
@@ -27,9 +27,9 @@ public:
     }
 
 public:
-    auto createSurface(const ManagedShared<gfx::Instance>& instance) -> ManagedShared<gfx::Surface> {
+    auto createSurface(const rc<gfx::Instance>& instance) -> rc<gfx::Surface> {
         VkSurfaceKHR raw_surface;
-        SDL_Vulkan_CreateSurface(window, instance->raii.raw, &raw_surface);
+        SDL_Vulkan_CreateSurface(window, instance->handle, &raw_surface);
         return instance->wrapSurface(raw_surface);
     }
 
@@ -71,14 +71,47 @@ struct Application {
 public:
     explicit Application(const char* title) {
         platform = MakeShared<WindowPlatform>(title, 800, 600);
-
-        gfx::InstanceConfiguration instance_config = {};
-        instance_config.name = title;
-        instance_config.version = 1;
-
-        instance = gfx::createInstance(instance_config);
+        instance = gfx::createInstance(gfx::InstanceConfiguration{
+            .name = title,
+            .version = 1
+        });
         adapter = instance->enumerateAdapters().front();
-        device = instance->createDevice(adapter);
+
+        {
+            auto queue_priorities = std::array{
+                1.0F
+            };
+            auto queue_create_infos = std::array{
+                vk::DeviceQueueCreateInfo()
+                    .setQueueFamilyIndex(0)
+                    .setQueuePriorities(queue_priorities)
+            };
+            auto extensions = std::array{
+                VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+                VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
+            };
+            auto synchronization_2_features = vk::PhysicalDeviceSynchronization2Features()
+                .setSynchronization2(VK_TRUE);
+            auto portability_subset_features = vk::PhysicalDevicePortabilitySubsetFeaturesKHR()
+                .setPNext(&synchronization_2_features)
+                .setImageViewFormatSwizzle(VK_TRUE);
+            auto timeline_semaphore_features = vk::PhysicalDeviceTimelineSemaphoreFeatures()
+                .setPNext(&portability_subset_features)
+                .setTimelineSemaphore(VK_TRUE);
+            auto dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures()
+                .setPNext(&timeline_semaphore_features)
+                .setDynamicRendering(VK_TRUE);
+            auto features_2 = vk::PhysicalDeviceFeatures2()
+                .setPNext(&dynamic_rendering_features);
+            auto create_info = vk::DeviceCreateInfo()
+                .setPNext(&features_2)
+                .setQueueCreateInfos(queue_create_infos)
+                .setPEnabledExtensionNames(extensions);
+            device = adapter->createDevice(create_info);
+        }
+
+
 
         surface = platform->createSurface(instance);
         swapchain = device->createSwapchain(surface);
@@ -92,7 +125,7 @@ public:
         swapchain->configure(surface_config);
 
         commandQueue = device->newCommandQueue();
-        commandBuffer = commandQueue->commandBuffer();
+        commandBuffer = commandQueue->newCommandBuffer();
 
         imgui = MakeShared<ImGuiBackend>(device);
         canvas = MakeShared<Canvas>(imgui->drawList());
@@ -208,7 +241,7 @@ protected:
         return quit;
     }
 
-    auto _drawView(const ManagedShared<View>& view) {
+    auto _drawView(const rc<View>& view) {
         auto uiSize = getUISize(platform->getWindowSize());
         auto childSize = view->getPreferredSize(ProposedSize(uiSize));
         auto translate = view->translation(childSize, uiSize, Alignment::center());
@@ -245,22 +278,22 @@ public:
 
 //todo: make this private
 protected:
-    ManagedShared<WindowPlatform>       platform        = {};
+    rc<WindowPlatform>       platform        = {};
     float_t                             average         = {};
     float_t                             accumulate[60]  = {};
     float_t                             accumulateTotal = {};
     int32_t                             accumulateCount = {};
     int32_t                             accumulateIndex = {};
 
-    ManagedShared<gfx::Adapter>         adapter         = {};
-    ManagedShared<gfx::Device>          device          = {};
-    ManagedShared<gfx::Instance>        instance        = {};
-    ManagedShared<gfx::Surface>         surface         = {};
+    rc<gfx::Adapter>         adapter         = {};
+    rc<gfx::Device>          device          = {};
+    rc<gfx::Instance>        instance        = {};
+    rc<gfx::Surface>         surface         = {};
 
-    ManagedShared<gfx::Swapchain>       swapchain       = {};
-    ManagedShared<gfx::CommandQueue>    commandQueue    = {};
-    ManagedShared<gfx::CommandBuffer>   commandBuffer   = {};
+    rc<gfx::Swapchain>       swapchain       = {};
+    rc<gfx::CommandQueue>    commandQueue    = {};
+    rc<gfx::CommandBuffer>   commandBuffer   = {};
 
-    ManagedShared<Canvas>               canvas;
-    ManagedShared<ImGuiBackend>         imgui;
+    rc<Canvas>               canvas;
+    rc<ImGuiBackend>         imgui;
 };

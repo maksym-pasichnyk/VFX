@@ -1,11 +1,15 @@
 #include "CommandQueue.hpp"
 #include "CommandBuffer.hpp"
+#include "ComputePipelineState.hpp"
 
-gfx::CommandQueue::CommandQueue(ManagedShared<Device> device, vk::CommandPool raw) : device(std::move(device)), raw(raw) {}
-gfx::CommandQueue::~CommandQueue() {
-    device->raii.raw.destroyCommandPool(raw, nullptr, device->raii.dispatcher);
+gfx::CommandQueue::CommandQueue(rc<Device> device, vk::CommandPoolCreateInfo const& create_info) : device(std::move(device)), handle() {
+    this->handle = this->device->handle.createCommandPool(create_info, nullptr, this->device->dispatcher);
 }
 
-auto gfx::CommandQueue::commandBuffer() -> ManagedShared<CommandBuffer> {
-    return MakeShared<CommandBuffer>(device, shared_from_this());
+gfx::CommandQueue::~CommandQueue() {
+    this->device->handle.destroyCommandPool(handle, nullptr, device->dispatcher);
+}
+
+auto gfx::CommandQueue::newCommandBuffer(this CommandQueue& self) -> rc<CommandBuffer> {
+    return MakeShared<CommandBuffer>(self.device, self.shared_from_this());
 }

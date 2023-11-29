@@ -1,5 +1,6 @@
 #include "Device.hpp"
 #include "Buffer.hpp"
+#include "Adapter.hpp"
 #include "Sampler.hpp"
 #include "Texture.hpp"
 #include "Surface.hpp"
@@ -10,8 +11,6 @@
 #include "CommandQueue.hpp"
 #include "RenderPipelineState.hpp"
 #include "ComputePipelineState.hpp"
-
-#include "spdlog/spdlog.h"
 #include "ManagedObject.hpp"
 
 #include <unordered_map>
@@ -342,62 +341,78 @@ struct DescriptorSetLayoutCreateInfo {
         bindings.emplace_back(other);
     }
 };
+gfx::Device::Device(rc<Adapter> adapter, vk::DeviceCreateInfo const& create_info)
+: adapter(std::move(adapter))
+, handle(this->adapter->handle.createDevice(create_info, nullptr, this->adapter->instance->dispatcher))
+, dispatcher(this->adapter->instance->dispatcher.vkGetDeviceProcAddr, this->handle)
+, allocator() {
+    VmaVulkanFunctions functions = {};
+    functions.vkGetDeviceProcAddr   = this->adapter->instance->dispatcher.vkGetDeviceProcAddr;
+    functions.vkGetInstanceProcAddr = this->adapter->instance->dispatcher.vkGetInstanceProcAddr;
 
-gfx::Device::Device(ManagedShared<Instance> instance, raii::Device raii, vk::PhysicalDevice adapter, uint32_t family_index, uint32_t queue_index, vk::Queue raw_queue, VmaAllocator allocator)
-    : instance(std::move(instance)), raii(raii), adapter(adapter), family_index(family_index), queue_index(queue_index), queue(raw_queue), allocator(allocator) {}
+    VmaAllocatorCreateInfo allocator_create_info = {};
+    allocator_create_info.physicalDevice = this->adapter->handle;
+    allocator_create_info.device = this->handle;
+    allocator_create_info.pVulkanFunctions = &functions;
+    allocator_create_info.instance = this->adapter->instance->handle;
+    allocator_create_info.vulkanApiVersion = VK_API_VERSION_1_2;
+    vk::resultCheck(static_cast<vk::Result>(vmaCreateAllocator(&allocator_create_info, &allocator)), "Failed to create allocator");
+}
 
 gfx::Device::~Device() {
     vmaDestroyAllocator(allocator);
-    raii.raw.destroy(nullptr, raii.dispatcher);
+    this->handle.destroy(nullptr, this->dispatcher);
 }
 
-void gfx::Device::waitIdle() {
-    raii.raw.waitIdle(raii.dispatcher);
+void gfx::Device::waitIdle(this Device& self) {
+    self.handle.waitIdle(self.dispatcher);
 }
 
-auto gfx::Device::newTexture(const TextureDescription& description) -> ManagedShared<Texture> {
+auto gfx::Device::newTexture(this Device& self, TextureDescription const& description) -> rc<Texture> {
     auto aspect = image_aspect_flags_table.at(description.format);
-    auto texture = MakeShared<Texture>(shared_from_this());
-
-    texture->format = description.format;
-    texture->extent.setWidth(description.width);
-    texture->extent.setHeight(description.height);
-    texture->extent.setDepth(1);
-    texture->subresource.setAspectMask(aspect);
-    texture->subresource.setLevelCount(1);
-    texture->subresource.setLayerCount(1);
 
     vk::ImageCreateInfo image_create_info = {};
     image_create_info.setImageType(vk::ImageType::e2D);
     image_create_info.setFormat(description.format);
-    image_create_info.extent.setWidth(description.width);
-    image_create_info.extent.setHeight(description.height);
-    image_create_info.extent.setDepth(1);
+    image_create_info.setExtent(vk::Extent3D(description.width, description.height, 1));
     image_create_info.setMipLevels(1);
     image_create_info.setArrayLayers(1);
     image_create_info.setUsage(description.usage);
 
     VmaAllocationCreateInfo allocation_create_info = {};
     allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
-    vmaCreateImage(allocator, reinterpret_cast<const VkImageCreateInfo*>(&image_create_info), &allocation_create_info, reinterpret_cast<VkImage*>(&texture->image), &texture->allocation, nullptr);
+
+    VkImage image;
+    VmaAllocation allocation;
+    vmaCreateImage(self.allocator, reinterpret_cast<const VkImageCreateInfo*>(&image_create_info), &allocation_create_info, reinterpret_cast<VkImage*>(&image), &allocation, nullptr);
 
     vk::ImageViewCreateInfo view_create_info = {};
-    view_create_info.setImage(texture->image);
+    view_create_info.setImage(image);
     view_create_info.setViewType(vk::ImageViewType::e2D),
     view_create_info.setFormat(description.format);
     view_create_info.setComponents(description.mapping),
-    view_create_info.setSubresourceRange(texture->subresource);
+    view_create_info.setSubresourceRange(vk::ImageSubresourceRange(aspect, 0, 1, 0, 1));
 
-    texture->image_view = raii.raw.createImageView(view_create_info, VK_NULL_HANDLE, raii.dispatcher);
-
-    return texture;
+    return MakeShared<Texture>(
+        self.shared_from_this(),
+        image,
+        description.format,
+        vk::Extent3D(
+            description.width,
+            description.height,
+            1
+        ),
+        self.handle.createImageView(view_create_info, VK_NULL_HANDLE, self.dispatcher),
+        vk::ImageSubresourceRange(aspect, 0, 1, 0, 1),
+        allocation
+    );
 }
 
-auto gfx::Device::newSampler(const vk::SamplerCreateInfo& info) -> ManagedShared<Sampler> {
-    return MakeShared<Sampler>(shared_from_this(), raii.raw.createSampler(info, VK_NULL_HANDLE, raii.dispatcher));
+auto gfx::Device::newSampler(this Device& self, vk::SamplerCreateInfo const& info) -> rc<Sampler> {
+    return MakeShared<Sampler>(self.shared_from_this(), info);
 }
 
-auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options) -> ManagedShared<Buffer> {
+auto gfx::Device::newBuffer(this Device& self, vk::BufferUsageFlags usage, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options) -> rc<Buffer> {
     vk::BufferCreateInfo buffer_create_info = {};
     buffer_create_info.setSize(static_cast<vk::DeviceSize>(size));
     buffer_create_info.setUsage(usage);
@@ -436,33 +451,28 @@ auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, uint64_t size, StorageMo
         }
     }
 
-    auto buffer = MakeShared<Buffer>(shared_from_this());
-    vmaCreateBuffer(allocator, reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info), &allocation_create_info, reinterpret_cast<VkBuffer*>(&buffer->raw), &buffer->allocation, nullptr);
-    return buffer;
+    VkBuffer buffer;
+    VmaAllocation allocation;
+    vmaCreateBuffer(self.allocator, reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info), &allocation_create_info, &buffer, &allocation, nullptr);
+    return MakeShared<Buffer>(self.shared_from_this(), buffer, allocation);
 }
 
-auto gfx::Device::newBuffer(vk::BufferUsageFlags usage, const void* pointer, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options) -> ManagedShared<Buffer> {
+auto gfx::Device::newBuffer(this Device& self, vk::BufferUsageFlags usage, const void* pointer, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options) -> rc<Buffer> {
     // todo: use transfer operation if buffer is not mappable
-    auto buffer = newBuffer(usage, size, storage, options);
+    auto buffer = self.newBuffer(usage, size, storage, options);
     std::memcpy(buffer->contents(), pointer, size);
     buffer->didModifyRange(0, size);
     return buffer;
 }
 
-auto gfx::Device::newLibrary(const std::vector<char>& bytes) -> ManagedShared<Library> {
-    vk::ShaderModuleCreateInfo module_create_info = {};
-    module_create_info.setCodeSize(bytes.size());
-    module_create_info.setPCode(reinterpret_cast<const uint32_t *>(bytes.data()));
-
-    auto library = MakeShared<Library>(shared_from_this());
-    library->raw = raii.raw.createShaderModule(module_create_info, VK_NULL_HANDLE, raii.dispatcher);
-
-    spvReflectCreateShaderModule(module_create_info.codeSize, module_create_info.pCode, &library->spvReflectShaderModule);
-
-    return library;
+auto gfx::Device::newLibrary(this Device& self, std::span<char const> bytes) -> rc<Library> {
+    vk::ShaderModuleCreateInfo create_info = {};
+    create_info.setCodeSize(bytes.size());
+    create_info.setPCode(reinterpret_cast<const uint32_t *>(bytes.data()));
+    return MakeShared<Library>(self.shared_from_this(), create_info);
 }
 
-auto gfx::Device::newDepthStencilState(DepthStencilStateDescription const& description) -> ManagedShared<DepthStencilState> {
+auto gfx::Device::newDepthStencilState(this Device& self, DepthStencilStateDescription const& description) -> rc<DepthStencilState> {
     auto depth_stencil_state = MakeShared<DepthStencilState>();
     depth_stencil_state->isDepthTestEnabled = description.isDepthTestEnabled;
     depth_stencil_state->isDepthWriteEnabled = description.isDepthWriteEnabled;
@@ -476,7 +486,7 @@ auto gfx::Device::newDepthStencilState(DepthStencilStateDescription const& descr
     return depth_stencil_state;
 }
 
-auto gfx::Device::newRenderPipelineState(RenderPipelineStateDescription const& description) -> ManagedShared<RenderPipelineState> {
+auto gfx::Device::newRenderPipelineState(this Device& self, RenderPipelineStateDescription const& description) -> rc<RenderPipelineState> {
     std::vector<vk::PushConstantRange> push_constant_ranges = {};
     std::vector<DescriptorSetLayoutCreateInfo> descriptor_sets = {};
 
@@ -508,7 +518,7 @@ auto gfx::Device::newRenderPipelineState(RenderPipelineStateDescription const& d
         }
     }
     
-    auto state = MakeShared<RenderPipelineState>(shared_from_this());
+    auto state = MakeShared<RenderPipelineState>(self.shared_from_this());
     state->vertexFunction           = description.vertexFunction;
     state->fragmentFunction         = description.fragmentFunction;
     state->tessellationState        = description.tessellationState;
@@ -526,24 +536,24 @@ auto gfx::Device::newRenderPipelineState(RenderPipelineStateDescription const& d
     state->isAlphaToOneEnabled      = description.isAlphaToOneEnabled;
 
     vk::PipelineCacheCreateInfo pipeline_cache_info = {};
-    vk::resultCheck(raii.raw.createPipelineCache(&pipeline_cache_info, nullptr, &state->cache, raii.dispatcher), "Failed to create pipeline cache");
+    vk::resultCheck(self.handle.createPipelineCache(&pipeline_cache_info, nullptr, &state->cache, self.dispatcher), "Failed to create pipeline cache");
 
     state->bindGroupLayouts.resize(descriptor_sets.size());
     for (uint32_t i = 0; i < state->bindGroupLayouts.size(); ++i) {
         vk::DescriptorSetLayoutCreateInfo layout_create_info = {};
         layout_create_info.setBindings(descriptor_sets[i].bindings);
-        state->bindGroupLayouts[i] = raii.raw.createDescriptorSetLayout(layout_create_info, nullptr, raii.dispatcher);
+        state->bindGroupLayouts[i] = self.handle.createDescriptorSetLayout(layout_create_info, nullptr, self.dispatcher);
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_create_info = {};
     pipeline_layout_create_info.setSetLayouts(state->bindGroupLayouts);
     pipeline_layout_create_info.setPushConstantRanges(push_constant_ranges);
-    state->pipelineLayout = raii.raw.createPipelineLayout(pipeline_layout_create_info, nullptr, raii.dispatcher);
+    state->pipelineLayout = self.handle.createPipelineLayout(pipeline_layout_create_info, nullptr, self.dispatcher);
 
     return state;
 }
 
-auto gfx::Device::newComputePipelineState(ManagedShared<Function> const& function) -> ManagedShared<ComputePipelineState> {
+auto gfx::Device::newComputePipelineState(this Device& self, rc<Function> const& function) -> rc<ComputePipelineState> {
     std::vector<vk::PushConstantRange> push_constant_ranges = {};
     std::vector<DescriptorSetLayoutCreateInfo> descriptor_sets = {};
 
@@ -572,23 +582,23 @@ auto gfx::Device::newComputePipelineState(ManagedShared<Function> const& functio
         }
     }
 
-    auto state = MakeShared<ComputePipelineState>(shared_from_this());
+    auto state = MakeShared<ComputePipelineState>(self.shared_from_this());
     state->descriptor_set_layouts.resize(descriptor_sets.size());
     for (uint32_t i = 0; i < descriptor_sets.size(); ++i) {
         vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {};
         descriptor_set_layout_create_info.setBindings(descriptor_sets[i].bindings);
 
-        state->descriptor_set_layouts[i] = raii.raw.createDescriptorSetLayout(descriptor_set_layout_create_info, nullptr, raii.dispatcher);
+        state->descriptor_set_layouts[i] = self.handle.createDescriptorSetLayout(descriptor_set_layout_create_info, nullptr, self.dispatcher);
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_create_info = {};
     pipeline_layout_create_info.setSetLayouts(state->descriptor_set_layouts);
     pipeline_layout_create_info.setPushConstantRanges(push_constant_ranges);
-    state->pipeline_layout = raii.raw.createPipelineLayout(pipeline_layout_create_info, nullptr, raii.dispatcher);
+    state->pipeline_layout = self.handle.createPipelineLayout(pipeline_layout_create_info, nullptr, self.dispatcher);
 
     vk::PipelineShaderStageCreateInfo shader_stage_create_info = {};
     shader_stage_create_info.setStage(vk::ShaderStageFlagBits::eCompute);
-    shader_stage_create_info.setModule(function->library->raw);
+    shader_stage_create_info.setModule(function->library->handle);
     shader_stage_create_info.setPName(function->name.c_str());
 
     vk::ComputePipelineCreateInfo pipeline_create_info = {};
@@ -597,20 +607,17 @@ auto gfx::Device::newComputePipelineState(ManagedShared<Function> const& functio
     pipeline_create_info.setBasePipelineHandle(nullptr);
     pipeline_create_info.setBasePipelineIndex(0);
 
-    vk::resultCheck(raii.raw.createComputePipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, raii.dispatcher), "Failed to create compute pipeline");
+    vk::resultCheck(self.handle.createComputePipelines({}, 1, &pipeline_create_info, nullptr, &state->pipeline, self.dispatcher), "Failed to create compute pipeline");
     return state;
 }
 
-auto gfx::Device::newCommandQueue() -> ManagedShared<CommandQueue> {
-    vk::CommandPoolCreateInfo command_pool_create_info = {};
-    command_pool_create_info.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
-    command_pool_create_info.setQueueFamilyIndex(family_index);
-
-    auto pool = raii.raw.createCommandPool(command_pool_create_info, nullptr, raii.dispatcher);
-
-    return MakeShared<CommandQueue>(shared_from_this(), pool);
+auto gfx::Device::newCommandQueue(this Device& self) -> rc<CommandQueue> {
+    vk::CommandPoolCreateInfo create_info = {};
+    create_info.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
+    create_info.setQueueFamilyIndex(0);
+    return MakeShared<CommandQueue>(self.shared_from_this(), create_info);
 }
 
-auto gfx::Device::createSwapchain(ManagedShared<Surface> const& surface) -> ManagedShared<Swapchain> {
-    return MakeShared<Swapchain>(shared_from_this(), surface);
+auto gfx::Device::createSwapchain(this Device& self, rc<Surface> const& surface) -> rc<Swapchain> {
+    return MakeShared<Swapchain>(self.shared_from_this(), surface);
 }

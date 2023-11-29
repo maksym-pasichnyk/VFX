@@ -9,7 +9,7 @@ struct GuiShaderData {
     simd::float2 scale;
 };
 
-ImGuiBackend::ImGuiBackend(const ManagedShared<gfx::Device>& device) : device(device) {
+ImGuiBackend::ImGuiBackend(const rc<gfx::Device>& device) : device(device) {
     buildFonts();
     buildShaders();
     buildBuffers();
@@ -107,7 +107,7 @@ auto ImGuiBackend::drawList() -> ImDrawList* {
     return &im_draw_list;
 }
 
-void ImGuiBackend::draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder) {
+void ImGuiBackend::draw(const rc<gfx::RenderCommandEncoder>& encoder) {
     if (im_draw_list.IdxBuffer.Size == 0) {
         return;
     }
@@ -118,7 +118,7 @@ void ImGuiBackend::draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder)
     auto descriptor_set = encoder->getCommandBuffer()->newDescriptorSet(render_pipeline_state, 0);
 
     vk::DescriptorImageInfo sampler_info = {};
-    sampler_info.setSampler(font_sampler->raw);
+    sampler_info.setSampler(font_sampler->handle);
 
     vk::DescriptorImageInfo image_info = {};
     image_info.setImageView(font_texture->image_view);
@@ -139,7 +139,7 @@ void ImGuiBackend::draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder)
     writes[1].setDescriptorType(vk::DescriptorType::eSampledImage);
     writes[1].setPImageInfo(&image_info);
 
-    device->raii.raw.updateDescriptorSets(writes, {}, device->raii.dispatcher);
+    device->handle.updateDescriptorSets(writes, {}, device->dispatcher);
 
     vk::DeviceSize vertex_buffer_offset = dynamic_buffer_offset;
     dynamic_buffer_offset += im_draw_list.VtxBuffer.Size * sizeof(ImDrawVert);

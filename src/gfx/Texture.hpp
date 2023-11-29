@@ -11,8 +11,8 @@ namespace gfx {
         vk::ComponentMapping    mapping = {};
     };
 
-    struct Texture : ManagedObject<Texture> {
-        ManagedShared<Device>       device;
+    struct Texture : public ManagedObject {
+        rc<Device>                  device;
         vk::Image                   image;
         vk::Format                  format;
         vk::Extent3D                extent;
@@ -20,11 +20,10 @@ namespace gfx {
         vk::ImageSubresourceRange   subresource;
         VmaAllocation               allocation;
 
-        explicit Texture(ManagedShared<Device> device);
-        explicit Texture(ManagedShared<Device> device, vk::Image image, vk::Format format, vk::Extent3D extent, vk::ImageView image_view, vk::ImageSubresourceRange subresource, VmaAllocation allocation);
+        explicit Texture(rc<Device> device, vk::Image image, vk::Format format, vk::Extent3D extent, vk::ImageView image_view, vk::ImageSubresourceRange subresource, VmaAllocation allocation);
         ~Texture() override;
 
-        void replaceRegion(const void* data, uint64_t size);
-        void setLabel(const std::string& name);
+        void replaceRegion(this Texture& self, const void* data, uint64_t size);
+        void setLabel(this Texture& self, std::string const& name);
     };
 }

@@ -4,17 +4,17 @@
 
 struct VStack : View {
 private:
-    std::vector<ManagedShared<View>>   children;
+    std::vector<rc<View>>   children;
     HorizontalAlignment     alignment;
     float_t                 spacing;
     std::vector<Size>       sizes;
 
 public:
-    explicit VStack(std::vector<ManagedShared<View>> children, HorizontalAlignment alignment = HorizontalAlignment::center(), std::optional<float_t> spacing = {})
+    explicit VStack(std::vector<rc<View>> children, HorizontalAlignment alignment = HorizontalAlignment::center(), std::optional<float_t> spacing = {})
         : children(std::move(children)), alignment(alignment), spacing(spacing.value_or(0.0F)) {}
 
 private:
-    void _draw(const ManagedShared<Canvas> &canvas, const Size &size) override {
+    void _draw(const rc<Canvas> &canvas, const Size &size) override {
         float_t stackX = alignment.defaultValue(size);
         float_t currentY = 0.0F;
 
@@ -84,6 +84,6 @@ private:
     }
 };
 
-static auto VStack(HorizontalAlignment alignment, std::optional<float_t> spacing, std::vector<ManagedShared<View>> children) {
+static auto VStack(HorizontalAlignment alignment, std::optional<float_t> spacing, std::vector<rc<View>> children) {
     return MakeShared<struct VStack>(std::move(children), alignment, spacing);
 }

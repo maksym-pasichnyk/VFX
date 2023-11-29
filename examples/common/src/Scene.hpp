@@ -4,10 +4,10 @@
 
 #include <vector>
 
-struct Scene : ManagedObject<Scene> {
+struct Scene : public ManagedObject {
 private:
-    std::vector<ManagedShared<Node>> mNodes;
+    std::vector<rc<Node>> mNodes;
 
 public:
-    explicit Scene(std::vector<ManagedShared<Node>> nodes) : mNodes(std::move(nodes)) {}
+    explicit Scene(std::vector<rc<Node>> nodes) : mNodes(std::move(nodes)) {}
 };

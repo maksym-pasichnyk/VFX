@@ -4,11 +4,11 @@
 
 namespace gfx {
     struct Drawable final {
-        ManagedShared<Texture>  texture;
-        uint32_t                drawableIndex;
-        vk::SwapchainKHR        swapchain;
+        rc<Texture>      texture;
+        uint32_t         drawableIndex;
+        vk::SwapchainKHR swapchain;
 
         explicit Drawable();
-        explicit Drawable(vk::SwapchainKHR swapchain, ManagedShared<Texture> texture, uint32_t drawableIndex);
+        explicit Drawable(vk::SwapchainKHR swapchain, rc<Texture> texture, uint32_t drawableIndex);
     };
 }

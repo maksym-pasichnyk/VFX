@@ -153,7 +153,7 @@ auto JsonParser::check(std::istream& stream, char ch) -> bool {
     return !stream.eof() && char(stream.peek()) == ch;
 }
 
-void JsonParser::expect(std::istream& stream, char ch, const std::string& msg) {
+void JsonParser::expect(std::istream& stream, char ch, std::string const& msg) {
     if (!check(stream, ch)) {
         throw std::runtime_error(msg);
     }

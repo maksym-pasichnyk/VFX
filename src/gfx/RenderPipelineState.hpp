@@ -22,11 +22,11 @@ namespace gfx {
         auto operator[](size_t i) -> vk::Format&;
     };
 
-    struct TessellationState : ManagedObject<TessellationState> {
+    struct TessellationState : public ManagedObject {
         uint32_t patch_control_points = 3;
     };
 
-    struct MultisampleState : ManagedObject<MultisampleState> {
+    struct MultisampleState : public ManagedObject {
         bool                            sample_shading_enable       = false;
         float                           min_sample_shading          = 1.0F;
         vk::Optional<vk::SampleMask>    sample_mask                 = nullptr;
@@ -50,10 +50,10 @@ namespace gfx {
     };
 
     struct RenderPipelineStateDescription {
-        ManagedShared<Function>                         vertexFunction              = {};
-        ManagedShared<Function>                         fragmentFunction            = {};
-        ManagedShared<TessellationState>                tessellationState           = MakeShared<TessellationState>();
-        ManagedShared<MultisampleState>                 multisampleState            = MakeShared<MultisampleState>();
+        rc<Function>                         vertexFunction              = {};
+        rc<Function>                         fragmentFunction            = {};
+        rc<TessellationState>                tessellationState           = MakeShared<TessellationState>();
+        rc<MultisampleState>                 multisampleState            = MakeShared<MultisampleState>();
         VertexInputState                                vertexInputState            = {};
         uint32_t                                        viewMask                    = {};
         vk::Format                                      depthAttachmentFormat       = vk::Format::eUndefined;
@@ -72,7 +72,7 @@ namespace gfx {
         bool                                            isAlphaToOneEnabled         = {};
     };
 
-    class DepthStencilState : public ManagedObject<DepthStencilState> {
+    class DepthStencilState : public ManagedObject {
         friend Device;
         friend RenderCommandEncoder;
 
@@ -88,17 +88,17 @@ namespace gfx {
         float               maxDepthBounds          = {};
     };
 
-    class RenderPipelineState : public ManagedObject<RenderPipelineState> {
+    class RenderPipelineState : public ManagedObject {
         friend Device;
         friend CommandBuffer;
         friend RenderCommandEncoder;
 
     private:
-        ManagedShared<Device>                           device                      = {};
-        ManagedShared<Function>                         vertexFunction              = {};
-        ManagedShared<Function>                         fragmentFunction            = {};
-        ManagedShared<TessellationState>                tessellationState           = {};
-        ManagedShared<MultisampleState>                 multisampleState            = {};
+        rc<Device>                           device                      = {};
+        rc<Function>                         vertexFunction              = {};
+        rc<Function>                         fragmentFunction            = {};
+        rc<TessellationState>                tessellationState           = {};
+        rc<MultisampleState>                 multisampleState            = {};
         VertexInputState                                vertexInputState            = {};
         uint32_t                                        viewMask                    = {};
         vk::Format                                      depthAttachmentFormat       = {};
@@ -117,7 +117,7 @@ namespace gfx {
         std::vector<vk::DescriptorSetLayout>            bindGroupLayouts            = {};
 
     public:
-        explicit RenderPipelineState(ManagedShared<Device> device);
+        explicit RenderPipelineState(rc<Device> device);
         ~RenderPipelineState() override;
     };
 }

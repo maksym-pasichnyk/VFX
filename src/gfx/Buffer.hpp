@@ -4,33 +4,18 @@
 #include "vk_mem_alloc.h"
 
 namespace gfx {
-    struct Device;
-    struct Texture;
-    struct CommandBuffer;
-    struct RenderCommandEncoder;
-    struct ComputeCommandEncoder;
-    struct Buffer : ManagedObject<Buffer> {
-        friend Device;
-        friend Texture;
-        friend CommandBuffer;
-        friend RenderCommandEncoder;
-        friend ComputeCommandEncoder;
+    struct Buffer : public ManagedObject {
+        rc<Device>    device;
+        vk::Buffer    handle;
+        VmaAllocation allocation;
 
-    private:
-        ManagedShared<Device>   device;
-        vk::Buffer              raw;
-        VmaAllocation           allocation;
-
-    public:
-        explicit Buffer(ManagedShared<Device> device);
-        explicit Buffer(ManagedShared<Device> device, vk::Buffer raw, VmaAllocation allocation);
+        explicit Buffer(rc<Device> device, vk::Buffer handle, VmaAllocation allocation);
         ~Buffer() override;
 
-    public:
         auto contents() -> void*;
         auto length() -> vk::DeviceSize;
         auto didModifyRange(vk::DeviceSize offset, vk::DeviceSize size) -> void;
-        void setLabel(const std::string& name);
+        void setLabel(std::string const& name);
         auto descriptorInfo() const -> vk::DescriptorBufferInfo;
     };
 }

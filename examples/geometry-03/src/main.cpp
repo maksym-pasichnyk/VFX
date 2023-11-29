@@ -100,7 +100,7 @@ public:
         auto descriptorSet = commandBuffer->newDescriptorSet(renderPipelineState, 0);
 
         vk::DescriptorImageInfo sampler_info = {};
-        sampler_info.setSampler(sampler->raw);
+        sampler_info.setSampler(sampler->handle);
 
         vk::DescriptorImageInfo texture_info = {};
         texture_info.setImageView(texture->image_view);
@@ -121,7 +121,7 @@ public:
         writes[1].setDescriptorCount(1);
         writes[1].setPImageInfo(&texture_info);
 
-        device->raii.raw.updateDescriptorSets(2, writes, 0, nullptr, device->raii.dispatcher);
+        device->handle.updateDescriptorSets(2, writes, 0, nullptr, device->dispatcher);
 
         commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
@@ -149,10 +149,10 @@ private:
 
     GltfBundle  gltf_bundle;
 
-    ManagedShared<gfx::Sampler>             sampler;
-    ManagedShared<gfx::Texture>             texture;
-    ManagedShared<gfx::DepthStencilState>   depthStencilState;
-    ManagedShared<gfx::RenderPipelineState> renderPipelineState;
+    rc<gfx::Sampler>             sampler;
+    rc<gfx::Texture>             texture;
+    rc<gfx::DepthStencilState>   depthStencilState;
+    rc<gfx::RenderPipelineState> renderPipelineState;
 };
 
 auto main(int argc, char** argv) -> int32_t {

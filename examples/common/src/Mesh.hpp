@@ -12,15 +12,15 @@ struct Vertex {
     alignas(16) glm::vec2 uv;
 };
 
-struct Mesh : ManagedObject<Mesh> {
+struct Mesh : public ManagedObject {
 private:
     std::vector<Vertex>         vertices_       = {};
     std::vector<uint32_t>       indices_        = {};
     std::vector<Primitive>      primitives_     = {};
     std::vector<glm::u32vec4>   joints_         = {};
     std::vector<glm::f32vec4>   weights_        = {};
-    ManagedShared<gfx::Buffer>  index_buffer_   = {};
-    ManagedShared<gfx::Buffer>  vertex_buffer_  = {};
+    rc<gfx::Buffer>  index_buffer_   = {};
+    rc<gfx::Buffer>  vertex_buffer_  = {};
 
 public:
     void setVertices(std::vector<Vertex> vertices) {
@@ -64,7 +64,7 @@ public:
     }
 
 public:
-    void uploadMeshData(const ManagedShared<gfx::Device>& device) {
+    void uploadMeshData(const rc<gfx::Device>& device) {
         if (indices_.empty()) {
             index_buffer_ = {};
         } else {
@@ -77,7 +77,7 @@ public:
         }
     }
 
-    void draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder) {
+    void draw(const rc<gfx::RenderCommandEncoder>& encoder) {
         if (index_buffer_) {
             encoder->bindIndexBuffer(index_buffer_, 0, vk::IndexType::eUint32);
         }

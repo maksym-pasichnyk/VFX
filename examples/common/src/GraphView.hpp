@@ -23,7 +23,7 @@ public:
     struct Node;
     struct Link;
 
-    struct Port : ManagedObject<Port> {
+    struct Port : public ManagedObject {
         friend Node;
         friend GraphView;
 
@@ -45,14 +45,14 @@ public:
         Capacity mCapacity;
         Direction mDirection;
 
-        std::set<ManagedShared<Link>> mLinks = {};
+        std::set<rc<Link>> mLinks = {};
 
     private:
         explicit Port(Node* node, size_t index, std::string name, Capacity capacity, Direction direction)
             : pNode(node), mIndex(index), mName(std::move(name)), mCapacity(capacity), mDirection(direction) {}
     };
 
-    struct Node : ManagedObject<Node> {
+    struct Node : public ManagedObject {
         friend GraphView;
 
     private:
@@ -60,8 +60,8 @@ public:
         Size mSize = Size{450.0F, 250.0F};
         Point mPosition = Point::zero();
 
-        std::vector<ManagedShared<Port>> mInputs = {};
-        std::vector<ManagedShared<Port>> mOutputs = {};
+        std::vector<rc<Port>> mInputs = {};
+        std::vector<rc<Port>> mOutputs = {};
 
     private:
         explicit Node(std::string text) : mText(std::move(text)) {}
@@ -83,7 +83,7 @@ public:
             mPosition = point;
         }
 
-        auto text() -> const std::string& {
+        auto text() -> std::string const& {
             return mText;
         }
 
@@ -92,15 +92,15 @@ public:
         }
 
         void addInput(std::string name, Port::Capacity capacity) {
-            mInputs.emplace_back(TransferPtr(new Port(this, mInputs.size(), std::move(name), capacity, Port::Direction::eInput)));
+            mInputs.emplace_back(rc(new Port(this, mInputs.size(), std::move(name), capacity, Port::Direction::eInput)));
         }
 
         void addOutput(std::string name, Port::Capacity capacity) {
-            mOutputs.emplace_back(TransferPtr(new Port(this, mOutputs.size(), std::move(name), capacity, Port::Direction::eOutput)));
+            mOutputs.emplace_back(rc(new Port(this, mOutputs.size(), std::move(name), capacity, Port::Direction::eOutput)));
         }
 
     private:
-        void draw(const ManagedShared<Canvas> &canvas, bool selected) {
+        void draw(const rc<Canvas> &canvas, bool selected) {
             ImVec2 textSize1 = canvas->drawList()->_Data->Font->CalcTextSizeA(36.0F, FLT_MAX, FLT_MAX, mText.data(), mText.data() + mText.size(), nullptr);
 
             canvas->saveState();
@@ -180,7 +180,7 @@ public:
             }
         }
 
-        auto _getSlotPosition(const ManagedShared<Port>& port) -> Point {
+        auto _getSlotPosition(const rc<Port>& port) -> Point {
             if (port->mDirection == Port::Direction::eInput) {
                 float x = mPosition.x + 10.0F + 10.0F + 10.0F;
                 float y = mPosition.y + 10.0F + 10.0F + 15.0F + 50.0F + 30.0F * static_cast<float>(port->mIndex);
@@ -193,15 +193,15 @@ public:
         }
     };
 
-    struct Link : ManagedObject<Link> {
+    struct Link : public ManagedObject {
         friend GraphView;
 
     private:
-        ManagedShared<Port> mPortA;
-        ManagedShared<Port> mPortB;
+        rc<Port> mPortA;
+        rc<Port> mPortB;
 
     private:
-        explicit Link(ManagedShared<Port> portA, ManagedShared<Port> portB)
+        explicit Link(rc<Port> portA, rc<Port> portB)
             : mPortA(std::move(portA)), mPortB(std::move(portB)){}
     };
 
@@ -210,8 +210,8 @@ private:
     float_t mTargetZoomScale = 2.0F;
     Point mTargetZoomPoint = Point();
 
-    std::list<ManagedShared<Node>> mNodes = {};
-    std::list<ManagedShared<Link>> mLinks = {};
+    std::list<rc<Node>> mNodes = {};
+    std::list<rc<Link>> mLinks = {};
 
     Point mGridOffset = Point();
     Point mStartPosition = Point();
@@ -219,16 +219,16 @@ private:
     Point mCursorPosition = Point();
     Interaction mInteraction = Interaction::eNone;
 
-    ManagedShared<Node> mSelectedNode = {};
-    ManagedShared<Port> mSelectedPort = {};
-    ManagedShared<Link> mSelectedLink = {};
+    rc<Node> mSelectedNode = {};
+    rc<Port> mSelectedPort = {};
+    rc<Link> mSelectedLink = {};
 
 private:
     auto getPreferredSize(const ProposedSize &proposed) -> Size override {
         return proposed.orMax();
     }
 
-    void _draw(const ManagedShared<Canvas> &canvas, const Size& size) override {
+    void _draw(const rc<Canvas> &canvas, const Size& size) override {
         float invScale = 1.0F / mZoomScale;
 
         canvas->saveState();
@@ -289,7 +289,7 @@ private:
         canvas->restoreState();
     }
 
-    void drawLink(const ManagedShared<Canvas> &canvas, const Point& pointA, const Point& pointD, ImU32 color = IM_COL32(255, 255, 255, 255)) {
+    void drawLink(const rc<Canvas> &canvas, const Point& pointA, const Point& pointD, ImU32 color = IM_COL32(255, 255, 255, 255)) {
         Point pointB = pointA + Point{std::abs(pointD.x - pointA.x), 0.0F};
         Point pointC = pointD - Point{std::abs(pointD.x - pointA.x), 0.0F};
 
@@ -303,7 +303,7 @@ private:
         canvas->drawList()->PathStroke(color, 0, 5.0F);
     }
 
-    auto findNodeAt(int32_t x, int32_t y) -> ManagedShared<Node> {
+    auto findNodeAt(int32_t x, int32_t y) -> rc<Node> {
         auto uiPoint = Point{static_cast<float_t>(x), static_cast<float_t>(y)};
 
         for (auto& node : ranges::reverse_view(mNodes)) {
@@ -319,7 +319,7 @@ private:
         return {};
     }
 
-    auto findPortAt(const ManagedShared<Node>& node, int32_t x, int32_t y) -> ManagedShared<Port> {
+    auto findPortAt(const rc<Node>& node, int32_t x, int32_t y) -> rc<Port> {
         auto uiPoint = Point{static_cast<float_t>(x), static_cast<float_t>(y)};
 
         for (auto& port : node->mInputs) {
@@ -337,7 +337,7 @@ private:
         return {};
     }
 
-    auto addLink(const ManagedShared<Port>& portA, const ManagedShared<Port>& portB) -> ManagedShared<Link> {
+    auto addLink(const rc<Port>& portA, const rc<Port>& portB) -> rc<Link> {
         for (auto& link : mLinks) {
             if (link->mPortA == portA && link->mPortB == portB) {
                 return {};
@@ -350,13 +350,13 @@ private:
             removeLinks(portB);
         }
 
-        auto link = mLinks.emplace_back(TransferPtr(new Link(portA, portB)));
+        auto link = mLinks.emplace_back(rc(new Link(portA, portB)));
         portA->mLinks.emplace(link);
         portB->mLinks.emplace(link);
         return link;
     }
 
-    void removeNode(const ManagedShared<Node>& node) {
+    void removeNode(const rc<Node>& node) {
         for (auto& port : node->mInputs) {
             if (port == mSelectedPort) {
                 mSelectedPort = {};
@@ -376,7 +376,7 @@ private:
         }
     }
 
-    void removeLinks(const ManagedShared<Port>& port) {
+    void removeLinks(const rc<Port>& port) {
         for (auto& link : auto(port->mLinks)) {
             link->mPortA->mLinks.erase(link);
             link->mPortB->mLinks.erase(link);
@@ -385,8 +385,8 @@ private:
     }
 
 public:
-    auto addNode(std::string text) -> ManagedShared<Node> {
-        return mNodes.emplace_back(TransferPtr(new Node(std::move(text))));
+    auto addNode(std::string text) -> rc<Node> {
+        return mNodes.emplace_back(rc(new Node(std::move(text))));
     }
 
     void update() {

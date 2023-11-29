@@ -22,15 +22,17 @@ static VKAPI_ATTR auto VKAPI_CALL debug_utils_messenger_callback(VkDebugUtilsMes
     return VK_FALSE;
 }
 
-gfx::Instance::Instance(raii::Context context, raii::Instance raii, vk::DebugUtilsMessengerEXT messenger) : context(std::move(context)), raii(std::move(raii)), messenger(messenger) {}
+gfx::Instance::Instance(rc<Context> context, vk::InstanceCreateInfo const& create_info)
+: context(std::move(context))
+, handle(vk::createInstance(create_info, nullptr, this->context->dispatcher))
+, dispatcher(this->context->dispatcher.vkGetInstanceProcAddr, this->handle) {}
 
 gfx::Instance::~Instance() {
-    raii.raw.destroy(messenger, nullptr, raii.dispatcher);
-    raii.raw.destroy(nullptr, raii.dispatcher);
+    this->handle.destroy(nullptr, this->dispatcher);
 }
 
-auto gfx::createInstance(const InstanceConfiguration& desc) -> ManagedShared<Instance> {
-    raii::Context context;
+auto gfx::createInstance(InstanceConfiguration const& desc) -> rc<Instance> {
+    auto context = MakeShared<Context>();
 
     auto app_info = vk::ApplicationInfo()
         .setPApplicationName(desc.name.c_str())
@@ -58,122 +60,34 @@ auto gfx::createInstance(const InstanceConfiguration& desc) -> ManagedShared<Ins
         .setPEnabledLayerNames(layers)
         .setPEnabledExtensionNames(extensions);
 
-    auto instance = raii::Instance(vk::createInstance(create_info, nullptr, context.dispatcher), context.dispatcher.vkGetInstanceProcAddr);
-
-    auto message_severity_flags = vk::DebugUtilsMessageSeverityFlagsEXT{};
-    message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
-    message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo;
-    message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
-    message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
-
-    auto message_type_flags = vk::DebugUtilsMessageTypeFlagsEXT{};
-    message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral;
-    message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
-    message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
-
-    auto debug_create_info = vk::DebugUtilsMessengerCreateInfoEXT()
-        .setMessageSeverity(message_severity_flags)
-        .setMessageType(message_type_flags)
-        .setPfnUserCallback(debug_utils_messenger_callback);
-
-    auto messenger = instance.raw.createDebugUtilsMessengerEXT(debug_create_info, nullptr, instance.dispatcher);
-
-    return MakeShared<Instance>(std::move(context), instance, messenger);
+//    auto message_severity_flags = vk::DebugUtilsMessageSeverityFlagsEXT{};
+//    message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
+//    message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo;
+//    message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
+//    message_severity_flags |= vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+//    auto message_type_flags = vk::DebugUtilsMessageTypeFlagsEXT{};
+//    message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral;
+//    message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
+//    message_type_flags |= vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
+//    auto debug_create_info = vk::DebugUtilsMessengerCreateInfoEXT()
+//        .setMessageSeverity(message_severity_flags)
+//        .setMessageType(message_type_flags)
+//        .setPfnUserCallback(debug_utils_messenger_callback);
+//    auto messenger = instance.handle.createDebugUtilsMessengerEXT(debug_create_info, nullptr, instance.dispatcher);
+    return MakeShared<Instance>(std::move(context), create_info);
 }
-auto gfx::Instance::createDevice(ManagedShared<Adapter> adapter) -> ManagedShared<Device> {
-    auto queue_family_properties = adapter->gpu.getQueueFamilyProperties(raii.dispatcher);
 
-    float queue_priority = 1.0F;
-    uint32_t queue_family_index = 0;
-    for (uint32_t i = 0; i < queue_family_properties.size(); ++i) {
-        if (queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
-            queue_family_index = i;
-            break;
-        }
+auto gfx::Instance::wrapSurface(this Instance& self, vk::SurfaceKHR surface) -> rc<Surface> {
+    return MakeShared<Surface>(self.shared_from_this(), surface);
+}
+
+auto gfx::Instance::enumerateAdapters(this Instance& self) -> std::vector<rc<Adapter>> {
+    auto physical_devices = self.handle.enumeratePhysicalDevices(self.dispatcher);
+
+    std::vector<rc<Adapter>> adapters = {};
+    adapters.reserve(physical_devices.size());
+    for (auto& physical_device : physical_devices) {
+        adapters.emplace_back(rc(new Adapter(self.shared_from_this(), physical_device)));
     }
-
-    auto queue_create_info = vk::DeviceQueueCreateInfo()
-            .setQueueFamilyIndex(queue_family_index)
-            .setQueuePriorities(queue_priority);
-
-    auto queue_create_infos = std::array{
-            queue_create_info
-    };
-
-    auto layers = std::vector<const char*>{};
-
-    auto extensions = std::vector<const char*>{
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-        VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
-//        VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME
-    };
-
-    auto synchronization_2_features = vk::PhysicalDeviceSynchronization2Features()
-        .setSynchronization2(VK_TRUE);
-
-    auto portability_subset_features = vk::PhysicalDevicePortabilitySubsetFeaturesKHR()
-        .setPNext(&synchronization_2_features)
-        .setImageViewFormatSwizzle(VK_TRUE);
-
-    auto timeline_semaphore_features = vk::PhysicalDeviceTimelineSemaphoreFeatures()
-        .setPNext(&portability_subset_features)
-        .setTimelineSemaphore(VK_TRUE);
-
-    auto dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures()
-        .setPNext(&timeline_semaphore_features)
-        .setDynamicRendering(VK_TRUE);
-
-    auto features_2 = adapter->gpu.getFeatures2(raii.dispatcher)
-        .setPNext(&dynamic_rendering_features);
-
-    auto create_info = vk::DeviceCreateInfo()
-        .setPNext(&features_2)
-        .setQueueCreateInfos(queue_create_infos)
-        .setPEnabledLayerNames(layers)
-        .setPEnabledExtensionNames(extensions);
-
-    auto device = raii::Device(
-        adapter->gpu.createDevice(create_info, nullptr, raii.dispatcher),
-        raii.dispatcher.vkGetDeviceProcAddr
-    );
-
-    VmaVulkanFunctions functions = {};
-    functions.vkGetDeviceProcAddr   = raii.dispatcher.vkGetDeviceProcAddr;
-    functions.vkGetInstanceProcAddr = raii.dispatcher.vkGetInstanceProcAddr;
-
-    VmaAllocatorCreateInfo allocator_create_info = {};
-    allocator_create_info.physicalDevice = adapter->gpu;
-    allocator_create_info.device = device.raw;
-    allocator_create_info.pVulkanFunctions = &functions;
-    allocator_create_info.instance = raii.raw;
-    allocator_create_info.vulkanApiVersion = VK_API_VERSION_1_2;
-
-    VmaAllocator allocator;
-    VkResult result = vmaCreateAllocator(&allocator_create_info, &allocator);
-    vk::resultCheck(static_cast<vk::Result>(result), "Failed to create allocator");
-
-    auto queue = device.raw.getQueue(queue_family_index, 0, device.dispatcher);
-    return MakeShared<Device>(shared_from_this(), device, adapter->gpu, queue_family_index, 0, queue, allocator);
-}
-
-auto gfx::Instance::wrapSurface(vk::SurfaceKHR surface) -> ManagedShared<Surface> {
-    return MakeShared<Surface>(shared_from_this(), surface);
-}
-
-auto gfx::Instance::getSurfaceCapabilitiesKHR(vk::PhysicalDevice adapter, vk::SurfaceKHR surface) -> vk::SurfaceCapabilitiesKHR {
-    return adapter.getSurfaceCapabilitiesKHR(surface, raii.dispatcher);
-}
-
-auto gfx::Instance::enumerateAdapters() -> std::vector<ManagedShared<Adapter>> {
-    auto gpus = raii.raw.enumeratePhysicalDevices(raii.dispatcher);
-
-    std::vector<ManagedShared<Adapter>> adapters = {};
-    adapters.reserve(gpus.size());
-
-    for (auto& gpu : gpus) {
-        adapters.emplace_back(TransferPtr(new Adapter(shared_from_this(), gpu)));
-    }
-
     return adapters;
 }

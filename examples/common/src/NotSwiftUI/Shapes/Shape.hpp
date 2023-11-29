@@ -3,6 +3,6 @@
 #include "NotSwiftUI/Core/Size.hpp"
 #include "Canvas.hpp"
 
-struct Shape : ManagedObject<Shape> {
-    virtual void path(const ManagedShared<Canvas>& canvas, const Size& size) = 0;
+struct Shape : public ManagedObject {
+    virtual void path(const rc<Canvas>& canvas, const Size& size) = 0;
 };

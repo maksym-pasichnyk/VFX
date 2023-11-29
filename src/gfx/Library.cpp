@@ -2,17 +2,20 @@
 #include "Library.hpp"
 #include "Function.hpp"
 
-gfx::Library::Library(ManagedShared<Device> device) : device(std::move(device)) {}
+gfx::Library::Library(rc<Device> device, vk::ShaderModuleCreateInfo const& create_info) : device(std::move(device)) {
+    this->handle = this->device->handle.createShaderModule(create_info, VK_NULL_HANDLE, this->device->dispatcher);
+    spvReflectCreateShaderModule(create_info.codeSize, create_info.pCode, &this->spvReflectShaderModule);
+}
 
 gfx::Library::~Library() {
-    device->raii.raw.destroyShaderModule(raw, nullptr, device->raii.dispatcher);
+    device->handle.destroyShaderModule(handle, nullptr, device->dispatcher);
     spvReflectDestroyShaderModule(&spvReflectShaderModule);
 }
 
-auto gfx::Library::newFunction(std::string name) -> ManagedShared<Function> {
-    for (auto& sep : std::span(spvReflectShaderModule.entry_points, spvReflectShaderModule.entry_point_count)) {
+auto gfx::Library::newFunction(this Library& self, std::string name) -> rc<Function> {
+    for (auto& sep : std::span(self.spvReflectShaderModule.entry_points, self.spvReflectShaderModule.entry_point_count)) {
         if (name == sep.name) {
-            return MakeShared<Function>(shared_from_this(), std::move(name), &sep);
+            return MakeShared<Function>(self.shared_from_this(), std::move(name), &sep);
         }
     }
     return {};

@@ -10,7 +10,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
-struct Canvas : ManagedObject<Canvas> {
+struct Canvas : public ManagedObject {
 private:
     struct State {
         float x = 0.0F;

@@ -5,13 +5,13 @@
 
 namespace gfx {
     struct CommandBuffer;
-    struct CommandQueue : ManagedObject<CommandQueue> {
-        ManagedShared<Device>   device;
-        vk::CommandPool         raw;
+    struct CommandQueue : public ManagedObject {
+        rc<Device>   device;
+        vk::CommandPool         handle;
 
-        explicit CommandQueue(ManagedShared<Device> device, vk::CommandPool raw);
+        explicit CommandQueue(rc<Device> device, vk::CommandPoolCreateInfo const& create_info);
         ~CommandQueue() override;
 
-        auto commandBuffer() -> ManagedShared<CommandBuffer>;
+        auto newCommandBuffer(this CommandQueue& self) -> rc<CommandBuffer>;
     };
 }

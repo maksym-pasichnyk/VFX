@@ -18,7 +18,7 @@ struct JsonObject : std::map<std::string, JsonElement> {
     using map::map;
 
     template<typename U>
-    auto value_or(const std::string& key, U&& u) const -> U;
+    auto value_or(std::string const& key, U&& u) const -> U;
 };
 
 struct JsonElement : Enum<long long, double, bool, std::string, JsonArray, JsonObject> {
@@ -38,21 +38,21 @@ struct JsonElement : Enum<long long, double, bool, std::string, JsonArray, JsonO
         }
     }
 
-    [[nodiscard]] auto contains(const std::string& key) const -> bool {
+    [[nodiscard]] auto contains(std::string const& key) const -> bool {
         return is<JsonObject>() and as<JsonObject>().contains(key);
     }
 
-    [[nodiscard]] auto at(const std::string& key) -> JsonElement& {
+    [[nodiscard]] auto at(std::string const& key) -> JsonElement& {
         return as<JsonObject>().at(key);
     }
 
-    [[nodiscard]] auto at(const std::string& key) const -> const JsonElement& {
+    [[nodiscard]] auto at(std::string const& key) const -> const JsonElement& {
         return as<JsonObject>().at(key);
     }
 };
 
 template<typename U>
-inline auto JsonObject::value_or(const std::string& key, U&& u) const -> U {
+inline auto JsonObject::value_or(std::string const& key, U&& u) const -> U {
     auto it = find(key);
     if (it != end()) {
         return it->second.get<U>();

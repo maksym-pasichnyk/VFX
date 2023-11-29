@@ -4,15 +4,15 @@
 
 struct FixedSize : View {
 private:
-    ManagedShared<View> content;
+    rc<View> content;
     bool horizontal;
     bool vertical;
 
 public:
-    explicit FixedSize(ManagedShared<View> content, bool horizontal, bool vertical)
+    explicit FixedSize(rc<View> content, bool horizontal, bool vertical)
         : content(std::move(content)), horizontal(horizontal), vertical(vertical) {}
 
-    void _draw(const ManagedShared<Canvas> &canvas, const Size &size) override {
+    void _draw(const rc<Canvas> &canvas, const Size &size) override {
         content->_draw(canvas, size);
     }
 

@@ -14,18 +14,18 @@ namespace gfx {
         bool                clipped      = {};
     };
 
-    struct Swapchain : ManagedObject<Swapchain> {
-        ManagedShared<Device>   device;
-        ManagedShared<Surface>  surface;
-        vk::SwapchainKHR        raw;
+    struct Swapchain : public ManagedObject {
+        rc<Device>              device;
+        rc<Surface>             surface;
+        vk::SwapchainKHR        handle;
         std::vector<Drawable>   drawables;
 
-        explicit Swapchain(ManagedShared<Device> device, ManagedShared<Surface> surface);
+        explicit Swapchain(rc<Device> device, rc<Surface> surface);
         ~Swapchain() override;
 
-        auto nextDrawable() -> Drawable;
-        auto drawableSize() -> vk::Extent2D;
+        auto nextDrawable(this Swapchain& self) -> Drawable;
+        auto drawableSize(this Swapchain const& self) -> vk::Extent2D;
 
-        void configure(const SurfaceConfiguration& config);
+        void configure(this Swapchain& self, const SurfaceConfiguration& config);
     };
 }

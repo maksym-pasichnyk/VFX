@@ -289,14 +289,14 @@ private:
     Camera camera;
     Transform transform;
 
-    ManagedShared<Mesh> cube;
+    rc<Mesh> cube;
 
     bool forward = false;
     bool backward = false;
     bool left = false;
     bool right = false;
 
-    ManagedShared<gfx::RenderPipelineState> renderPipelineState;
+    rc<gfx::RenderPipelineState> renderPipelineState;
 };
 
 auto main(int argc, char** argv) -> int32_t {

@@ -4,9 +4,9 @@
 #include "Graphics.hpp"
 #include "Canvas.hpp"
 
-struct ImGuiBackend : ManagedObject<ImGuiBackend> {
+struct ImGuiBackend : public ManagedObject {
 public:
-    explicit ImGuiBackend(const ManagedShared<gfx::Device>& device);
+    explicit ImGuiBackend(const rc<gfx::Device>& device);
 
 private:
     void buildFonts();
@@ -18,7 +18,7 @@ public:
     void setCurrentContext();
 
     auto drawList() -> ImDrawList*;
-    void draw(const ManagedShared<gfx::RenderCommandEncoder>& encoder);
+    void draw(const rc<gfx::RenderCommandEncoder>& encoder);
     void setScreenSize(const Size& size);
 
 private:
@@ -29,10 +29,10 @@ private:
     ImDrawListSharedData                    im_shared_data          = {};
     ImDrawList                              im_draw_list            = {&im_shared_data};
 
-    ManagedShared<gfx::Device>              device                  = {};
-    ManagedShared<gfx::Texture>             font_texture            = {};
-    ManagedShared<gfx::Sampler>             font_sampler            = {};
-    ManagedShared<gfx::Buffer>              dynamic_buffer          = {};
+    rc<gfx::Device>              device                  = {};
+    rc<gfx::Texture>             font_texture            = {};
+    rc<gfx::Sampler>             font_sampler            = {};
+    rc<gfx::Buffer>              dynamic_buffer          = {};
     vk::DeviceSize                          dynamic_buffer_offset   = {};
-    ManagedShared<gfx::RenderPipelineState> render_pipeline_state   = {};
+    rc<gfx::RenderPipelineState> render_pipeline_state   = {};
 };
