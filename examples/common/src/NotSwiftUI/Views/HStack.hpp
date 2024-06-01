@@ -87,5 +87,5 @@ public:
 };
 
 static auto HStack(VerticalAlignment alignment, std::optional<float_t> spacing, std::vector<rc<View>> children) {
-    return MakeShared<struct HStack>(std::move(children), alignment, spacing);
+    return rc<struct HStack>::init(std::move(children), alignment, spacing);
 }

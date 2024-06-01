@@ -15,15 +15,15 @@ namespace gfx {
     };
 
     struct Swapchain : public ManagedObject {
-        rc<Device>              device;
-        rc<Surface>             surface;
-        vk::SwapchainKHR        handle;
-        std::vector<Drawable>   drawables;
+        rc<Device>                  device;
+        rc<Surface>                 surface;
+        vk::SwapchainKHR            handle;
+        std::vector<rc<Drawable>>   drawables;
 
         explicit Swapchain(rc<Device> device, rc<Surface> surface);
         ~Swapchain() override;
 
-        auto nextDrawable(this Swapchain& self) -> Drawable;
+        auto nextDrawable(this Swapchain& self) -> rc<Drawable>;
         auto drawableSize(this Swapchain const& self) -> vk::Extent2D;
 
         void configure(this Swapchain& self, const SurfaceConfiguration& config);

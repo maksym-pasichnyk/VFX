@@ -31,5 +31,5 @@ public:
 };
 
 inline auto View::frame(std::optional<float_t> width, std::optional<float_t> height, Alignment alignment) {
-    return MakeShared<FixedFrame>(shared_from_this(), width, height, alignment);
+    return rc<FixedFrame>::init(shared_from_this(), width, height, alignment);
 }

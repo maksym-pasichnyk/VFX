@@ -67,5 +67,5 @@ public:
 };
 
 inline auto View::frame(std::optional<float_t> minWidth, std::optional<float_t> idealWidth, std::optional<float_t> maxWidth, std::optional<float_t> minHeight, std::optional<float_t> idealHeight, std::optional<float_t> maxHeight, Alignment alignment) {
-    return MakeShared<FlexibleFrame>(shared_from_this(), minWidth, idealWidth, maxWidth, minHeight, idealHeight, maxHeight, alignment);
+    return rc<FlexibleFrame>::init(shared_from_this(), minWidth, idealWidth, maxWidth, minHeight, idealHeight, maxHeight, alignment);
 }

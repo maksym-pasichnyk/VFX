@@ -85,5 +85,5 @@ private:
 };
 
 static auto VStack(HorizontalAlignment alignment, std::optional<float_t> spacing, std::vector<rc<View>> children) {
-    return MakeShared<struct VStack>(std::move(children), alignment, spacing);
+    return rc<struct VStack>::init(std::move(children), alignment, spacing);
 }

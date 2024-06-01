@@ -39,26 +39,26 @@ public:
 
 private:
     void buildShaders() {
-        auto vertexLibrary = device->newLibrary(Assets::readFile("shaders/simple_shader.vert.spv"));
-        auto fragmentLibrary = device->newLibrary(Assets::readFile("shaders/simple_shader.frag.spv"));
+        auto vert_library = device->newLibrary(Assets::readFile("shaders/simple_shader.vert.spv"));
+        auto frag_library = device->newLibrary(Assets::readFile("shaders/simple_shader.frag.spv"));
 
-        gfx::RenderPipelineStateDescription description;
-        description.vertexFunction = vertexLibrary->newFunction("main");
-        description.fragmentFunction = fragmentLibrary->newFunction("main");
-        description.vertexInputState = {
-            .bindings = {
-                vk::VertexInputBindingDescription{0, sizeof(Vertex), vk::VertexInputRate::eVertex}
-            },
-            .attributes = {
-                vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, position)},
-                vk::VertexInputAttributeDescription{1, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, color)},
-            }
+        auto vertex_input_state = rc<gfx::VertexInputState>::init();
+        vertex_input_state->bindings = {
+            vk::VertexInputBindingDescription(0, sizeof(Vertex), vk::VertexInputRate::eVertex)
+        };
+        vertex_input_state->attributes = {
+            vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, position)),
+            vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, color)),
         };
 
-        description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-        description.colorBlendAttachments[0].setBlendEnable(false);
+        auto description = gfx::RenderPipelineStateDescription::init();
+        description->setVertexFunction(vert_library->newFunction("main"));
+        description->setFragmentFunction(frag_library->newFunction("main"));
+        description->setVertexInputState(vertex_input_state);
+        description->colorAttachmentFormats()[0] = vk::Format::eB8G8R8A8Unorm;
+        description->colorBlendAttachments()[0].setBlendEnable(false);
 
-        renderPipelineState = device->newRenderPipelineState(description);
+        render_pipeline_state = device->newRenderPipelineState(description);
     }
 
     void buildBuffers() {
@@ -115,7 +115,7 @@ private:
         std::vector<Primitive> primitives;
         primitives.emplace_back(0, 0, 0, static_cast<uint32_t>(vertices.size()));
 
-        cube = MakeShared<Mesh>();
+        cube = rc<Mesh>::init();
         cube->setVertices(vertices);
         cube->setPrimitives(primitives);
         cube->uploadMeshData(device);
@@ -160,7 +160,7 @@ public:
         gfx::RenderingInfo rendering_info = {};
         rendering_info.renderArea = rendering_area;
         rendering_info.layerCount = 1;
-        rendering_info.colorAttachments[0].texture = drawable.texture;
+        rendering_info.colorAttachments[0].texture = drawable->texture;
         rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
         rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
         rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
@@ -177,10 +177,10 @@ public:
         fillVolume(shader_data.Volume);
 
         commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer->setImageLayout(drawable->texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
         auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
-        encoder->setRenderPipelineState(renderPipelineState);
+        encoder->setRenderPipelineState(render_pipeline_state);
         encoder->pushConstants(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(GlobalSharedData), &shader_data);
 
         encoder->setScissor(0, rendering_area);
@@ -188,7 +188,7 @@ public:
         cube->draw(encoder);
         encoder->endEncoding();
 
-        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer->setImageLayout(drawable->texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer->end();
         commandBuffer->submit();
         commandBuffer->present(drawable);
@@ -296,7 +296,7 @@ private:
     bool left = false;
     bool right = false;
 
-    rc<gfx::RenderPipelineState> renderPipelineState;
+    rc<gfx::RenderPipelineState> render_pipeline_state;
 };
 
 auto main(int argc, char** argv) -> int32_t {

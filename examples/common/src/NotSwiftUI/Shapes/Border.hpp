@@ -18,5 +18,5 @@ public:
 };
 
 inline auto View::border(const Color& color, float_t width) {
-    return overlay(MakeShared<ShapeView<Border>>(MakeShared<Border>(width))->foregroundColor(color));
+    return overlay(rc<ShapeView<Border>>::init(rc<Border>::init(width))->foregroundColor(color));
 }

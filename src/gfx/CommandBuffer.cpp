@@ -77,12 +77,12 @@ void gfx::CommandBuffer::submit() {
     device->handle.getQueue(0, 0, device->dispatcher).submit(submit_info, fence, device->dispatcher);
 }
 
-void gfx::CommandBuffer::present(const gfx::Drawable& drawable) {
+void gfx::CommandBuffer::present(rc<gfx::Drawable> const& drawable) {
     vk::PresentInfoKHR present_info = {};
     present_info.setWaitSemaphores(semaphore);
     present_info.setSwapchainCount(1);
-    present_info.setPSwapchains(&drawable.swapchain);
-    present_info.setPImageIndices(&drawable.drawableIndex);
+    present_info.setPSwapchains(&drawable->swapchain);
+    present_info.setPImageIndices(&drawable->drawableIndex);
 
     // todo: get valid device for present
     auto result = device->handle.getQueue(0, 0, device->dispatcher).presentKHR(present_info, device->dispatcher);
@@ -120,7 +120,7 @@ auto gfx::CommandBuffer::newDescriptorSet(const rc<RenderPipelineState>& render_
         vk::DescriptorSetAllocateInfo allocate_info = {};
         allocate_info.setDescriptorPool(pool);
         allocate_info.setDescriptorSetCount(1);
-        allocate_info.setPSetLayouts(&render_pipeline_state->bindGroupLayouts[index]);
+        allocate_info.setPSetLayouts(&render_pipeline_state->descriptorSetLayouts[index]);
 
         vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
         vk::Result result = device->handle.allocateDescriptorSets(&allocate_info, &descriptor_set, device->dispatcher);
@@ -153,7 +153,7 @@ auto gfx::CommandBuffer::newDescriptorSet(const rc<RenderPipelineState>& render_
     vk::DescriptorSetAllocateInfo allocate_info = {};
     allocate_info.setDescriptorPool(pool);
     allocate_info.setDescriptorSetCount(1);
-    allocate_info.setPSetLayouts(&render_pipeline_state->bindGroupLayouts[index]);
+    allocate_info.setPSetLayouts(&render_pipeline_state->descriptorSetLayouts[index]);
 
     vk::DescriptorSet descriptor_set = VK_NULL_HANDLE;
     vk::Result result = device->handle.allocateDescriptorSets(&allocate_info, &descriptor_set, device->dispatcher);
@@ -164,7 +164,7 @@ auto gfx::CommandBuffer::newDescriptorSet(const rc<RenderPipelineState>& render_
 }
 
 auto gfx::CommandBuffer::newRenderCommandEncoder(const RenderingInfo& info) -> rc<RenderCommandEncoder> {
-    auto encoder = MakeShared<RenderCommandEncoder>(shared_from_this());
+    auto encoder = rc<RenderCommandEncoder>(new RenderCommandEncoder(shared_from_this()));
     encoder->_beginRendering(info);
     return encoder;
 }
@@ -272,151 +272,154 @@ void gfx::RenderCommandEncoder::_endRendering() {
 }
 
 void gfx::RenderCommandEncoder::_setup() {
-    if ((flags_ & RenderCommandEncoderPipeline) == RenderCommandEncoderPipeline) {
-        flags_ &= ~RenderCommandEncoderPipeline;
-
-        std::size_t key = 0;
-        VULKAN_HPP_HASH_COMBINE(key, depthStencilState_.get());
-        VULKAN_HPP_HASH_COMBINE(key, renderPipelineState_.get());
-        VULKAN_HPP_HASH_COMBINE(key, depthClampEnable_);
-        VULKAN_HPP_HASH_COMBINE(key, rasterizerDiscardEnable_);
-        VULKAN_HPP_HASH_COMBINE(key, polygonMode_);
-        VULKAN_HPP_HASH_COMBINE(key, lineWidth_);
-        VULKAN_HPP_HASH_COMBINE(key, cullMode_);
-        VULKAN_HPP_HASH_COMBINE(key, frontFace_);
-        VULKAN_HPP_HASH_COMBINE(key, depthBiasEnable_);
-        VULKAN_HPP_HASH_COMBINE(key, depthBiasConstantFactor_);
-        VULKAN_HPP_HASH_COMBINE(key, depthBiasClamp_);
-        VULKAN_HPP_HASH_COMBINE(key, depthBiasSlopeFactor_);
-
-        auto it = renderPipelineState_->pipelines.emplace(key, Lazy{[&] -> vk::Pipeline {
-            vk::PipelineViewportStateCreateInfo viewport_state = {};
-            viewport_state.setViewportCount(1);
-            viewport_state.setScissorCount(1);
-
-            vk::PipelineInputAssemblyStateCreateInfo input_assembly_state = {};
-            input_assembly_state.setTopology(renderPipelineState_->inputPrimitiveTopology);
-            input_assembly_state.setPrimitiveRestartEnable(renderPipelineState_->primitiveRestartEnable);
-
-            vk::PipelineRasterizationStateCreateInfo rasterization_state = {};
-            rasterization_state.setDepthClampEnable(depthClampEnable_);
-            rasterization_state.setRasterizerDiscardEnable(rasterizerDiscardEnable_);
-            rasterization_state.setPolygonMode(polygonMode_);
-            rasterization_state.setLineWidth(lineWidth_);
-            rasterization_state.setCullMode(cullMode_);
-            rasterization_state.setFrontFace(frontFace_);
-            rasterization_state.setDepthBiasEnable(depthBiasEnable_);
-            rasterization_state.setDepthBiasConstantFactor(depthBiasConstantFactor_);
-            rasterization_state.setDepthBiasClamp(depthBiasClamp_);
-            rasterization_state.setDepthBiasSlopeFactor(depthBiasSlopeFactor_);
-
-            vk::PipelineTessellationStateCreateInfo tessellation_state = {};
-            if (renderPipelineState_->tessellationState) {
-                tessellation_state.setPatchControlPoints(renderPipelineState_->tessellationState->patch_control_points);
-            }
-
-            auto rasterization_samples = [this] {
-                switch (renderPipelineState_->rasterSampleCount) {
-                    case 1: return vk::SampleCountFlagBits::e1;
-                    case 2: return vk::SampleCountFlagBits::e2;
-                    case 4: return vk::SampleCountFlagBits::e4;
-                    case 8: return vk::SampleCountFlagBits::e8;
-                    case 16: return vk::SampleCountFlagBits::e16;
-                    case 32: return vk::SampleCountFlagBits::e32;
-                    case 64: return vk::SampleCountFlagBits::e64;
-                    default: return vk::SampleCountFlagBits{};
-                }
-            }();
-
-            vk::PipelineMultisampleStateCreateInfo multisample_state = {};
-            multisample_state.setRasterizationSamples(rasterization_samples);
-            if (renderPipelineState_->multisampleState) {
-                multisample_state.setSampleShadingEnable(renderPipelineState_->multisampleState->sample_shading_enable);
-                multisample_state.setMinSampleShading(renderPipelineState_->multisampleState->min_sample_shading);
-                multisample_state.setPSampleMask(renderPipelineState_->multisampleState->sample_mask);
-            }
-            multisample_state.setAlphaToCoverageEnable(renderPipelineState_->isAlphaToCoverageEnabled);
-            multisample_state.setAlphaToOneEnable(renderPipelineState_->isAlphaToOneEnabled);
-
-            vk::PipelineDepthStencilStateCreateInfo depth_stencil_state = {};
-
-            auto dynamicStates = std::array{
-                vk::DynamicState::eViewport,
-                vk::DynamicState::eScissor
-            };
-
-            vk::PipelineDynamicStateCreateInfo dynamic_state = {};
-            dynamic_state.setDynamicStates(dynamicStates);
-
-            std::vector<vk::PipelineShaderStageCreateInfo> stages = {};
-
-            vk::PipelineShaderStageCreateInfo vertex_stage = {};
-            vertex_stage.setStage(vk::ShaderStageFlagBits::eVertex);
-            vertex_stage.setModule(renderPipelineState_->vertexFunction->library->handle);
-            vertex_stage.setPName(renderPipelineState_->vertexFunction->name.c_str());
-            stages.emplace_back(vertex_stage);
-
-            vk::PipelineShaderStageCreateInfo fragment_stage = {};
-            fragment_stage.setStage(vk::ShaderStageFlagBits::eFragment);
-            fragment_stage.setModule(renderPipelineState_->fragmentFunction->library->handle);
-            fragment_stage.setPName(renderPipelineState_->fragmentFunction->name.c_str());
-            stages.emplace_back(fragment_stage);
-
-            vk::PipelineVertexInputStateCreateInfo vertex_input_state = {};
-            vertex_input_state.setVertexBindingDescriptions(renderPipelineState_->vertexInputState.bindings);
-            vertex_input_state.setVertexAttributeDescriptions(renderPipelineState_->vertexInputState.attributes);
-
-            vk::PipelineColorBlendStateCreateInfo color_blend_state = {};
-            color_blend_state.setAttachments(renderPipelineState_->colorBlendAttachments.elements);
-
-            vk::PipelineRenderingCreateInfo rendering = {};
-            rendering.setViewMask(renderPipelineState_->viewMask);
-            rendering.setColorAttachmentFormats(renderPipelineState_->colorAttachmentFormats.elements);
-            rendering.setDepthAttachmentFormat(renderPipelineState_->depthAttachmentFormat);
-            rendering.setStencilAttachmentFormat(renderPipelineState_->stencilAttachmentFormat);
-
-            vk::GraphicsPipelineCreateInfo pipeline_create_info = {};
-            pipeline_create_info.setPNext(&rendering);
-            pipeline_create_info.setStages(stages);
-            pipeline_create_info.setPVertexInputState(&vertex_input_state);
-            pipeline_create_info.setPInputAssemblyState(&input_assembly_state);
-            pipeline_create_info.setPViewportState(&viewport_state);
-            pipeline_create_info.setPRasterizationState(&rasterization_state);
-            pipeline_create_info.setPTessellationState(&tessellation_state);
-            pipeline_create_info.setPMultisampleState(&multisample_state);
-
-            if (depthStencilState_) {
-                depth_stencil_state.setDepthTestEnable(depthStencilState_->isDepthTestEnabled);
-                depth_stencil_state.setDepthWriteEnable(depthStencilState_->isDepthWriteEnabled);
-                depth_stencil_state.setDepthCompareOp(depthStencilState_->depthCompareFunction);
-                depth_stencil_state.setDepthBoundsTestEnable(depthStencilState_->isDepthBoundsTestEnabled);
-                depth_stencil_state.setMinDepthBounds(depthStencilState_->minDepthBounds);
-                depth_stencil_state.setMaxDepthBounds(depthStencilState_->maxDepthBounds);
-                depth_stencil_state.setStencilTestEnable(depthStencilState_->isStencilTestEnabled);
-                depth_stencil_state.setFront(depthStencilState_->frontFaceStencil);
-                depth_stencil_state.setBack(depthStencilState_->backFaceStencil);
-
-                pipeline_create_info.setPDepthStencilState(&depth_stencil_state);
-            }
-
-            pipeline_create_info.setPColorBlendState(&color_blend_state);
-            pipeline_create_info.setPDynamicState(&dynamic_state);
-            pipeline_create_info.setLayout(renderPipelineState_->pipelineLayout);
-            pipeline_create_info.setRenderPass(nullptr);
-            pipeline_create_info.setSubpass(0);
-            pipeline_create_info.setBasePipelineHandle(nullptr);
-            pipeline_create_info.setBasePipelineIndex(0);
-
-            vk::Pipeline pipeline;
-            vk::resultCheck(commandBuffer->device->handle.createGraphicsPipelines(renderPipelineState_->cache, 1, &pipeline_create_info, nullptr, &pipeline, commandBuffer->device->dispatcher), "Failed to create graphics pipeline");
-            return pipeline;
-        }
-        });
-
-        auto pipeline = it.first->second;
-
-        commandBuffer->handle.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline, commandBuffer->device->dispatcher);
+    if ((flags_ & RenderCommandEncoderPipeline) != RenderCommandEncoderPipeline) {
+        return;
     }
+    flags_ &= ~RenderCommandEncoderPipeline;
+
+    std::size_t key = 0;
+    VULKAN_HPP_HASH_COMBINE(key, depthStencilState_.get());
+    VULKAN_HPP_HASH_COMBINE(key, renderPipelineState_.get());
+    VULKAN_HPP_HASH_COMBINE(key, depthClampEnable_);
+    VULKAN_HPP_HASH_COMBINE(key, rasterizerDiscardEnable_);
+    VULKAN_HPP_HASH_COMBINE(key, polygonMode_);
+    VULKAN_HPP_HASH_COMBINE(key, lineWidth_);
+    VULKAN_HPP_HASH_COMBINE(key, cullMode_);
+    VULKAN_HPP_HASH_COMBINE(key, frontFace_);
+    VULKAN_HPP_HASH_COMBINE(key, depthBiasEnable_);
+    VULKAN_HPP_HASH_COMBINE(key, depthBiasConstantFactor_);
+    VULKAN_HPP_HASH_COMBINE(key, depthBiasClamp_);
+    VULKAN_HPP_HASH_COMBINE(key, depthBiasSlopeFactor_);
+
+    auto it = renderPipelineState_->pipelines.emplace(key, Lazy{[&] -> vk::Pipeline {
+        auto renderPipelineStateDescription = renderPipelineState_->description;
+        vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
+
+        vk::PipelineViewportStateCreateInfo pipelineViewportStateCreateInfo = {};
+        pipelineViewportStateCreateInfo.setViewportCount(1);
+        pipelineViewportStateCreateInfo.setScissorCount(1);
+        graphicsPipelineCreateInfo.setPViewportState(&pipelineViewportStateCreateInfo);
+
+        vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo = {};
+        pipelineRenderingCreateInfo.setViewMask(renderPipelineStateDescription->getViewMask());
+        pipelineRenderingCreateInfo.setColorAttachmentFormats(renderPipelineStateDescription->colorAttachmentFormats().elements);
+        pipelineRenderingCreateInfo.setDepthAttachmentFormat(renderPipelineStateDescription->getDepthAttachmentFormat());
+        pipelineRenderingCreateInfo.setStencilAttachmentFormat(renderPipelineStateDescription->getStencilAttachmentFormat());
+        graphicsPipelineCreateInfo.setPNext(&pipelineRenderingCreateInfo);
+
+        vk::PipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo = {};
+        pipelineInputAssemblyStateCreateInfo.setTopology(renderPipelineStateDescription->getInputPrimitiveTopology());
+        pipelineInputAssemblyStateCreateInfo.setPrimitiveRestartEnable(renderPipelineStateDescription->getPrimitiveRestartEnable());
+        graphicsPipelineCreateInfo.setPInputAssemblyState(&pipelineInputAssemblyStateCreateInfo);
+
+        vk::PipelineRasterizationStateCreateInfo rasterization_state = {};
+        rasterization_state.setDepthClampEnable(depthClampEnable_);
+        rasterization_state.setRasterizerDiscardEnable(rasterizerDiscardEnable_);
+        rasterization_state.setPolygonMode(polygonMode_);
+        rasterization_state.setLineWidth(lineWidth_);
+        rasterization_state.setCullMode(cullMode_);
+        rasterization_state.setFrontFace(frontFace_);
+        rasterization_state.setDepthBiasEnable(depthBiasEnable_);
+        rasterization_state.setDepthBiasConstantFactor(depthBiasConstantFactor_);
+        rasterization_state.setDepthBiasClamp(depthBiasClamp_);
+        rasterization_state.setDepthBiasSlopeFactor(depthBiasSlopeFactor_);
+
+        vk::PipelineTessellationStateCreateInfo tessellation_state = {};
+        if (auto tesselationState = renderPipelineStateDescription->getTessellationState()) {
+            tessellation_state.setPatchControlPoints(tesselationState->patch_control_points);
+        }
+
+        auto rasterization_samples = [&renderPipelineStateDescription] {
+            switch (renderPipelineStateDescription->getRasterSampleCount()) {
+                case 1: return vk::SampleCountFlagBits::e1;
+                case 2: return vk::SampleCountFlagBits::e2;
+                case 4: return vk::SampleCountFlagBits::e4;
+                case 8: return vk::SampleCountFlagBits::e8;
+                case 16: return vk::SampleCountFlagBits::e16;
+                case 32: return vk::SampleCountFlagBits::e32;
+                case 64: return vk::SampleCountFlagBits::e64;
+                default: return vk::SampleCountFlagBits{};
+            }
+        }();
+
+        vk::PipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo = {};
+        pipelineMultisampleStateCreateInfo.setRasterizationSamples(rasterization_samples);
+        if (auto multisampleState = renderPipelineStateDescription->getMultisampleState()) {
+            pipelineMultisampleStateCreateInfo.setSampleShadingEnable(multisampleState->sample_shading_enable);
+            pipelineMultisampleStateCreateInfo.setMinSampleShading(multisampleState->min_sample_shading);
+            pipelineMultisampleStateCreateInfo.setPSampleMask(multisampleState->sample_mask);
+        }
+        pipelineMultisampleStateCreateInfo.setAlphaToCoverageEnable(renderPipelineStateDescription->getIsAlphaToCoverageEnabled());
+        pipelineMultisampleStateCreateInfo.setAlphaToOneEnable(renderPipelineStateDescription->getIsAlphaToOneEnabled());
+        graphicsPipelineCreateInfo.setPMultisampleState(&pipelineMultisampleStateCreateInfo);
+
+        vk::PipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo = {};
+
+        auto dynamicStates = std::array{
+            vk::DynamicState::eViewport,
+            vk::DynamicState::eScissor
+        };
+
+        vk::PipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo = {};
+        pipelineDynamicStateCreateInfo.setDynamicStates(dynamicStates);
+        graphicsPipelineCreateInfo.setPDynamicState(&pipelineDynamicStateCreateInfo);
+
+        std::vector<vk::PipelineShaderStageCreateInfo> pipelineShaderStageCreateInfos = {};
+        if (auto vertexFunction = renderPipelineStateDescription->getVertexFunction()) {
+            vk::PipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = {};
+            pipelineShaderStageCreateInfo.setStage(vk::ShaderStageFlagBits::eVertex);
+            pipelineShaderStageCreateInfo.setModule(vertexFunction->library->handle);
+            pipelineShaderStageCreateInfo.setPName(vertexFunction->name.c_str());
+            pipelineShaderStageCreateInfos.emplace_back(pipelineShaderStageCreateInfo);
+        }
+        if (auto fragmentFunction = renderPipelineStateDescription->getFragmentFunction()) {
+            vk::PipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = {};
+            pipelineShaderStageCreateInfo.setStage(vk::ShaderStageFlagBits::eFragment);
+            pipelineShaderStageCreateInfo.setModule(fragmentFunction->library->handle);
+            pipelineShaderStageCreateInfo.setPName(fragmentFunction->name.c_str());
+            pipelineShaderStageCreateInfos.emplace_back(pipelineShaderStageCreateInfo);
+        }
+        graphicsPipelineCreateInfo.setStages(pipelineShaderStageCreateInfos);
+
+        vk::PipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo = {};
+        if (auto vertexInputState = renderPipelineStateDescription->getVertexInputState()) {
+            pipelineVertexInputStateCreateInfo.setVertexBindingDescriptions(vertexInputState->bindings);
+            pipelineVertexInputStateCreateInfo.setVertexAttributeDescriptions(vertexInputState->attributes);
+        }
+        graphicsPipelineCreateInfo.setPVertexInputState(&pipelineVertexInputStateCreateInfo);
+
+        vk::PipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo = {};
+        pipelineColorBlendStateCreateInfo.setAttachments(renderPipelineStateDescription->colorBlendAttachments().elements);
+        graphicsPipelineCreateInfo.setPColorBlendState(&pipelineColorBlendStateCreateInfo);
+
+        graphicsPipelineCreateInfo.setPRasterizationState(&rasterization_state);
+        graphicsPipelineCreateInfo.setPTessellationState(&tessellation_state);
+
+        if (depthStencilState_) {
+            pipelineDepthStencilStateCreateInfo.setDepthTestEnable(depthStencilState_->isDepthTestEnabled);
+            pipelineDepthStencilStateCreateInfo.setDepthWriteEnable(depthStencilState_->isDepthWriteEnabled);
+            pipelineDepthStencilStateCreateInfo.setDepthCompareOp(depthStencilState_->depthCompareFunction);
+            pipelineDepthStencilStateCreateInfo.setDepthBoundsTestEnable(depthStencilState_->isDepthBoundsTestEnabled);
+            pipelineDepthStencilStateCreateInfo.setMinDepthBounds(depthStencilState_->minDepthBounds);
+            pipelineDepthStencilStateCreateInfo.setMaxDepthBounds(depthStencilState_->maxDepthBounds);
+            pipelineDepthStencilStateCreateInfo.setStencilTestEnable(depthStencilState_->isStencilTestEnabled);
+            pipelineDepthStencilStateCreateInfo.setFront(depthStencilState_->frontFaceStencil);
+            pipelineDepthStencilStateCreateInfo.setBack(depthStencilState_->backFaceStencil);
+
+            graphicsPipelineCreateInfo.setPDepthStencilState(&pipelineDepthStencilStateCreateInfo);
+        }
+
+        graphicsPipelineCreateInfo.setLayout(renderPipelineState_->pipelineLayout);
+        graphicsPipelineCreateInfo.setRenderPass(nullptr);
+        graphicsPipelineCreateInfo.setSubpass(0);
+        graphicsPipelineCreateInfo.setBasePipelineHandle(nullptr);
+        graphicsPipelineCreateInfo.setBasePipelineIndex(0);
+
+        vk::Pipeline pipeline;
+        vk::resultCheck(commandBuffer->device->handle.createGraphicsPipelines(renderPipelineState_->pipelineCache, 1, &graphicsPipelineCreateInfo, nullptr, &pipeline, commandBuffer->device->dispatcher), "Failed to create graphics pipeline");
+        return pipeline;
+    }});
+    commandBuffer->handle.bindPipeline(vk::PipelineBindPoint::eGraphics, it.first->second, commandBuffer->device->dispatcher);
 }
 
 auto gfx::RenderCommandEncoder::getCommandBuffer() -> rc<CommandBuffer> {

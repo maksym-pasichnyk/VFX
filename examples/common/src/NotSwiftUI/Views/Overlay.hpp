@@ -30,5 +30,5 @@ public:
 };
 
 inline auto View::overlay(rc<View> overlay, Alignment alignment) {
-    return MakeShared<Overlay>(shared_from_this(), std::move(overlay), alignment);
+    return rc<Overlay>::init(shared_from_this(), std::move(overlay), alignment);
 }

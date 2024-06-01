@@ -32,7 +32,7 @@ gfx::Instance::~Instance() {
 }
 
 auto gfx::createInstance(InstanceConfiguration const& desc) -> rc<Instance> {
-    auto context = MakeShared<Context>();
+    auto context = rc<Context>::init();
 
     auto app_info = vk::ApplicationInfo()
         .setPApplicationName(desc.name.c_str())
@@ -74,11 +74,11 @@ auto gfx::createInstance(InstanceConfiguration const& desc) -> rc<Instance> {
 //        .setMessageType(message_type_flags)
 //        .setPfnUserCallback(debug_utils_messenger_callback);
 //    auto messenger = instance.handle.createDebugUtilsMessengerEXT(debug_create_info, nullptr, instance.dispatcher);
-    return MakeShared<Instance>(std::move(context), create_info);
+    return rc<Instance>(new Instance(std::move(context), create_info));
 }
 
 auto gfx::Instance::wrapSurface(this Instance& self, vk::SurfaceKHR surface) -> rc<Surface> {
-    return MakeShared<Surface>(self.shared_from_this(), surface);
+    return rc<Surface>(new Surface(self.shared_from_this(), surface));
 }
 
 auto gfx::Instance::enumerateAdapters(this Instance& self) -> std::vector<rc<Adapter>> {
@@ -87,7 +87,7 @@ auto gfx::Instance::enumerateAdapters(this Instance& self) -> std::vector<rc<Ada
     std::vector<rc<Adapter>> adapters = {};
     adapters.reserve(physical_devices.size());
     for (auto& physical_device : physical_devices) {
-        adapters.emplace_back(rc(new Adapter(self.shared_from_this(), physical_device)));
+        adapters.emplace_back(rc<Adapter>(new Adapter(self.shared_from_this(), physical_device)));
     }
     return adapters;
 }

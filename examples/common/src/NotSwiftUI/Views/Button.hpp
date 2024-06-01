@@ -29,5 +29,5 @@ public:
 };
 
 static auto Button(rc<struct View> text) {
-    return MakeShared<struct Button>(std::move(text));
+    return rc<struct Button>::init(std::move(text));
 }

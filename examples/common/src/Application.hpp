@@ -70,7 +70,7 @@ private:
 struct Application {
 public:
     explicit Application(const char* title) {
-        platform = MakeShared<WindowPlatform>(title, 800, 600);
+        platform = rc<WindowPlatform>::init(title, 800, 600);
         instance = gfx::createInstance(gfx::InstanceConfiguration{
             .name = title,
             .version = 1
@@ -127,8 +127,8 @@ public:
         commandQueue = device->newCommandQueue();
         commandBuffer = commandQueue->newCommandBuffer();
 
-        imgui = MakeShared<ImGuiBackend>(device);
-        canvas = MakeShared<Canvas>(imgui->drawList());
+        imgui = rc<ImGuiBackend>::init(device);
+        canvas = rc<Canvas>::init(imgui->drawList());
     }
 
 public:

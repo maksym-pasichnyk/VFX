@@ -11,5 +11,5 @@ auto gfx::Adapter::getSurfaceCapabilities(this Adapter& self, rc<Surface> const&
 }
 
 auto gfx::Adapter::createDevice(this Adapter& self, vk::DeviceCreateInfo const& create_info) -> rc<Device> {
-    return MakeShared<Device>(self.shared_from_this(), create_info);
+    return rc<Device>(new Device(self.shared_from_this(), create_info));
 }

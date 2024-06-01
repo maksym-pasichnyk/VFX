@@ -20,14 +20,17 @@ auto gfx::RenderPipelineColorAttachmentFormatArray::operator[](size_t i) -> vk::
     return elements[i];
 }
 
-gfx::RenderPipelineState::RenderPipelineState(rc<Device> device) : device(std::move(device)) {}
+gfx::RenderPipelineState::RenderPipelineState(rc<Device> device, rc<RenderPipelineStateDescription> description)
+: device(std::move(device))
+, description(std::move(description)) {}
 
 gfx::RenderPipelineState::~RenderPipelineState() {
-    for (auto& layout : bindGroupLayouts) {
+    for (auto& layout : descriptorSetLayouts) {
         device->handle.destroyDescriptorSetLayout(layout, nullptr, device->dispatcher);
     }
+
     device->handle.destroyPipelineLayout(pipelineLayout, nullptr, device->dispatcher);
-    device->handle.destroyPipelineCache(cache, nullptr, device->dispatcher);
+    device->handle.destroyPipelineCache(pipelineCache, nullptr, device->dispatcher);
 
     for (auto [_, pipeline] : pipelines) {
         device->handle.destroyPipeline(pipeline, nullptr, device->dispatcher);

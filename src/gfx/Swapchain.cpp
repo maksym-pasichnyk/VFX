@@ -8,11 +8,11 @@ gfx::Swapchain::~Swapchain() {
 }
 
 auto gfx::Swapchain::drawableSize(this Swapchain const& self) -> vk::Extent2D {
-    auto extent = self.drawables[0].texture->extent;
+    auto extent = self.drawables[0]->texture->extent;
     return vk::Extent2D().setWidth(extent.width).setHeight(extent.height);
 }
 
-auto gfx::Swapchain::nextDrawable(this Swapchain& self) -> Drawable {
+auto gfx::Swapchain::nextDrawable(this Swapchain& self) -> rc<Drawable> {
     auto fence = self.device->handle.createFenceUnique(vk::FenceCreateInfo(), nullptr, self.device->dispatcher);
 
     uint32_t image_index;
@@ -76,7 +76,7 @@ void gfx::Swapchain::configure(this Swapchain& self, const SurfaceConfiguration&
         view_create_info.setFormat(config.format);
         view_create_info.setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
-        auto texture = MakeShared<Texture>(
+        auto texture = rc<Texture>::init(
             self.device,
             images[i],
             config.format,
@@ -89,6 +89,6 @@ void gfx::Swapchain::configure(this Swapchain& self, const SurfaceConfiguration&
             vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1),
             nullptr
         );
-        self.drawables[i] = Drawable(self.handle, std::move(texture), uint32_t(i));
+        self.drawables[i] = rc<Drawable>::init(self.handle, std::move(texture), uint32_t(i));
     }
 }

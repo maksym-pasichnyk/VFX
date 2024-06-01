@@ -393,7 +393,7 @@ auto gfx::Device::newTexture(this Device& self, TextureDescription const& descri
     view_create_info.setComponents(description.mapping),
     view_create_info.setSubresourceRange(vk::ImageSubresourceRange(aspect, 0, 1, 0, 1));
 
-    return MakeShared<Texture>(
+    return rc<Texture>(new Texture(
         self.shared_from_this(),
         image,
         description.format,
@@ -405,11 +405,11 @@ auto gfx::Device::newTexture(this Device& self, TextureDescription const& descri
         self.handle.createImageView(view_create_info, VK_NULL_HANDLE, self.dispatcher),
         vk::ImageSubresourceRange(aspect, 0, 1, 0, 1),
         allocation
-    );
+    ));
 }
 
 auto gfx::Device::newSampler(this Device& self, vk::SamplerCreateInfo const& info) -> rc<Sampler> {
-    return MakeShared<Sampler>(self.shared_from_this(), info);
+    return rc<Sampler>(new Sampler(self.shared_from_this(), info));
 }
 
 auto gfx::Device::newBuffer(this Device& self, vk::BufferUsageFlags usage, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options) -> rc<Buffer> {
@@ -454,7 +454,7 @@ auto gfx::Device::newBuffer(this Device& self, vk::BufferUsageFlags usage, uint6
     VkBuffer buffer;
     VmaAllocation allocation;
     vmaCreateBuffer(self.allocator, reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info), &allocation_create_info, &buffer, &allocation, nullptr);
-    return MakeShared<Buffer>(self.shared_from_this(), buffer, allocation);
+    return rc<Buffer>(new Buffer(self.shared_from_this(), buffer, allocation));
 }
 
 auto gfx::Device::newBuffer(this Device& self, vk::BufferUsageFlags usage, const void* pointer, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options) -> rc<Buffer> {
@@ -469,11 +469,11 @@ auto gfx::Device::newLibrary(this Device& self, std::span<char const> bytes) -> 
     vk::ShaderModuleCreateInfo create_info = {};
     create_info.setCodeSize(bytes.size());
     create_info.setPCode(reinterpret_cast<const uint32_t *>(bytes.data()));
-    return MakeShared<Library>(self.shared_from_this(), create_info);
+    return rc<Library>(new Library(self.shared_from_this(), create_info));
 }
 
 auto gfx::Device::newDepthStencilState(this Device& self, DepthStencilStateDescription const& description) -> rc<DepthStencilState> {
-    auto depth_stencil_state = MakeShared<DepthStencilState>();
+    auto depth_stencil_state = rc<DepthStencilState>(new DepthStencilState());
     depth_stencil_state->isDepthTestEnabled = description.isDepthTestEnabled;
     depth_stencil_state->isDepthWriteEnabled = description.isDepthWriteEnabled;
     depth_stencil_state->depthCompareFunction = description.depthCompareFunction;
@@ -486,21 +486,20 @@ auto gfx::Device::newDepthStencilState(this Device& self, DepthStencilStateDescr
     return depth_stencil_state;
 }
 
-auto gfx::Device::newRenderPipelineState(this Device& self, RenderPipelineStateDescription const& description) -> rc<RenderPipelineState> {
+auto gfx::Device::newRenderPipelineState(this Device& self, rc<RenderPipelineStateDescription> const& description) -> rc<RenderPipelineState> {
     std::vector<vk::PushConstantRange> push_constant_ranges = {};
     std::vector<DescriptorSetLayoutCreateInfo> descriptor_sets = {};
 
-    for (auto& function : {description.vertexFunction, description.fragmentFunction}) {
-        // todo: merge if overlaps
-        for (auto& pcb : std::span(function->library->spvReflectShaderModule.push_constant_blocks, function->library->spvReflectShaderModule.push_constant_block_count)) {
+    auto func = [&](gfx::Function* impl) {
+        for (auto& pcb : std::span(impl->library->spvReflectShaderModule.push_constant_blocks, impl->library->spvReflectShaderModule.push_constant_block_count)) {
             vk::PushConstantRange push_constant_range = {};
             push_constant_range.setSize(pcb.size);
             push_constant_range.setOffset(pcb.offset);
-            push_constant_range.setStageFlags(vk::ShaderStageFlags(function->entry_point->shader_stage));
+            push_constant_range.setStageFlags(vk::ShaderStageFlags(impl->entry_point->shader_stage));
             push_constant_ranges.emplace_back(push_constant_range);
         }
 
-        for (auto& sds : std::span(function->library->spvReflectShaderModule.descriptor_sets, function->library->spvReflectShaderModule.descriptor_set_count)) {
+        for (auto& sds : std::span(impl->library->spvReflectShaderModule.descriptor_sets, impl->library->spvReflectShaderModule.descriptor_set_count)) {
             if (sds.set >= descriptor_sets.size()) {
                 descriptor_sets.resize(sds.set + 1);
             }
@@ -510,43 +509,30 @@ auto gfx::Device::newRenderPipelineState(this Device& self, RenderPipelineStateD
                 binding.setBinding(sb->binding);
                 binding.setDescriptorType(vk::DescriptorType(sb->descriptor_type));
                 binding.setDescriptorCount(sb->count);
-                binding.setStageFlags(vk::ShaderStageFlags(function->entry_point->shader_stage));
+                binding.setStageFlags(vk::ShaderStageFlags(impl->entry_point->shader_stage));
                 binding.setPImmutableSamplers(nullptr);
 
                 descriptor_sets[sds.set].emplace(binding);
             }
         }
-    }
-    
-    auto state = MakeShared<RenderPipelineState>(self.shared_from_this());
-    state->vertexFunction           = description.vertexFunction;
-    state->fragmentFunction         = description.fragmentFunction;
-    state->tessellationState        = description.tessellationState;
-    state->multisampleState         = description.multisampleState;
-    state->vertexInputState         = description.vertexInputState;
-    state->viewMask                 = description.viewMask;
-    state->depthAttachmentFormat    = description.depthAttachmentFormat;
-    state->stencilAttachmentFormat  = description.stencilAttachmentFormat;
-    state->colorAttachmentFormats   = description.colorAttachmentFormats;
-    state->colorBlendAttachments    = description.colorBlendAttachments;
-    state->inputPrimitiveTopology   = description.inputPrimitiveTopology;
-    state->primitiveRestartEnable   = description.primitiveRestartEnable;
-    state->rasterSampleCount        = description.rasterSampleCount;
-    state->isAlphaToCoverageEnabled = description.isAlphaToCoverageEnabled;
-    state->isAlphaToOneEnabled      = description.isAlphaToOneEnabled;
+    };
 
+    func(&*description->getVertexFunction());
+    func(&*description->getFragmentFunction());
+
+    auto state = rc<RenderPipelineState>(new RenderPipelineState(self.shared_from_this(), description));
     vk::PipelineCacheCreateInfo pipeline_cache_info = {};
-    vk::resultCheck(self.handle.createPipelineCache(&pipeline_cache_info, nullptr, &state->cache, self.dispatcher), "Failed to create pipeline cache");
+    vk::resultCheck(self.handle.createPipelineCache(&pipeline_cache_info, nullptr, &state->pipelineCache, self.dispatcher), "Failed to create pipeline cache");
 
-    state->bindGroupLayouts.resize(descriptor_sets.size());
-    for (uint32_t i = 0; i < state->bindGroupLayouts.size(); ++i) {
+    state->descriptorSetLayouts.resize(descriptor_sets.size());
+    for (uint32_t i = 0; i < state->descriptorSetLayouts.size(); ++i) {
         vk::DescriptorSetLayoutCreateInfo layout_create_info = {};
         layout_create_info.setBindings(descriptor_sets[i].bindings);
-        state->bindGroupLayouts[i] = self.handle.createDescriptorSetLayout(layout_create_info, nullptr, self.dispatcher);
+        state->descriptorSetLayouts[i] = self.handle.createDescriptorSetLayout(layout_create_info, nullptr, self.dispatcher);
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_create_info = {};
-    pipeline_layout_create_info.setSetLayouts(state->bindGroupLayouts);
+    pipeline_layout_create_info.setSetLayouts(state->descriptorSetLayouts);
     pipeline_layout_create_info.setPushConstantRanges(push_constant_ranges);
     state->pipelineLayout = self.handle.createPipelineLayout(pipeline_layout_create_info, nullptr, self.dispatcher);
 
@@ -582,7 +568,7 @@ auto gfx::Device::newComputePipelineState(this Device& self, rc<Function> const&
         }
     }
 
-    auto state = MakeShared<ComputePipelineState>(self.shared_from_this());
+    auto state = rc<ComputePipelineState>(new ComputePipelineState(self.shared_from_this()));
     state->descriptor_set_layouts.resize(descriptor_sets.size());
     for (uint32_t i = 0; i < descriptor_sets.size(); ++i) {
         vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {};
@@ -615,9 +601,11 @@ auto gfx::Device::newCommandQueue(this Device& self) -> rc<CommandQueue> {
     vk::CommandPoolCreateInfo create_info = {};
     create_info.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
     create_info.setQueueFamilyIndex(0);
-    return MakeShared<CommandQueue>(self.shared_from_this(), create_info);
+
+    vk::CommandPool command_pool = self.handle.createCommandPool(create_info, nullptr, self.dispatcher);
+    return rc<CommandQueue>(new CommandQueue(self.shared_from_this(), command_pool));
 }
 
 auto gfx::Device::createSwapchain(this Device& self, rc<Surface> const& surface) -> rc<Swapchain> {
-    return MakeShared<Swapchain>(self.shared_from_this(), surface);
+    return rc<Swapchain>(new Swapchain(self.shared_from_this(), surface));
 }

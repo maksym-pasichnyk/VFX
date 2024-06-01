@@ -28,15 +28,15 @@ public:
         gfx::RenderingInfo rendering_info = {};
         rendering_info.renderArea = rendering_area;
         rendering_info.layerCount = 1;
-        rendering_info.colorAttachments[0].texture = drawable.texture;
+        rendering_info.colorAttachments[0].texture = drawable->texture;
         rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
         rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
         rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
         commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer->setImageLayout(drawable->texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
-        auto descriptor_set = commandBuffer->newDescriptorSet(renderPipelineState, 0);
+        auto descriptor_set = commandBuffer->newDescriptorSet(render_pipeline_state, 0);
         auto descriptor_info = vertexBuffer->descriptorInfo();
 
         vk::WriteDescriptorSet buffer_write_info = {};
@@ -49,14 +49,14 @@ public:
         device->handle.updateDescriptorSets({buffer_write_info}, {}, device->dispatcher);
 
         auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
-        encoder->setRenderPipelineState(renderPipelineState);
+        encoder->setRenderPipelineState(render_pipeline_state);
         encoder->bindDescriptorSet(descriptor_set, 0);
         encoder->setScissor(0, rendering_area);
         encoder->setViewport(0, rendering_viewport);
         encoder->draw(3, 1, 0, 0);
         encoder->endEncoding();
 
-        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer->setImageLayout(drawable->texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer->end();
         commandBuffer->submit();
         commandBuffer->present(drawable);
@@ -68,14 +68,13 @@ private:
         auto vertexLibrary = device->newLibrary(Assets::readFile("shaders/default.vert.spv"));
         auto fragmentLibrary = device->newLibrary(Assets::readFile("shaders/default.frag.spv"));
 
-        gfx::RenderPipelineStateDescription description;
-        description.vertexFunction = vertexLibrary->newFunction("main");
-        description.fragmentFunction = fragmentLibrary->newFunction("main");
+        auto description = gfx::RenderPipelineStateDescription::init();
+        description->setVertexFunction(vertexLibrary->newFunction("main"));
+        description->setFragmentFunction(fragmentLibrary->newFunction("main"));
+        description->colorAttachmentFormats()[0] = vk::Format::eB8G8R8A8Unorm;
+        description->colorBlendAttachments()[0].setBlendEnable(false);
 
-        description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-        description.colorBlendAttachments[0].setBlendEnable(false);
-
-        renderPipelineState = device->newRenderPipelineState(description);
+        render_pipeline_state = device->newRenderPipelineState(description);
     }
 
     void buildBuffers() {
@@ -98,7 +97,7 @@ private:
 private:
     rc<View> content;
     rc<gfx::Buffer> vertexBuffer;
-    rc<gfx::RenderPipelineState> renderPipelineState;
+    rc<gfx::RenderPipelineState> render_pipeline_state;
 };
 
 auto main(int argc, char** argv) -> int32_t {

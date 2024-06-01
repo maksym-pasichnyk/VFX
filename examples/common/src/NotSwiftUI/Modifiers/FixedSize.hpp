@@ -29,5 +29,5 @@ public:
 };
 
 inline auto View::fixedSize(bool horizontal, bool vertical) {
-    return MakeShared<FixedSize>(shared_from_this(), horizontal, vertical);
+    return rc<FixedSize>::init(shared_from_this(), horizontal, vertical);
 }

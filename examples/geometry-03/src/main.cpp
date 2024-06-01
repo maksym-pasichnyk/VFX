@@ -33,7 +33,7 @@ private:
         renderPipelineStateDescription.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
         renderPipelineStateDescription.colorBlendAttachments[0].setBlendEnable(false);
 
-        renderPipelineState = device->newRenderPipelineState(renderPipelineStateDescription);
+        render_pipeline_state = device->newRenderPipelineState(renderPipelineStateDescription);
         sampler = device->newSampler(vk::SamplerCreateInfo{
             .magFilter = vk::Filter::eNearest,
             .minFilter = vk::Filter::eNearest,
@@ -97,7 +97,7 @@ public:
 
         commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
-        auto descriptorSet = commandBuffer->newDescriptorSet(renderPipelineState, 0);
+        auto descriptorSet = commandBuffer->newDescriptorSet(render_pipeline_state, 0);
 
         vk::DescriptorImageInfo sampler_info = {};
         sampler_info.setSampler(sampler->handle);
@@ -127,7 +127,7 @@ public:
 
         auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
         encoder->setDepthStencilState(depthStencilState);
-        encoder->setRenderPipelineState(renderPipelineState);
+        encoder->setRenderPipelineState(render_pipeline_state);
         encoder->bindDescriptorSet(descriptorSet, 0);
         encoder->pushConstants(vk::ShaderStageFlagBits::eVertex, 0, sizeof(ShaderData), &shader_data);
         encoder->setScissor(0, rendering_area);
@@ -152,7 +152,7 @@ private:
     rc<gfx::Sampler>             sampler;
     rc<gfx::Texture>             texture;
     rc<gfx::DepthStencilState>   depthStencilState;
-    rc<gfx::RenderPipelineState> renderPipelineState;
+    rc<gfx::RenderPipelineState> render_pipeline_state;
 };
 
 auto main(int argc, char** argv) -> int32_t {

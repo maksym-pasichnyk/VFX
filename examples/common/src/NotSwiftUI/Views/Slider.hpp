@@ -42,5 +42,5 @@ public:
 };
 
 static auto Slider(float_t current, float_t min, float_t max) {
-    return MakeShared<struct Slider>(current, min, max)->fixedSize(false, true);
+    return rc<struct Slider>::init(current, min, max)->fixedSize(false, true);
 }

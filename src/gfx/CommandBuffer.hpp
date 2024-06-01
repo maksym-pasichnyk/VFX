@@ -147,7 +147,7 @@ namespace gfx {
         void begin(const vk::CommandBufferBeginInfo& begin_info);
         void end();
         void submit();
-        void present(const Drawable& drawable);
+        void present(rc<gfx::Drawable> const& drawable);
         void waitUntilCompleted();
         void setImageLayout(const rc<Texture>& texture, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask, vk::AccessFlagBits2 srcAccessMask, vk::AccessFlagBits2 dstAccessMask);
 

@@ -112,6 +112,12 @@ public:
 
     friend auto operator<=>(rc<T> const&, rc<T> const&) noexcept = default;
 
+public:
+    template<typename... Args>
+    static auto init(Args&&... args) {
+        return rc(new T(std::forward<Args>(args)...));
+    }
+
 private:
     struct __deleter {
         static void operator()(T* ptr) {
@@ -121,8 +127,3 @@ private:
 
     std::unique_ptr<T, __deleter> __handle;
 };
-
-template<typename T, typename... Args>
-inline auto MakeShared(Args&&... args) -> rc<T> {
-    return rc(new T(std::forward<Args>(args)...));
-}

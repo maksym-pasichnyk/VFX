@@ -25,5 +25,5 @@ public:
 };
 
 inline auto View::foregroundColor(const Color& color) {
-    return MakeShared<ForegroundColor>(shared_from_this(), color);
+    return rc<ForegroundColor>::init(shared_from_this(), color);
 }

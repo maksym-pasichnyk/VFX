@@ -54,7 +54,7 @@ namespace gfx {
         auto newBuffer(this Device& self, vk::BufferUsageFlags usage, const void* pointer, uint64_t size, StorageMode storage, VmaAllocationCreateFlags options = 0) -> rc<Buffer>;
         auto newLibrary(this Device& self, std::span<char const> bytes) -> rc<Library>;
         auto newDepthStencilState(this Device& self, DepthStencilStateDescription const& description) -> rc<DepthStencilState>;
-        auto newRenderPipelineState(this Device& self, RenderPipelineStateDescription const& description) -> rc<RenderPipelineState>;
+        auto newRenderPipelineState(this Device& self, rc<RenderPipelineStateDescription> const& description) -> rc<RenderPipelineState>;
         auto newComputePipelineState(this Device& self, rc<Function> const& function) -> rc<ComputePipelineState>;
         auto newCommandQueue(this Device& self) -> rc<CommandQueue>;
         auto createSwapchain(this Device& self, rc<Surface> const& surface) -> rc<Swapchain>;

@@ -55,31 +55,29 @@ void ImGuiBackend::buildFonts() {
 }
 
 void ImGuiBackend::buildShaders() {
-    auto vertexLibrary      = device->newLibrary(Assets::readFile("shaders/gui.vert.spv"));
-    auto fragmentLibrary    = device->newLibrary(Assets::readFile("shaders/gui.frag.spv"));
+    auto vert_library = device->newLibrary(Assets::readFile("shaders/gui.vert.spv"));
+    auto frag_library = device->newLibrary(Assets::readFile("shaders/gui.frag.spv"));
 
-    gfx::RenderPipelineStateDescription description;
-    description.vertexFunction      = vertexLibrary->newFunction("main");
-    description.fragmentFunction    = fragmentLibrary->newFunction("main");
-    description.vertexInputState    = {
-        .bindings = {
-            vk::VertexInputBindingDescription{0, sizeof(ImDrawVert), vk::VertexInputRate::eVertex}
-        },
-        .attributes = {
-            vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, pos)},
-            vk::VertexInputAttributeDescription{1, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, uv)},
-            vk::VertexInputAttributeDescription{2, 0, vk::Format::eR8G8B8A8Unorm, offsetof(ImDrawVert, col)}
-        }
+    auto vertex_input_state = rc<gfx::VertexInputState>::init();
+    vertex_input_state->bindings = {
+        vk::VertexInputBindingDescription(0, sizeof(ImDrawVert), vk::VertexInputRate::eVertex)
+    };
+    vertex_input_state->attributes = {
+        vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, pos)),
+        vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32Sfloat, offsetof(ImDrawVert, uv)),
+        vk::VertexInputAttributeDescription(2, 0, vk::Format::eR8G8B8A8Unorm, offsetof(ImDrawVert, col)),
     };
 
-    description.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-
-    description.colorBlendAttachments[0].setBlendEnable(true);
-    description.colorBlendAttachments[0].setColorBlendOp(vk::BlendOp::eAdd);
-    description.colorBlendAttachments[0].setAlphaBlendOp(vk::BlendOp::eAdd);
-    description.colorBlendAttachments[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
-    description.colorBlendAttachments[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
-
+    auto description = gfx::RenderPipelineStateDescription::init();
+    description->setVertexFunction(vert_library->newFunction("main"));
+    description->setFragmentFunction(frag_library->newFunction("main"));
+    description->setVertexInputState(std::move(vertex_input_state));
+    description->colorAttachmentFormats()[0] = vk::Format::eB8G8R8A8Unorm;
+    description->colorBlendAttachments()[0].setBlendEnable(true);
+    description->colorBlendAttachments()[0].setColorBlendOp(vk::BlendOp::eAdd);
+    description->colorBlendAttachments()[0].setAlphaBlendOp(vk::BlendOp::eAdd);
+    description->colorBlendAttachments()[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
+    description->colorBlendAttachments()[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
     render_pipeline_state = device->newRenderPipelineState(description);
 }
 
