@@ -27,5 +27,5 @@ public:
 
 template<std::derived_from<Shape> T>
 static auto Shape(rc<T> shape) {
-    return MakeShared<struct ShapeView<T>>(std::move(shape));
+    return rc<struct ShapeView<T>>::init(std::move(shape));
 }

@@ -127,7 +127,7 @@ struct GltfBundle {
                 primitives.emplace_back(baseIndex, baseVertex, numIndices, numVertices);
             }
 
-            auto gfxMesh = MakeShared<Mesh>();
+            auto gfxMesh = rc<Mesh>::init();
             gfxMesh->setVertices(std::move(vertices));
             gfxMesh->setIndices(std::move(indices));
             gfxMesh->setPrimitives(std::move(primitives));
@@ -153,7 +153,7 @@ struct GltfBundle {
                 }
             }
 
-            bundle.skins.emplace_back(MakeShared<Skin>(skin.skeleton, skin.joints, std::move(inverseBindMatrices)));
+            bundle.skins.emplace_back(rc<Skin>::init(skin.skeleton, skin.joints, std::move(inverseBindMatrices)));
         }
 
         std::vector<rc<Node>> nodes = {};
@@ -193,7 +193,7 @@ struct GltfBundle {
             if (node.mesh >= 0) {
                 mesh = bundle.meshes.at(node.mesh);
             }
-            nodes.emplace_back(MakeShared<Node>(std::move(skin), std::move(mesh), position, rotation, scale));
+            nodes.emplace_back(rc<Node>::init(std::move(skin), std::move(mesh), position, rotation, scale));
         }
 
         for (size_t i = 0; i < model.nodes.size(); ++i) {
@@ -203,7 +203,7 @@ struct GltfBundle {
         }
 
         for (auto& scene : model.scenes) {
-            bundle.scenes.emplace_back(MakeShared<Scene>(cxx::iter(scene.nodes).map([&](int i) { return nodes[i]; }).collect()));
+            bundle.scenes.emplace_back(rc<Scene>::init(cxx::iter(scene.nodes).map([&](int i) { return nodes[i]; }).collect()));
         }
 
         for (auto& animation : model.animations) {
@@ -272,7 +272,7 @@ struct GltfBundle {
                 channels.emplace_back(channel.target_path, channel.sampler, channel.target_node);
             }
 
-            bundle.animations.emplace_back(MakeShared<Animation>(animation.name, std::move(samplers), std::move(channels), start, end));
+            bundle.animations.emplace_back(rc<Animation>::init(animation.name, std::move(samplers), std::move(channels), start, end));
         }
         return bundle;
     }

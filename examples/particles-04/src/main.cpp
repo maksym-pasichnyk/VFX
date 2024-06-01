@@ -7,16 +7,16 @@
 struct Game : Application {
 public:
     Game() : Application("Particles-04") {
-        explosionParticleSystem = MakeShared<ParticleSystem>(device, 1000);
+        explosionParticleSystem = rc<ParticleSystem>::init(device, 1000);
         explosionParticleSystem->updateEvent().connect<&Game::onExplosionParticleUpdate>(this);
 
-        sparkleParticleSystem = MakeShared<ParticleSystem>(device, 1000);
+        sparkleParticleSystem = rc<ParticleSystem>::init(device, 1000);
         sparkleParticleSystem->updateEvent().connect<&Game::onSparkleParticleUpdate>(this);
 
-        rocketParticleSystem = MakeShared<ParticleSystem>(device, 1000);
+        rocketParticleSystem = rc<ParticleSystem>::init(device, 1000);
         rocketParticleSystem->updateEvent().connect<&Game::onRocketParticleUpdate>(this);
         rocketParticleSystem->deathEvent().connect<&Game::onRocketParticleDeath>(this);
-        rocketParticleEmitter = MakeShared<RocketParticleEmitter>(rocketParticleSystem, 2.5F);
+        rocketParticleEmitter = rc<RocketParticleEmitter>::init(rocketParticleSystem, 2.5F);
     }
 
 public:
@@ -47,7 +47,7 @@ public:
         gfx::RenderingInfo rendering_info = {};
         rendering_info.renderArea = rendering_area;
         rendering_info.layerCount = 1;
-        rendering_info.colorAttachments[0].texture = drawable.texture;
+        rendering_info.colorAttachments[0].texture = drawable->texture;
         rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
         rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
         rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
@@ -57,7 +57,7 @@ public:
         shader_data.g_view_matrix = world_to_camera_matrix;
 
         commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer->setImageLayout(drawable->texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
         auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
         encoder->setScissor(0, rendering_area);
@@ -69,7 +69,7 @@ public:
 
         encoder->endEncoding();
 
-        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer->setImageLayout(drawable->texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer->end();
         commandBuffer->submit();
         commandBuffer->present(drawable);

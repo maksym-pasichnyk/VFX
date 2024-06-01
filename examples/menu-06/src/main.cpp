@@ -33,13 +33,13 @@ public:
         gfx::RenderingInfo rendering_info = {};
         rendering_info.renderArea = rendering_area;
         rendering_info.layerCount = 1;
-        rendering_info.colorAttachments[0].texture = drawable.texture;
+        rendering_info.colorAttachments[0].texture = drawable->texture;
         rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
         rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
         rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
 
         commandBuffer->begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer->setImageLayout(drawable->texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
         imgui->resetForNewFrame();
         _drawView(content);
@@ -50,7 +50,7 @@ public:
         imgui->draw(encoder);
         encoder->endEncoding();
 
-        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer->setImageLayout(drawable->texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer->end();
         commandBuffer->submit();
         commandBuffer->present(drawable);

@@ -16,22 +16,22 @@ private:
         gfx::DepthStencilStateDescription depthStencilStateDescription;
         depthStencilState = device->newDepthStencilState(depthStencilStateDescription);
 
-        gfx::RenderPipelineStateDescription renderPipelineStateDescription;
-        renderPipelineStateDescription.vertexFunction = vertexLibrary->newFunction("main");
-        renderPipelineStateDescription.fragmentFunction = fragmentLibrary->newFunction("main");
-        renderPipelineStateDescription.vertexInputState = {
-            .bindings = {
-                vk::VertexInputBindingDescription{0, sizeof(Vertex), vk::VertexInputRate::eVertex}
-            },
-            .attributes = {
-                vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, position)},
-                vk::VertexInputAttributeDescription{1, 0, vk::Format::eR32G32B32A32Sfloat, offsetof(Vertex, color)},
-                vk::VertexInputAttributeDescription{2, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, uv)},
-            }
+        auto vertexInputState = rc<gfx::VertexInputState>::init();
+        vertexInputState->bindings = {
+            vk::VertexInputBindingDescription{0, sizeof(Vertex), vk::VertexInputRate::eVertex}
+        };
+        vertexInputState->attributes = {
+            vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, position)},
+            vk::VertexInputAttributeDescription{1, 0, vk::Format::eR32G32B32A32Sfloat, offsetof(Vertex, color)},
+            vk::VertexInputAttributeDescription{2, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, uv)},
         };
 
-        renderPipelineStateDescription.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
-        renderPipelineStateDescription.colorBlendAttachments[0].setBlendEnable(false);
+        auto renderPipelineStateDescription = gfx::RenderPipelineStateDescription::init();
+        renderPipelineStateDescription->setVertexFunction(vertexLibrary->newFunction("main"));
+        renderPipelineStateDescription->setFragmentFunction(fragmentLibrary->newFunction("main"));
+        renderPipelineStateDescription->setVertexInputState(vertexInputState);
+        renderPipelineStateDescription->colorAttachmentFormats()[0] = vk::Format::eB8G8R8A8Unorm;
+        renderPipelineStateDescription->colorBlendAttachments()[0].setBlendEnable(false);
 
         render_pipeline_state = device->newRenderPipelineState(renderPipelineStateDescription);
         sampler = device->newSampler(vk::SamplerCreateInfo{
@@ -42,7 +42,6 @@ private:
             .addressModeV = vk::SamplerAddressMode::eRepeat,
             .addressModeW = vk::SamplerAddressMode::eRepeat,
         });
-
         texture = device->newTexture(gfx::TextureDescription{
             .width = 1,
             .height = 1,
@@ -86,7 +85,7 @@ public:
         gfx::RenderingInfo rendering_info = {};
         rendering_info.renderArea = rendering_area;
         rendering_info.layerCount = 1;
-        rendering_info.colorAttachments[0].texture = drawable.texture;
+        rendering_info.colorAttachments[0].texture = drawable->texture;
         rendering_info.colorAttachments[0].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
         rendering_info.colorAttachments[0].loadOp = vk::AttachmentLoadOp::eClear;
         rendering_info.colorAttachments[0].storeOp = vk::AttachmentStoreOp::eStore;
@@ -123,7 +122,7 @@ public:
 
         device->handle.updateDescriptorSets(2, writes, 0, nullptr, device->dispatcher);
 
-        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
+        commandBuffer->setImageLayout(drawable->texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2{}, vk::AccessFlagBits2::eColorAttachmentWrite);
 
         auto encoder = commandBuffer->newRenderCommandEncoder(rendering_info);
         encoder->setDepthStencilState(depthStencilState);
@@ -135,7 +134,7 @@ public:
         gltf_bundle.meshes.front()->draw(encoder);
         encoder->endEncoding();
 
-        commandBuffer->setImageLayout(drawable.texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
+        commandBuffer->setImageLayout(drawable->texture, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe, vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2{});
         commandBuffer->end();
         commandBuffer->submit();
         commandBuffer->present(drawable);

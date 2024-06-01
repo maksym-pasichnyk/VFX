@@ -47,29 +47,30 @@ private:
         auto vertexLibrary = mDevice->newLibrary(Assets::readFile("shaders/particles.vert.spv"));
         auto fragmentLibrary = mDevice->newLibrary(Assets::readFile("shaders/particles.frag.spv"));
 
-        gfx::RenderPipelineStateDescription renderPipelineStateDescription;
-        renderPipelineStateDescription.vertexFunction = vertexLibrary->newFunction("main");
-        renderPipelineStateDescription.fragmentFunction = fragmentLibrary->newFunction("main");
-        renderPipelineStateDescription.vertexInputState = {
-            .bindings = {
-                vk::VertexInputBindingDescription{0, sizeof(glm::vec3), vk::VertexInputRate::eVertex},
-                vk::VertexInputBindingDescription{1, sizeof(Instance), vk::VertexInputRate::eInstance}
-            },
-            .attributes = {
-                vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32B32Sfloat, 0},
-                vk::VertexInputAttributeDescription{1, 1, vk::Format::eR32G32B32Sfloat, offsetof(Instance, position)},
-                vk::VertexInputAttributeDescription{2, 1, vk::Format::eR32G32B32A32Sfloat, offsetof(Instance, color)},
-            }
+        auto vertexInputState = rc<gfx::VertexInputState>::init();
+        vertexInputState->bindings = {
+            vk::VertexInputBindingDescription{0, sizeof(glm::vec3), vk::VertexInputRate::eVertex},
+            vk::VertexInputBindingDescription{1, sizeof(Instance), vk::VertexInputRate::eInstance}
+        };
+        vertexInputState->attributes = {
+            vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32B32Sfloat, 0},
+            vk::VertexInputAttributeDescription{1, 1, vk::Format::eR32G32B32Sfloat, offsetof(Instance, position)},
+            vk::VertexInputAttributeDescription{2, 1, vk::Format::eR32G32B32A32Sfloat, offsetof(Instance, color)},
         };
 
-        renderPipelineStateDescription.colorAttachmentFormats[0] = vk::Format::eB8G8R8A8Unorm;
+        auto renderPipelineStateDescription = gfx::RenderPipelineStateDescription::init();
+        renderPipelineStateDescription->setVertexFunction(vertexLibrary->newFunction("main"));
+        renderPipelineStateDescription->setFragmentFunction(fragmentLibrary->newFunction("main"));
+        renderPipelineStateDescription->setVertexInputState(vertexInputState);
+
+        renderPipelineStateDescription->colorAttachmentFormats()[0] = vk::Format::eB8G8R8A8Unorm;
 //        description.depthStencilState->depth_test_enable = true;
 
-        renderPipelineStateDescription.colorBlendAttachments[0].setBlendEnable(true);
-        renderPipelineStateDescription.colorBlendAttachments[0].setColorBlendOp(vk::BlendOp::eAdd);
-        renderPipelineStateDescription.colorBlendAttachments[0].setAlphaBlendOp(vk::BlendOp::eAdd);
-        renderPipelineStateDescription.colorBlendAttachments[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
-        renderPipelineStateDescription.colorBlendAttachments[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
+        renderPipelineStateDescription->colorBlendAttachments()[0].setBlendEnable(true);
+        renderPipelineStateDescription->colorBlendAttachments()[0].setColorBlendOp(vk::BlendOp::eAdd);
+        renderPipelineStateDescription->colorBlendAttachments()[0].setAlphaBlendOp(vk::BlendOp::eAdd);
+        renderPipelineStateDescription->colorBlendAttachments()[0].setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
+        renderPipelineStateDescription->colorBlendAttachments()[0].setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
 
         mRenderPipelineState = mDevice->newRenderPipelineState(renderPipelineStateDescription);
     }
